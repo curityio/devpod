@@ -76,20 +76,29 @@ func RunSetupServer(
 	reader io.Reader,
 	writer io.WriteCloser,
 	allowGitCredentials, allowDockerCredentials bool,
-	mounts []*config.Mount,
+	setupInfo *config.Result,
 	log log.Logger,
 	options ...Option,
 ) (*config.Result, error) {
-	opts := append(options, []Option{
-		WithMounts(mounts),
+	options = append(options,
 		WithAllowGitCredentials(allowGitCredentials),
 		WithAllowDockerCredentials(allowDockerCredentials),
-		WithAllowKubeConfig(true),
-	}...)
-	tunnelServ := New(log, opts...)
-	tunnelServ.allowPlatformOptions = true
+	)
+	tunnelServ := newSetupServer(setupInfo, log, options...)
 
 	return tunnelServ.RunWithResult(ctx, reader, writer)
+}
+
+func newSetupServer(setupInfo *config.Result, log log.Logger, options ...Option) *tunnelServer {
+	options = append(options,
+		WithMounts(config.GetMounts(setupInfo)),
+		WithWorkspaceMount(config.GetWorkspaceMount(setupInfo)),
+		WithAllowKubeConfig(true),
+	)
+	tunnelServ := New(log, options...)
+	tunnelServ.allowPlatformOptions = true
+
+	return tunnelServ
 }
 
 func New(log log.Logger, options ...Option) *tunnelServer {
@@ -108,6 +117,8 @@ type tunnelServer struct {
 
 	// stream mounts
 	mounts []*config.Mount
+	// workspaceMount is the mount of the workspace folder, if known
+	workspaceMount *config.Mount
 
 	forwarder              netstat.Forwarder
 	allowGitCredentials    bool
@@ -449,18 +460,10 @@ func (t *tunnelServer) StreamWorkspace(
 		return fmt.Errorf("workspace is nil")
 	}
 
-	// Get .devpodignore files to exclude
-	excludes := []string{}
-	f, err := os.Open(filepath.Join(t.workspace.Source.LocalFolder, pkgconfig.IgnoreFileName))
-	if err == nil {
-		excludes, err = ignorefile.ReadAll(f)
-		if err != nil {
-			t.log.Warnf("error reading %s file: error=%v", pkgconfig.IgnoreFileName, err)
-		}
-	}
+	excludes := t.readIgnoreFile(t.workspace.Source.LocalFolder)
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err = extract.WriteTarExclude(buf, t.workspace.Source.LocalFolder, false, excludes)
+	err := extract.WriteTarExclude(buf, t.workspace.Source.LocalFolder, false, excludes)
 	if err != nil {
 		return err
 	}
@@ -491,16 +494,13 @@ func (t *tunnelServer) StreamMount(
 		return fmt.Errorf("mount %s is not allowed to download", message.Mount)
 	}
 
-	// Get .devpodignore files to exclude
-	excludes := []string{}
-	if t.workspace != nil {
-		f, err := os.Open(filepath.Join(t.workspace.Source.LocalFolder, pkgconfig.IgnoreFileName))
-		if err == nil {
-			excludes, err = ignorefile.ReadAll(f)
-			if err != nil {
-				t.log.Warnf("error reading %s file: error=%v", pkgconfig.IgnoreFileName, err)
-			}
-		}
+	// The ignore file only applies to the workspace folder, other bind mounts
+	// are streamed whole
+	var excludes []string
+	if t.workspaceMount != nil && mount.String() == t.workspaceMount.String() {
+		excludes = t.readIgnoreFile(mount.Source)
+	} else {
+		t.log.Debugf("stream mount %s without excludes, it is not the workspace mount", mount.String())
 	}
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
@@ -511,4 +511,30 @@ func (t *tunnelServer) StreamMount(
 
 	// make sure buffer is flushed
 	return buf.Flush()
+}
+
+// readIgnoreFile returns the exclude patterns of the ignore file in folder, or
+// nil if there is none.
+func (t *tunnelServer) readIgnoreFile(folder string) []string {
+	ignoreFile := filepath.Join(folder, pkgconfig.IgnoreFileName)
+	// #nosec G304 -- the ignore file of the workspace folder, which is streamed anyway
+	f, err := os.Open(ignoreFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.log.Debugf("no %s found, nothing is excluded", ignoreFile)
+		} else {
+			t.log.Warnf("error opening %s, nothing is excluded: error=%v", ignoreFile, err)
+		}
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+
+	excludes, err := ignorefile.ReadAll(f)
+	if err != nil {
+		t.log.Warnf("error reading %s, nothing is excluded: error=%v", ignoreFile, err)
+		return nil
+	}
+
+	t.log.Debugf("loaded %d exclude patterns from %s: %v", len(excludes), ignoreFile, excludes)
+	return excludes
 }

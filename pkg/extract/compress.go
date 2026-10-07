@@ -10,8 +10,9 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
+
+	"github.com/moby/patternmatcher"
 )
 
 func WriteTarExclude(
@@ -46,16 +47,20 @@ func WriteTarExclude(
 
 	// When its a file we copy the file to the toplevel of the tar
 	if !stat.IsDir() {
-		return NewArchiver(
-			filepath.Dir(absolute),
-			tarWriter,
-			excludedPaths,
-		).AddToArchive(filepath.Base(absolute))
+		archiver, err := NewArchiver(filepath.Dir(absolute), tarWriter, excludedPaths)
+		if err != nil {
+			return err
+		}
+		return archiver.AddToArchive(filepath.Base(absolute))
 	}
 
 	// When its a folder we copy the contents and not the folder itself to the
 	// toplevel of the tar
-	return NewArchiver(absolute, tarWriter, excludedPaths).AddToArchive("")
+	archiver, err := NewArchiver(absolute, tarWriter, excludedPaths)
+	if err != nil {
+		return err
+	}
+	return archiver.AddToArchive("")
 }
 
 func WriteTar(writer io.Writer, localPath string, compress bool) error {
@@ -68,22 +73,39 @@ type Archiver struct {
 	writer       *tar.Writer
 	writtenFiles map[string]bool
 
-	excludedPaths []string
+	// excludes holds the exclude patterns, with .dockerignore semantics. It is
+	// nil when nothing is excluded.
+	excludes *patternmatcher.PatternMatcher
 }
 
-// NewArchiver creates a new archiver.
-func NewArchiver(basePath string, writer *tar.Writer, excludedPaths []string) *Archiver {
+// NewArchiver creates a new archiver. excludedPaths are patterns relative to
+// basePath, with the same syntax as a .dockerignore file.
+func NewArchiver(basePath string, writer *tar.Writer, excludedPaths []string) (*Archiver, error) {
+	var excludes *patternmatcher.PatternMatcher
+	if len(excludedPaths) > 0 {
+		var err error
+		excludes, err = patternmatcher.New(excludedPaths)
+		if err != nil {
+			return nil, fmt.Errorf("parse exclude patterns: %w", err)
+		}
+	}
+
 	return &Archiver{
 		basePath:     basePath,
 		writer:       writer,
 		writtenFiles: map[string]bool{},
-
-		excludedPaths: excludedPaths,
-	}
+		excludes:     excludes,
+	}, nil
 }
 
 // AddToArchive adds a new path to the archive.
 func (a *Archiver) AddToArchive(relativePath string) error {
+	return a.addToArchive(relativePath, patternmatcher.MatchInfo{})
+}
+
+// addToArchive adds a path to the archive. parentInfo holds the exclude
+// results of the parent directory, or the zero value when they are unknown.
+func (a *Archiver) addToArchive(relativePath string, parentInfo patternmatcher.MatchInfo) error {
 	if a.writtenFiles[relativePath] {
 		return nil
 	}
@@ -95,34 +117,57 @@ func (a *Archiver) AddToArchive(relativePath string) error {
 		return nil
 	}
 
+	excluded, info, err := a.isExcluded(relativePath, parentInfo)
+	if err != nil {
+		return err
+	}
+
 	if stat.IsDir() {
-		// check if excluded
-		if a.isExcluded(path.Clean(relativePath) + "/") {
+		// Skip an excluded folder without reading it, unless a negation
+		// pattern could re-include something below it.
+		if excluded && !a.excludes.Exclusions() {
 			return nil
 		}
 
 		// Recursively tar folder
-		return a.tarFolder(relativePath, stat)
+		return a.tarFolder(relativePath, stat, excluded, info)
 	}
 
-	// check if excluded
-	if a.isExcluded(path.Clean(relativePath)) {
+	if excluded {
 		return nil
 	}
 	return a.tarFile(relativePath, stat)
 }
 
-func (a *Archiver) isExcluded(relativePath string) bool {
-	for _, excludePath := range a.excludedPaths {
-		if strings.HasPrefix(relativePath, excludePath) {
-			return true
-		}
+// isExcluded matches relativePath against the exclude patterns. It also
+// returns the match results to pass down to the path's children.
+func (a *Archiver) isExcluded(
+	relativePath string,
+	parentInfo patternmatcher.MatchInfo,
+) (bool, patternmatcher.MatchInfo, error) {
+	if a.excludes == nil {
+		return false, patternmatcher.MatchInfo{}, nil
 	}
 
-	return false
+	// Patterns are relative to the archive root, so the root itself never matches
+	relativePath = path.Clean(filepath.ToSlash(relativePath))
+	if relativePath == "." || relativePath == "/" {
+		return false, patternmatcher.MatchInfo{}, nil
+	}
+
+	excluded, info, err := a.excludes.MatchesUsingParentResults(relativePath, parentInfo)
+	if err != nil {
+		return false, info, fmt.Errorf("match %s against exclude patterns: %w", relativePath, err)
+	}
+	return excluded, info, nil
 }
 
-func (a *Archiver) tarFolder(target string, targetStat os.FileInfo) error {
+func (a *Archiver) tarFolder(
+	target string,
+	targetStat os.FileInfo,
+	excluded bool,
+	matchInfo patternmatcher.MatchInfo,
+) error {
 	filePath := path.Join(a.basePath, target)
 	files, err := os.ReadDir(filePath)
 	if err != nil {
@@ -130,7 +175,7 @@ func (a *Archiver) tarFolder(target string, targetStat os.FileInfo) error {
 		return nil
 	}
 
-	if len(files) == 0 && target != "" {
+	if len(files) == 0 && target != "" && !excluded {
 		return a.tarEmptyFolder(target, targetStat)
 	}
 
@@ -140,7 +185,7 @@ func (a *Archiver) tarFolder(target string, targetStat os.FileInfo) error {
 			continue
 		}
 
-		if err = a.AddToArchive(path.Join(target, f.Name())); err != nil {
+		if err = a.addToArchive(path.Join(target, f.Name()), matchInfo); err != nil {
 			return fmt.Errorf("recursive tar %s: %w", f.Name(), err)
 		}
 	}
