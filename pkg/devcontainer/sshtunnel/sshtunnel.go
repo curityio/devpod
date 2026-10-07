@@ -92,9 +92,32 @@ func ExecuteCommand(ctx context.Context, opts ExecuteCommandOptions) (*config2.R
 	})
 
 	result, err := waitForTunnelCompletion(cancelCtx, ts)
-	wg.Wait()
+
+	// Cancelling only sends a signal over SSH, which never arrives if the
+	// container is gone. Close the pipes as well, so the SSH client and the
+	// agent command see EOF and their goroutines return.
+	cancel()
+	ts.cleanup()
+	waitForGoroutines(&wg, opts.Log)
 
 	return result, err
+}
+
+// waitForGoroutines waits for the tunnel goroutines to return, but no longer
+// than cleanupTimeout, so a goroutine stuck on a dead connection cannot hang
+// the caller.
+func waitForGoroutines(wg *sync.WaitGroup, logger log.Logger) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(cleanupTimeout):
+		logger.Debug("timed out waiting for SSH tunnel goroutines to return")
+	}
 }
 
 func setupTunnelContext(opts ExecuteCommandOptions) (*sshSessionTunnel, error) {
@@ -124,8 +147,9 @@ func (ts *sshSessionTunnel) cleanup() {
 }
 
 // cleanupTimeout is how long waitForTunnelCompletion waits for goroutines
-// to report after the tunnel server has returned a valid result.
-const cleanupTimeout = 10 * time.Second
+// to report after the tunnel server has returned a valid result, and how long
+// ExecuteCommand then waits for them to return. It is a variable for tests.
+var cleanupTimeout = 10 * time.Second
 
 func waitForTunnelCompletion(ctx context.Context, ts *sshSessionTunnel) (*config2.Result, error) {
 	result, err := ts.opts.TunnelServerFunc(
@@ -190,17 +214,14 @@ type pipePair struct {
 	stdinWriter  *os.File
 }
 
+// Close closes all pipe ends. It can be called more than once. It does not
+// clear the fields, as the tunnel goroutines may still hold them.
 func (p *pipePair) Close() {
-	closeFile := func(fp **os.File) {
-		if *fp != nil {
-			_ = (*fp).Close()
-			*fp = nil
+	for _, f := range []*os.File{p.stdoutReader, p.stdoutWriter, p.stdinReader, p.stdinWriter} {
+		if f != nil {
+			_ = f.Close()
 		}
 	}
-	closeFile(&p.stdoutReader)
-	closeFile(&p.stdoutWriter)
-	closeFile(&p.stdinReader)
-	closeFile(&p.stdinWriter)
 }
 
 func createPipes() (*pipePair, error) {
