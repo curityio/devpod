@@ -25,6 +25,7 @@ import (
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/stdio"
 	"github.com/loft-sh/log"
+	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	perrors "github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -54,17 +55,26 @@ func RunUpServer(ctx context.Context, reader io.Reader, writer io.WriteCloser, a
 	return tunnelServ.RunWithResult(ctx, reader, writer)
 }
 
-func RunSetupServer(ctx context.Context, reader io.Reader, writer io.WriteCloser, allowGitCredentials, allowDockerCredentials bool, mounts []*config.Mount, log log.Logger, options ...Option) (*config.Result, error) {
+func RunSetupServer(ctx context.Context, reader io.Reader, writer io.WriteCloser, allowGitCredentials, allowDockerCredentials bool, setupInfo *config.Result, log log.Logger, options ...Option) (*config.Result, error) {
 	opts := append(options, []Option{
-		WithMounts(mounts),
 		WithAllowGitCredentials(allowGitCredentials),
 		WithAllowDockerCredentials(allowDockerCredentials),
+	}...)
+	tunnelServ := newSetupServer(setupInfo, log, opts...)
+
+	return tunnelServ.RunWithResult(ctx, reader, writer)
+}
+
+func newSetupServer(setupInfo *config.Result, log log.Logger, options ...Option) *tunnelServer {
+	opts := append(options, []Option{
+		WithMounts(config.GetMounts(setupInfo)),
+		WithWorkspaceMount(config.GetWorkspaceMount(setupInfo)),
 		WithAllowKubeConfig(true),
 	}...)
 	tunnelServ := New(log, opts...)
 	tunnelServ.allowPlatformOptions = true
 
-	return tunnelServ.RunWithResult(ctx, reader, writer)
+	return tunnelServ
 }
 
 func New(log log.Logger, options ...Option) *tunnelServer {
@@ -83,6 +93,8 @@ type tunnelServer struct {
 
 	// stream mounts
 	mounts []*config.Mount
+	// workspaceMount is the mount of the workspace folder, if known
+	workspaceMount *config.Mount
 
 	forwarder              netstat.Forwarder
 	allowGitCredentials    bool
@@ -372,18 +384,10 @@ func (t *tunnelServer) StreamWorkspace(message *tunnel.Empty, stream tunnel.Tunn
 		return fmt.Errorf("workspace is nil")
 	}
 
-	// Get .devpodignore files to exclude
-	excludes := []string{}
-	f, err := os.Open(filepath.Join(t.workspace.Source.LocalFolder, ".devpodignore"))
-	if err == nil {
-		excludes, err = ignorefile.ReadAll(f)
-		if err != nil {
-			t.log.Warnf("Error reading .devpodignore file: %v", err)
-		}
-	}
+	excludes := t.readIgnoreFile(t.workspace.Source.LocalFolder)
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err = extract.WriteTarExclude(buf, t.workspace.Source.LocalFolder, false, excludes)
+	err := extract.WriteTarWithOptions(buf, t.workspace.Source.LocalFolder, streamTarOptions(excludes))
 	if err != nil {
 		return err
 	}
@@ -408,24 +412,62 @@ func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tu
 		return fmt.Errorf("mount %s is not allowed to download", message.Mount)
 	}
 
-	// Get .devpodignore files to exclude
-	excludes := []string{}
-	if t.workspace != nil {
-		f, err := os.Open(filepath.Join(t.workspace.Source.LocalFolder, ".devpodignore"))
-		if err == nil {
-			excludes, err = ignorefile.ReadAll(f)
-			if err != nil {
-				t.log.Warnf("Error reading .devpodignore file: %v", err)
-			}
-		}
+	// The ignore file only applies to the workspace folder, other bind mounts
+	// are streamed whole
+	var excludes []string
+	if t.workspaceMount != nil && mount.String() == t.workspaceMount.String() {
+		excludes = t.readIgnoreFile(mount.Source)
+	} else {
+		t.log.Debugf("Stream mount %s without excludes, it is not the workspace mount", mount.String())
 	}
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err := extract.WriteTarExclude(buf, mount.Source, false, excludes)
+	err := extract.WriteTarWithOptions(buf, mount.Source, streamTarOptions(excludes))
 	if err != nil {
 		return err
 	}
 
 	// make sure buffer is flushed
 	return buf.Flush()
+}
+
+// ignoreFileName is the name of the file listing the paths not to stream.
+const ignoreFileName = ".devpodignore"
+
+// readIgnoreFile returns the exclude patterns of the ignore file in folder, or
+// nil if there is none or it is invalid.
+func (t *tunnelServer) readIgnoreFile(folder string) []string {
+	ignoreFile := filepath.Join(folder, ignoreFileName)
+	f, err := os.Open(ignoreFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.log.Debugf("No %s found, nothing is excluded", ignoreFile)
+		} else {
+			t.log.Warnf("Error opening %s, nothing is excluded: %v", ignoreFile, err)
+		}
+		return nil
+	}
+	defer f.Close()
+
+	excludes, err := ignorefile.ReadAll(f)
+	if err == nil {
+		_, err = patternmatcher.New(excludes)
+	}
+	if err != nil {
+		t.log.Warnf("Error reading %s, nothing is excluded: %v", ignoreFile, err)
+		return nil
+	}
+
+	t.log.Debugf("Loaded %d exclude patterns from %s: %v", len(excludes), ignoreFile, excludes)
+	return excludes
+}
+
+// streamTarOptions returns the options to stream a folder into the container
+// with excludes. The dockerless build context is always streamed whole, as the
+// build fails without it.
+func streamTarOptions(excludes []string) extract.TarOptions {
+	return extract.TarOptions{
+		Excludes:  excludes,
+		KeepNames: []string{config.DevPodContextFeatureFolder},
+	}
 }
