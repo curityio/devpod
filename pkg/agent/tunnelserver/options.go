@@ -51,6 +51,15 @@ func WithMounts(mounts []*config.Mount) Option {
 	}
 }
 
+// WithWorkspaceMount marks the mount of the workspace folder. Only that mount is
+// streamed with the excludes of its ignore file.
+func WithWorkspaceMount(mount *config.Mount) Option {
+	return func(s *tunnelServer) *tunnelServer {
+		s.workspaceMount = mount
+		return s
+	}
+}
+
 func WithPlatformOptions(options *devpod.PlatformOptions) Option {
 	return func(s *tunnelServer) *tunnelServer {
 		s.platformOptions = options

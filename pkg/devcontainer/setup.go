@@ -131,7 +131,7 @@ func (r *runner) setupContainer(
 			stdin,
 			r.WorkspaceConfig.Agent.InjectGitCredentials != "false",
 			r.WorkspaceConfig.Agent.InjectDockerCredentials != "false",
-			config.GetMounts(result),
+			result,
 			r.Log,
 			tunnelserver.WithPlatformOptions(&r.WorkspaceConfig.CLIOptions.Platform),
 		)
