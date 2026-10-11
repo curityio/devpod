@@ -221,7 +221,13 @@ func (c *ContainerTunnel) runInContainer(ctx context.Context, sshClient *ssh.Cli
 		}
 		err = devssh.Run(cancelCtx, sshClient, command, stdinReader, stdoutWriter, writer, envVars)
 		if err != nil {
-			c.log.Errorf("Error tunneling to container: %v", err)
+			// The tunnel is cancelled once the handler is done, which closes
+			// the session before the command can send its exit status
+			if cancelCtx.Err() != nil {
+				c.log.Debugf("Container tunnel closed: %v", err)
+			} else {
+				c.log.Errorf("Error tunneling to container: %v", err)
+			}
 			return
 		}
 	}()
