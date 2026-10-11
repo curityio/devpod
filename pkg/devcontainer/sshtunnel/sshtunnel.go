@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/loft-sh/log"
 
@@ -142,5 +143,18 @@ func ExecuteCommand(
 		return result, err
 	}
 
-	return result, <-errChan
+	// If the container is gone, the other goroutine's SSH session never sees
+	// EOF, as the pipes are only closed when this function returns. Do not
+	// wait for it forever.
+	select {
+	case err := <-errChan:
+		return result, err
+	case <-time.After(cleanupTimeout):
+		log.Debugf("Timed out waiting for the SSH tunnel to close")
+		return result, nil
+	}
 }
+
+// cleanupTimeout is how long ExecuteCommand waits for the second goroutine to
+// return after the first one did. It is a variable for tests.
+var cleanupTimeout = 10 * time.Second
