@@ -1,7 +1,6 @@
-FROM mcr.microsoft.com/vscode/devcontainers/ruby:3.2-bullseye AS base
+FROM mcr.microsoft.com/devcontainers/ruby:3.2-bookworm AS base
 
-RUN apt update
-RUN apt install vim -y
+RUN apt-get update && apt-get install -y vim
 
 FROM base
 
