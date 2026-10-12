@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -342,9 +343,13 @@ var _ = DevPodDescribe("devpod up test suite", func() {
 				err = dockerHelper.Inspect(ctx, ids, "container", &containerDetails)
 				framework.ExpectNoError(err)
 
-				containerDetail := containerDetails[0]
-				gomega.Expect(containerDetail.HostConfig.CapAdd).To(gomega.ContainElement("SYS_PTRACE"), "image capabilities are not duplicated")
-				gomega.Expect(containerDetail.HostConfig.CapAdd).To(gomega.ContainElement("NET_ADMIN"), "devcontainer configuration can add capabilities")
+				// Newer Docker Engines report capabilities with the CAP_ prefix.
+				capAdd := []string{}
+				for _, c := range containerDetails[0].HostConfig.CapAdd {
+					capAdd = append(capAdd, strings.TrimPrefix(c, "CAP_"))
+				}
+				gomega.Expect(capAdd).To(gomega.ContainElement("SYS_PTRACE"), "image capabilities are not duplicated")
+				gomega.Expect(capAdd).To(gomega.ContainElement("NET_ADMIN"), "devcontainer configuration can add capabilities")
 			}, ginkgo.SpecTimeout(framework.GetTimeout()))
 
 			ginkgo.It("should start a new workspace with securityOpt", func(ctx context.Context) {
