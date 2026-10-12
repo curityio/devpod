@@ -22,7 +22,6 @@ const initialSettings: TSettings = {
 
   experimental_colorMode: "light",
   experimental_multiDevcontainer: false,
-  experimental_fleet: true,
   experimental_jupyterNotebooks: true,
   experimental_vscodeInsiders: true,
   experimental_cursor: true,

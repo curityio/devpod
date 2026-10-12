@@ -43,8 +43,6 @@ var _ = DevPodDescribe("devpod ide test suite", func() {
 			err = f.DevPodUpWithIDE(ctx, tempDir, "--open-ide=false", "--ide=jupyternotebook")
 			framework.ExpectNoError(err)
 
-			// Fleet is not tested: JetBrains discontinued it and no longer serves its downloads.
-
 			// check if ssh works
 			err = f.DevPodSSHEchoTestString(ctx, tempDir)
 			framework.ExpectNoError(err)

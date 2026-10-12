@@ -21,14 +21,14 @@ func NewDockerCredentialsHelperCmd(flags *flags.GlobalFlags) *cobra.Command {
 	cmd := &DockerCredentialsHelperCmd{
 		GlobalFlags: flags,
 	}
-	fleetCmd := &cobra.Command{
+	dockerCredentialsCmd := &cobra.Command{
 		Use:   "setup-docker-credentials-helper",
 		Short: "Setup the docker credentials helper manually",
 		Args:  cobra.NoArgs,
 		RunE:  cmd.Run,
 	}
 
-	return fleetCmd
+	return dockerCredentialsCmd
 }
 
 func (c *DockerCredentialsHelperCmd) Run(cmd *cobra.Command, _ []string) error {
