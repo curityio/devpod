@@ -242,7 +242,7 @@ func (t *tunnelServer) GitCredentials(ctx context.Context, message *tunnel.Messa
 			}
 		}
 	} else {
-		if t.workspace.Source.GitRepository != "" {
+		if t.workspace != nil && t.workspace.Source.GitRepository != "" {
 			path, err := gitcredentials.GetHTTPPath(ctx, gitcredentials.GetHttpPathParameters{
 				Host:        credentials.Host,
 				Protocol:    credentials.Protocol,

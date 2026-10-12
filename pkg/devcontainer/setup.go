@@ -134,6 +134,7 @@ func (r *runner) setupContainer(
 			result,
 			r.Log,
 			tunnelserver.WithPlatformOptions(&r.WorkspaceConfig.CLIOptions.Platform),
+			tunnelserver.WithWorkspace(r.WorkspaceConfig.Workspace),
 		)
 	}
 
