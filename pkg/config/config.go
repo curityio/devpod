@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/loft-sh/devpod/pkg/file"
 	"github.com/loft-sh/devpod/pkg/types"
 	"github.com/pkg/errors"
 )
@@ -296,7 +297,7 @@ func SaveConfig(config *Config) error {
 		return err
 	}
 
-	err = os.WriteFile(configOrigin, out, 0600)
+	err = file.WriteFileAtomic(configOrigin, out, 0600)
 	if err != nil {
 		return err
 	}

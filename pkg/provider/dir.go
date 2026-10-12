@@ -11,6 +11,7 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/config"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
+	"github.com/loft-sh/devpod/pkg/file"
 	"github.com/loft-sh/devpod/pkg/id"
 )
 
@@ -183,7 +184,7 @@ func SaveProviderConfig(context string, provider *ProviderConfig) error {
 	}
 
 	providerConfigFile := filepath.Join(providerDir, ProviderConfigFile)
-	err = os.WriteFile(providerConfigFile, providerDirBytes, 0600)
+	err = file.WriteFileAtomic(providerConfigFile, providerDirBytes, 0600)
 	if err != nil {
 		return err
 	}
@@ -208,7 +209,7 @@ func SaveProInstanceConfig(context string, proInstance *ProInstance) error {
 	}
 
 	proInstanceConfigFile := filepath.Join(providerDir, ProInstanceConfigFile)
-	err = os.WriteFile(proInstanceConfigFile, proInstanceBytes, 0600)
+	err = file.WriteFileAtomic(proInstanceConfigFile, proInstanceBytes, 0600)
 	if err != nil {
 		return err
 	}
@@ -233,7 +234,7 @@ func SaveWorkspaceResult(workspace *Workspace, result *config2.Result) error {
 	}
 
 	workspaceResultFile := filepath.Join(workspaceDir, WorkspaceResultFile)
-	err = os.WriteFile(workspaceResultFile, resultBytes, 0600)
+	err = file.WriteFileAtomic(workspaceResultFile, resultBytes, 0600)
 	if err != nil {
 		return err
 	}
@@ -258,7 +259,7 @@ func SaveWorkspaceConfig(workspace *Workspace) error {
 	}
 
 	workspaceConfigFile := filepath.Join(workspaceDir, WorkspaceConfigFile)
-	err = os.WriteFile(workspaceConfigFile, workspaceConfigBytes, 0644)
+	err = file.WriteFileAtomic(workspaceConfigFile, workspaceConfigBytes, 0644)
 	if err != nil {
 		return err
 	}
@@ -283,7 +284,7 @@ func SaveMachineConfig(machine *Machine) error {
 	}
 
 	machineConfigFile := filepath.Join(machineDir, MachineConfigFile)
-	err = os.WriteFile(machineConfigFile, machineConfigBytes, 0600)
+	err = file.WriteFileAtomic(machineConfigFile, machineConfigBytes, 0600)
 	if err != nil {
 		return err
 	}
