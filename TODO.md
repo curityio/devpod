@@ -26,3 +26,13 @@ in `curityio/devpod`. Copy the relevant information into our docs (or recreate t
 - [ ] `docs/pages/troubleshooting/ide-troubleshooting.mdx`: issue [#1187](https://github.com/loft-sh/devpod/issues/1187) (NeoVim `$TERM` workaround)
 - [ ] `docs/pages/troubleshooting/linux-troubleshooting.mdx`: issue [#1045](https://github.com/loft-sh/devpod/issues/1045) (SSH connection string too long)
 - [ ] `desktop/flatpak/DevPod.metainfo.xml`: release notes for [v0.6.10](https://github.com/loft-sh/devpod/releases/tag/v0.6.10)
+
+## Replace the desktop app update signing key
+
+The Tauri updater verifies every update against `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json`,
+which is still Loft's public key. Our releases are signed with the `TAURI_PRIVATE_KEY` secret, so the app will reject them
+unless the keys match:
+
+- [ ] Generate a new key pair with `tauri signer generate`
+- [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
+- [ ] Replace `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` with the new public key
