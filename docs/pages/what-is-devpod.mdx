@@ -3,28 +3,45 @@ title: What is DevPod?
 sidebar_label: What is DevPod?
 ---
 
+import ThemedImage from "@theme/ThemedImage";
+import useBaseUrl from "@docusaurus/useBaseUrl";
+
+:::note
+This project is a fork of [loft-sh/devpod](https://github.com/loft-sh/devpod).
+It is a **hard fork**: [Curity](https://curity.io/) plans to reduce the scope of the project and focus only on
+setting up [devcontainers](https://containers.dev/) and making it simpler to run workloads in them.
+:::
+
+<p>
+  <ThemedImage
+    alt="DevPod logo"
+    width="500"
+    sources={{
+      light: useBaseUrl("/media/devpod-logo-curity.svg"),
+      dark: useBaseUrl("/media/devpod-logo-curity-dark.svg"),
+    }}
+  />
+</p>
+<p>
+  <a href="https://curity.io/">
+    <ThemedImage
+      alt="Curity logo"
+      width="200"
+      sources={{
+        light: useBaseUrl("/media/curity-logo.svg"),
+        dark: useBaseUrl("/media/curity-logo-dark.svg"),
+      }}
+    />
+  </a>
+</p>
+
 DevPod is a tool used to create reproducible developer environments. Each developer environment runs in a separate container and is specified through a [devcontainer.json](https://containers.dev/). [DevPod providers](./managing-providers/what-are-providers) can create these containers on the local computer, any reachable remote machine, or in a public or private cloud. It's also possible to extend DevPod and write your own custom providers.
 
-<figure>
-  <img src={require("@site/static/media/devpod-flow.gif").default} alt="DevPod Flow" />
-  <figcaption>DevPod</figcaption>
-</figure>
-
 You can think of DevPod as the glue connecting your local IDE to a machine you want to use for development. So depending on your project's requirements, you can create a workspace locally on the computer, a powerful cloud machine, or a spare remote computer. Within DevPod, every workspace is managed the same way, which also makes it easy to switch between workspaces that might be hosted somewhere else.
-
-
-<figure>
-  <img src={require("@site/static/media/devpod-architecture-2.png").default} alt="DevPod Architecture" />
-  <figcaption>DevPod - Architecture</figcaption>
-</figure>
 
 ## Why DevPod?
 
 DevPod reuses the open [DevContainer standard](https://containers.dev/) to create a consistent developer experience no matter what backend you want to use.
-
-<figure>
-  <img src={require("@site/static/media/codespaces-but.png").default} alt="What is DevPod" />
-</figure>
 
 Compared to hosted services such as Github Codespaces, JetBrains Spaces or Google Cloud Workstations, DevPod has the following advantages:
 * **Cost savings**: DevPod is usually around 5-10 times cheaper than existing services with comparable feature sets, because it uses bare virtual machines and shuts down unused virtual machines automatically.
