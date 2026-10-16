@@ -1,16 +1,10 @@
 import React from 'react';
-import Layout from '@theme/Layout';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {Redirect} from '@docusaurus/router';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
+// GitHub Pages has no server-side redirects, so send the site root to the first docs page here.
 function Home() {
-  const context = useDocusaurusContext();
-  const {siteConfig = {}} = context;
-  return (
-    <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
-    </Layout>
-  );
+  return <Redirect to={useBaseUrl('/what-is-devpod')} />;
 }
 
 export default Home;

@@ -77,7 +77,7 @@ service/kubernetes   ClusterIP   xxx.yyy.zzz.qqq    <none>        443/TCP   4d14
 
 ## Install Devpods
 
-Using the Devpods install for Linux deb [docs](https://devpod.sh/docs/getting-started/install)
+Using the Devpods install for Linux deb [docs](https://curityio.github.io/devpod/getting-started/install)
 
 Download the deb install
 
@@ -186,7 +186,7 @@ kube-system       Active   12d
 Add a provider via 'Providers' > '+ Add'. Select the kubernetes provider.
 
 <figure>
-  <img src="/docs/media/add-provider-1.png" alt="DevPod Flow" />
+  <img src={require("@site/static/media/add-provider-1.png").default} alt="DevPod Flow" />
   <figcaption>Select Provider</figcaption>
 </figure>
 
@@ -200,7 +200,7 @@ Add a provider via 'Providers' > '+ Add'. Select the kubernetes provider.
 | Kubernetes Config | /home/dev/.kube/config |
 
 <figure>
-  <img src="/docs/media/create-workspace-virtualbox-kubernetes-provider-configuration.png" alt="DevPod Flow" />
+  <img src={require("@site/static/media/create-workspace-virtualbox-kubernetes-provider-configuration.png").default} alt="DevPod Flow" />
   <figcaption>Kubernetes Provider Configuration</figcaption>
 </figure>
 
@@ -213,20 +213,20 @@ Select **Add Provider**
 Navigate to 'Workspaces' > '+ Create'. Enter your project url or choose one of the quickstart examples. Make sure to select 'VS Code Browser' under 'Default IDE'
 
 <figure>
-  <img src="/docs/media/create-workspace-virtualbox-workspace.png" alt="DevPod Flow" />
+  <img src={require("@site/static/media/create-workspace-virtualbox-workspace.png").default} alt="DevPod Flow" />
   <figcaption>Create Workspace</figcaption>
 </figure>
 
 Then press 'Create Workspace'.
 
 <figure>
-  <img src="/docs/media/create-workspace-virtualbox-workspace-create.png" alt="DevPod Flow" />
+  <img src={require("@site/static/media/create-workspace-virtualbox-workspace-create.png").default} alt="DevPod Flow" />
   <figcaption>Create Workspace</figcaption>
 </figure>
 
 A new window appears showing DevPod starting the workspace. After the workspace was created, VS Code should open automatically connected to the DevContainer.
 
 <figure>
-  <img src="/docs/media/create-workspace-vscode-browser-2.png" alt="DevPod Flow" />
+  <img src={require("@site/static/media/create-workspace-vscode-browser-2.png").default} alt="DevPod Flow" />
   <figcaption>VS Code opens automatically in the browser</figcaption>
 </figure>

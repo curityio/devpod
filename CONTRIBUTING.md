@@ -48,7 +48,7 @@ The application should be in `desktop/src-tauri/target/release`
 
 ## Provider
 
-Head over to [the docs](https://devpod.sh/docs/developing-providers/quickstart)
+Head over to [the docs](https://curityio.github.io/devpod/developing-providers/quickstart)
 for an introduction into developing your own providers
 
 ### Publish your provider

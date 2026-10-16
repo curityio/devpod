@@ -36,3 +36,10 @@ unless the keys match:
 - [ ] Generate a new key pair with `tauri signer generate`
 - [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
 - [ ] Replace `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` with the new public key
+
+## Host the IDE and provider icons ourselves
+
+The IDE icons (`pkg/ide/ideparse/parse.go`) and the built-in provider icons (`providers/*/provider.yaml`) are loaded from
+Loft's website, `https://devpod.sh/assets/...`:
+
+- [ ] Copy the icons into this repository (e.g. the docs site's static files) and point the URLs at our copies
