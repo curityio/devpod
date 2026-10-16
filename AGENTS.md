@@ -14,7 +14,7 @@ VMs). [CHANGELOG.md](CHANGELOG.md) lists what the fork changed and [TODO.md](TOD
 | `pkg/` | Core Go code: `devcontainer/` (parsing, building and running dev containers), `driver/` (docker, kubernetes, custom), `workspace/`, `provider/`, `client/`, `agent/` (agent injection and the gRPC tunnel between CLI and agent), `ide/`, `ssh/`, `credentials/`, `config/`. |
 | `providers/` | The built-in `docker` and `kubernetes` provider definitions, embedded into the binary. Other providers live in separate repos. |
 | `desktop/` | The desktop app: Tauri 2 (Rust, `desktop/src-tauri`) with a React/TypeScript UI (`desktop/src`). It runs the `devpod` CLI as a sidecar. |
-| `docs/` | Docusaurus documentation site. |
+| `docs/` | Docusaurus documentation site, deployed to [curityio.github.io/devpod](https://curityio.github.io/devpod/) by `.github/workflows/docs.yaml` on pushes to `main`. |
 | `e2e/` | Ginkgo end-to-end tests that run the real CLI against Docker, Podman and a kind cluster. |
 | `hack/` | Build and test scripts. |
 | `examples/` | Sample devcontainer projects, also used by the e2e tests. |
