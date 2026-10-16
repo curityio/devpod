@@ -98,12 +98,6 @@ jobs:
             os: darwin
             arch: arm64
             cli_only: false
-          # The WIX version we use for the installer (latest 3.something) doesn't support arm builds - if we need to support arm windows,
-          # we'd need to switch the installer toolchain to WIX 4.xx, not sure how that works out with tauri
-          # - host: windows-latest
-          #   target: aarch64-pc-windows-msvc
-          #   arch: arm64
-          #   cli-only: false
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             arch: amd64
@@ -487,18 +481,6 @@ jobs:
           export DESKTOP_SHA256=$(sha256sum "${desktopPath}" | cut -f1 -d ' ')
           export META_SHA256=$(sha256sum "${metaPath}" | cut -f1 -d ' ')
           envsubst < desktop/flatpak/sh.loft.devpod.tmpl > desktop/flatpak/sh.loft.devpod.yaml
-
-      # - name: Updates flatpak manifest in flathub
-      #   uses: dmnemec/copy_file_to_another_repo_action@master
-      #   env:
-      #     API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
-      #   with:
-      #     source_file: 'desktop/flatpak/sh.loft.DevPod.yaml'
-      #     destination_repo: 'flathub/sh.loft.DevPod'
-      #     destination_folder: ''
-      #     user_email: 'bot@loft.sh'
-      #     user_name: 'loftbot'
-      #     commit_message: 'Update flatpak manifest with latest release'
 
   publish-updates:
     needs: [build-app, create-release]
