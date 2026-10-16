@@ -259,7 +259,7 @@ func (cmd *StartCmd) upgrade() error {
 		// Retry Loft installation
 		err = upgradeRelease(chartName, chartRepo, cmd.Context, cmd.Namespace, extraArgs, cmd.Log)
 		if err != nil {
-			return errors.New(err.Error() + fmt.Sprintf("\n\nExisting installation failed. Reach out to get help:\n- via Slack: %s (fastest option)\n- via Online Chat: %s\n- via Email: %s\n", ansi.Color("https://slack.loft.sh/", "green+b"), ansi.Color("https://loft.sh/", "green+b"), ansi.Color("support@loft.sh", "green+b")))
+			return errors.New(err.Error() + fmt.Sprintf("\n\nExisting installation failed. Reach out to get help by opening an issue at: %s\n", ansi.Color("https://github.com/curityio/devpod/issues", "green+b")))
 		}
 	}
 
@@ -351,8 +351,6 @@ Login via CLI: %s
 
 !!! You must accept the untrusted certificate in your browser !!!
 
-Follow this guide to add a valid certificate: %s
-
 #################################################################
 
 DevPod Pro was successfully installed and can now be reached at: %s
@@ -361,7 +359,6 @@ Thanks for using DevPod Pro!
 `,
 			ansi.Color(url, "green+b"),
 			ansi.Color("devpod pro login "+url, "green+b"),
-			"https://loft.sh/docs/administration/ssl",
 			url))
 	}
 	ready, err := isHostReachable(ctx, host)

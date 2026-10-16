@@ -73,13 +73,13 @@ func WaitForPodReady(ctx context.Context, kubeClient kubernetes.Interface, names
 					Container: "manager",
 				}).Do(context.Background()).Raw()
 				if err != nil {
-					return false, fmt.Errorf("there seems to be an issue with %s starting up: %s (%s). Please reach out to our support at https://loft.sh/", "DevPod Pro", message, reason)
+					return false, fmt.Errorf("there seems to be an issue with %s starting up: %s (%s). Please open an issue at https://github.com/curityio/devpod/issues", "DevPod Pro", message, reason)
 				}
 				if strings.Contains(string(out), "register instance: Post \"https://license.loft.sh/register\": dial tcp") {
-					return false, fmt.Errorf("%[1]s logs: \n%[2]v \nThere seems to be an issue with %[1]s starting up. Looks like you try to install %[1]s into an air-gapped environment, please reach out to our support at https://loft.sh/ for an offline license", "DevPod Pro", string(out))
+					return false, fmt.Errorf("%[1]s logs: \n%[2]v \nThere seems to be an issue with %[1]s starting up. Looks like you try to install %[1]s into an air-gapped environment, please open an issue at https://github.com/curityio/devpod/issues for an offline license", "DevPod Pro", string(out))
 				}
 
-				return false, fmt.Errorf("%[1]s logs: \n%v \nThere seems to be an issue with %[1]s starting up: %[2]s (%[3]s). Please reach out to our support at https://loft.sh/", "DevPod Pro", string(out), message, reason)
+				return false, fmt.Errorf("%[1]s logs: \n%v \nThere seems to be an issue with %[1]s starting up: %[2]s (%[3]s). Please open an issue at https://github.com/curityio/devpod/issues", "DevPod Pro", string(out), message, reason)
 			} else if containerStatus.State.Waiting != nil && time.Now().After(now.Add(time.Second*10)) {
 				if containerStatus.State.Waiting.Message != "" {
 					log.Infof("Please keep waiting, %s container is still starting up: %s (%s)", "DevPod Pro", containerStatus.State.Waiting.Message, containerStatus.State.Waiting.Reason)

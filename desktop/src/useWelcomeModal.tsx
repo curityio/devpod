@@ -16,7 +16,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router"
 import { client } from "./client"
-import { LoftOSSBadge, Step, Steps, useInstallCLI } from "./components"
+import { CurityBadge, Step, Steps, useInstallCLI } from "./components"
 import { Briefcase, CommandLine, DevpodWordmark } from "./icons"
 import { Routes } from "./routes"
 
@@ -85,7 +85,7 @@ export function useWelcomeModal() {
                       </Heading>
                       <DevpodWordmark width="40" height="16" />
                     </HStack>
-                    <LoftOSSBadge />
+                    <CurityBadge />
                   </HStack>
 
                   <Text fontWeight="bold">
@@ -117,7 +117,7 @@ export function useWelcomeModal() {
                   <Text>
                     DevPod ships with a powerful CLI that allows you to create, manage and connect
                     to your workspaces and providers. You can either{" "}
-                    <Link onClick={() => client.open("https://github.com/loft-sh/devpod/releases")}>
+                    <Link onClick={() => client.open("https://github.com/curityio/devpod/releases")}>
                       download the standalone binary
                     </Link>{" "}
                     or directly add it to your <Code>$PATH</Code>.

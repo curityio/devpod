@@ -35,19 +35,7 @@ module.exports = {
           position: "left",
         },
         {
-          href: "https://loft.sh/blog",
-          label: "Blog",
-          position: "left",
-          target: "_self",
-        },
-        {
-          href: "https://slack.loft.sh/",
-          className: "slack-link",
-          "aria-label": "Slack",
-          position: "right",
-        },
-        {
-          href: "https://github.com/loft-sh/devpod",
+          href: "https://github.com/curityio/devpod",
           className: "github-link",
           "aria-label": "GitHub",
           position: "right",
@@ -65,7 +53,7 @@ module.exports = {
     footer: {
       style: "light",
       links: [],
-      copyright: `Copyright © ${new Date().getFullYear()} <a href="https://loft.sh/">Loft Labs, Inc.</a>`,
+      copyright: `Copyright © ${new Date().getFullYear()} <a href="https://curity.io/">Curity AB</a>`,
     },
   },
   presets: [
@@ -76,7 +64,7 @@ module.exports = {
           path: "pages",
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/loft-sh/devpod/edit/main/docs/",
+          editUrl: "https://github.com/curityio/devpod/edit/main/docs/",
         },
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
