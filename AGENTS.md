@@ -86,7 +86,7 @@ cd src-tauri && cargo +stable check
   `devpod pro`, proxy providers or Tailscale no longer apply.
 - **Telemetry still goes to Loft.** Release builds send CLI usage events to `analytics.loft.rocks` (through
   `github.com/loft-sh/analytics-client`, in `pkg/telemetry`) unless the context option `TELEMETRY=false` or
-  `DEVPOD_DISABLE_TELEMETRY=true` is set. Dev builds don't send any.
+  `DEVPOD_DISABLE_TELEMETRY=true` is set. Dev builds don't send any (tracked in `TODO.md`).
 - **The desktop updater can't verify our releases yet.** The public key in `desktop/src-tauri/tauri.conf.json` is
   still Loft's, so updates will be rejected until it is replaced (tracked in `TODO.md`).
 - **External providers are still upstream's.** Providers other than `docker` and `kubernetes` (aws, gcloud, ssh,
