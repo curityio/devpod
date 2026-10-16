@@ -85,7 +85,7 @@ export function useWelcomeModal() {
                     cloud. It&apos;s also possible to extend DevPod and write your own custom
                     providers. <br />
                     For more information, head over to our{" "}
-                    <Link onClick={() => client.open("https://curityio.github.io/devpod")}>
+                    <Link onClick={() => client.open("https://devpod.curityio.net")}>
                       documentation.
                     </Link>
                   </Text>

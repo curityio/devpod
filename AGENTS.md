@@ -14,7 +14,7 @@ VMs). [CHANGELOG.md](CHANGELOG.md) lists what the fork changed and [TODO.md](TOD
 | `pkg/` | Core Go code: `devcontainer/` (parsing, building and running dev containers), `driver/` (docker, kubernetes, custom), `workspace/`, `provider/`, `client/`, `agent/` (agent injection and the gRPC tunnel between CLI and agent), `ide/`, `ssh/`, `credentials/`, `config/`. |
 | `providers/` | The built-in `docker` and `kubernetes` provider definitions, embedded into the binary. Other providers live in separate repos. |
 | `desktop/` | The desktop app: Tauri 2 (Rust, `desktop/src-tauri`) with a React/TypeScript UI (`desktop/src`). It runs the `devpod` CLI as a sidecar. |
-| `docs/` | Docusaurus documentation site, deployed to [curityio.github.io/devpod](https://curityio.github.io/devpod/) by `.github/workflows/docs.yaml` on pushes to `main`. |
+| `docs/` | Docusaurus documentation site, deployed to [devpod.curityio.net](https://devpod.curityio.net/) (GitHub Pages with a custom domain, so `baseUrl` is `/`) by `.github/workflows/docs.yaml` on pushes to `main`. |
 | `e2e/` | Ginkgo end-to-end tests that run the real CLI against Docker, Podman and a kind cluster. |
 | `hack/` | Build and test scripts. |
 | `examples/` | Sample devcontainer projects, also used by the e2e tests. |
@@ -87,7 +87,7 @@ cd src-tauri && cargo +stable check
 - **Telemetry is disabled.** `pkg/telemetry` only has a no-op collector; the hooks stay so it can be re-enabled
   when Curity has a backend for it (tracked in `TODO.md`).
 - **Icons are served from the docs site.** The IDE and provider icon URLs point at `docs/static/icons/`, published at
-  `https://curityio.github.io/devpod/icons/`. Add new icons there (Docusaurus uses `/assets/` for its own output).
+  `https://devpod.curityio.net/icons/`. Add new icons there (Docusaurus uses `/assets/` for its own output).
 - **External providers are still upstream's.** Providers other than `docker` and `kubernetes` (aws, gcloud, ssh,
   ...) are still under the `loft-sh` GitHub organization (tracked in `TODO.md`).
 - **Where state lives.** Local state is in `~/.devpod` (override with `DEVPOD_HOME`): contexts, provider configs,

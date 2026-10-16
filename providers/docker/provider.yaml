@@ -1,6 +1,6 @@
 name: docker
 version: v0.0.1
-icon: https://curityio.github.io/devpod/icons/docker.svg
+icon: https://devpod.curityio.net/icons/docker.svg
 home: https://github.com/curityio/devpod
 description: |-
   DevPod on Docker
