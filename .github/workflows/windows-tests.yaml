@@ -1,0 +1,47 @@
+name: Windows tests
+
+# Runs on GitHub-hosted Windows runners. They can't run Linux containers, so the Docker e2e tests
+# (e2e-tests.yaml) only run on Linux; this checks that the CLI builds and its unit tests pass on Windows.
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**.go"
+      - "go.mod"
+      - ".github/workflows/windows-tests.yaml"
+
+concurrency:
+  group: windows-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  GO111MODULE: on
+  GOFLAGS: -mod=vendor
+
+jobs:
+  windows-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Git set line ending
+        run: |
+          git config --global core.autocrlf false
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build CLI
+        run: |
+          go build -ldflags "-s -w" -o devpod-windows-amd64.exe
+
+      - name: Unit tests
+        run: |
+          go test ./pkg/... ./cmd/...
