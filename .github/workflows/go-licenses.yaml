@@ -17,6 +17,9 @@ concurrency:
 jobs:
   update-licenses:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Check out code
@@ -36,11 +39,16 @@ jobs:
         # GOROOT at it; otherwise go-licenses doesn't recognize standard library packages
         run: GOROOT="$(go env GOROOT)" go-licenses report ./... > docs/pages/licenses/devpod.mdx --template .github/licenses.tmpl --ignore github.com/loft-sh
 
+      - name: Point license links at this repository
+        # go-licenses builds the links from the Go module path, which is still github.com/loft-sh/devpod
+        run: sed -i 's#https://github.com/loft-sh/devpod/blob/HEAD/#https://github.com/curityio/devpod/blob/HEAD/#g' docs/pages/licenses/devpod.mdx
+
       - name: Create pull request
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
-          committer: Loft Bot <loft-bot@users.noreply.github.com>
+          token: ${{ secrets.GITHUB_TOKEN }}
+          committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
           branch: licenses/devpod
           commit-message: "license(DevPod): Updated OSS licenses"
           title: "license(DevPod): Updated OSS licenses"
