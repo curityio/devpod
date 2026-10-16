@@ -32,6 +32,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- The documentation is published on this repository's GitHub Pages site,
+  [curityio.github.io/devpod](https://curityio.github.io/devpod/), instead of Loft's devpod.sh
+  ([#9](https://github.com/curityio/devpod/pull/9)). Links in the README, guides and desktop app point
+  there. The Netlify config and Loft's Algolia search are removed, so the docs have no search for now.
 - The desktop app checks for updates in `curityio/devpod` GitHub releases instead of Loft's update
   server ([#7](https://github.com/curityio/devpod/pull/7)).
 - Links point to `curityio/devpod` instead of `loft-sh/devpod`, the README has a hard-fork note and
