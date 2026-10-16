@@ -36,3 +36,11 @@ unless the keys match:
 - [ ] Generate a new key pair with `tauri signer generate`
 - [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
 - [ ] Replace `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` with the new public key
+
+## Stop sending telemetry to Loft
+
+Release builds send CLI usage events to Loft's `analytics.loft.rocks` (through `github.com/loft-sh/analytics-client`,
+used in `pkg/telemetry`) unless the context option `TELEMETRY=false` or `DEVPOD_DISABLE_TELEMETRY=true` is set:
+
+- [ ] Remove telemetry (and the `analytics-client` dependency), or point it at a Curity endpoint
+- [ ] Update the `TELEMETRY` context option and the docs that mention telemetry accordingly
