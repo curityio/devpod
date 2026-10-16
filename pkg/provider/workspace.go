@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/api/v4/pkg/devpod"
 	"github.com/loft-sh/devpod/pkg/config"
 	devcontainerconfig "github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/git"
@@ -59,28 +58,11 @@ type Workspace struct {
 	// Context is the context where this config file was loaded from
 	Context string `json:"context,omitempty"`
 
-	// Imported signals that this workspace was imported
-	Imported bool `json:"imported,omitempty"`
-
 	// Origin is the place where this config file was loaded from
 	Origin string `json:"-"`
 
-	// Pro signals this workspace is remote and doesn't necessarily exist locally. It also has more metadata about the pro workspace
-	Pro *ProMetadata `json:"pro,omitempty"`
-
 	// Path to the file where the SSH config to access the workspace is stored
 	SSHConfigPath string `json:"sshConfigPath,omitempty"`
-}
-
-type ProMetadata struct {
-	// InstanceName is the platform CRD name for this workspace
-	InstanceName string `json:"instanceName,omitempty"`
-
-	// Project is the platform project the workspace lives in
-	Project string `json:"project,omitempty"`
-
-	// DisplayName is the name intended to show users
-	DisplayName string `json:"displayName,omitempty"`
 }
 
 type WorkspaceIDEConfig struct {
@@ -154,9 +136,6 @@ type ContainerWorkspaceInfo struct {
 	// ContentFolder holds the folder where the content is stored
 	ContentFolder string `json:"contentFolder,omitempty"`
 
-	// PullFromInsideContainer determines if project should be pulled from Source when container starts
-	PullFromInsideContainer types.StrBool `json:"pullFromInsideContainer,omitempty"`
-
 	// Agent holds the agent info
 	Agent ProviderAgentConfig `json:"agent,omitempty"`
 }
@@ -198,9 +177,6 @@ type AgentWorkspaceInfo struct {
 }
 
 type CLIOptions struct {
-	// Platform are the platform options
-	Platform devpod.PlatformOptions `json:"platformOptions,omitempty"`
-
 	// up options
 	ID                          string            `json:"id,omitempty"`
 	Source                      string            `json:"source,omitempty"`
@@ -312,8 +288,4 @@ func ParseWorkspaceSource(source string) *WorkspaceSource {
 	}
 
 	return nil
-}
-
-func (w *Workspace) IsPro() bool {
-	return w.Pro != nil
 }

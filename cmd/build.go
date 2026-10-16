@@ -67,7 +67,7 @@ func NewBuildCmd(flags *flags.GlobalFlags) *cobra.Command {
 			}
 
 			// create a temporary workspace
-			exists := workspace2.Exists(ctx, devPodConfig, args, "", cmd.Owner, log.Default)
+			exists := workspace2.Exists(ctx, devPodConfig, args, "", log.Default)
 			sshConfigFile, err := os.CreateTemp("", "devpodssh.config")
 			if err != nil {
 				return err
@@ -76,7 +76,7 @@ func NewBuildCmd(flags *flags.GlobalFlags) *cobra.Command {
 			// defer removal of temporary ssh config file
 			defer os.Remove(sshConfigPath)
 
-			baseWorkspaceClient, err := workspace2.Resolve(
+			workspaceClient, err := workspace2.Resolve(
 				ctx,
 				devPodConfig,
 				"",
@@ -85,14 +85,12 @@ func NewBuildCmd(flags *flags.GlobalFlags) *cobra.Command {
 				"",
 				cmd.Machine,
 				cmd.ProviderOptions,
-				false,
 				cmd.DevContainerImage,
 				cmd.DevContainerPath,
 				sshConfigPath,
 				nil,
 				cmd.UID,
 				false,
-				cmd.Owner,
 				log.Default,
 			)
 			if err != nil {
@@ -102,17 +100,11 @@ func NewBuildCmd(flags *flags.GlobalFlags) *cobra.Command {
 			// delete workspace if we have created it
 			if exists == "" && !cmd.SkipDelete {
 				defer func() {
-					err = baseWorkspaceClient.Delete(ctx, client.DeleteOptions{Force: true})
+					err = workspaceClient.Delete(ctx, client.DeleteOptions{Force: true})
 					if err != nil {
 						log.Default.Errorf("Error deleting workspace: %v", err)
 					}
 				}()
-			}
-
-			// check if regular workspace client
-			workspaceClient, ok := baseWorkspaceClient.(client.WorkspaceClient)
-			if !ok {
-				return fmt.Errorf("building is currently not supported for proxy providers")
 			}
 
 			return cmd.Run(ctx, workspaceClient)

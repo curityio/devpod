@@ -19,8 +19,7 @@ import (
 type ListCmd struct {
 	*flags.GlobalFlags
 
-	Output  string
-	SkipPro bool
+	Output string
 }
 
 // NewListCmd creates a new destroy command
@@ -43,7 +42,6 @@ func NewListCmd(flags *flags.GlobalFlags) *cobra.Command {
 	}
 
 	listCmd.Flags().StringVar(&cmd.Output, "output", "plain", "The output format to use. Can be json or plain")
-	listCmd.Flags().BoolVar(&cmd.SkipPro, "skip-pro", false, "Don't list pro workspaces")
 	return listCmd
 }
 
@@ -54,7 +52,7 @@ func (cmd *ListCmd) Run(ctx context.Context) error {
 		return err
 	}
 
-	workspaces, err := workspace.List(ctx, devPodConfig, cmd.SkipPro, cmd.Owner, log.Default)
+	workspaces, err := workspace.List(ctx, devPodConfig, log.Default)
 	if err != nil {
 		return err
 	}
@@ -74,19 +72,14 @@ func (cmd *ListCmd) Run(ctx context.Context) error {
 			return workspaces[i].LastUsedTimestamp.Time.Unix() > workspaces[j].LastUsedTimestamp.Time.Unix()
 		})
 		for _, entry := range workspaces {
-			name := entry.ID
-			if entry.IsPro() && entry.Pro.DisplayName != "" && entry.ID != entry.Pro.DisplayName {
-				name = fmt.Sprintf("%s (%s)", entry.Pro.DisplayName, entry.ID)
-			}
 			tableEntries = append(tableEntries, []string{
-				name,
+				entry.ID,
 				entry.Source.String(),
 				entry.Machine.ID,
 				entry.Provider.Name,
 				entry.IDE.Name,
 				time.Since(entry.LastUsedTimestamp.Time).Round(1 * time.Second).String(),
 				time.Since(entry.CreationTimestamp.Time).Round(1 * time.Second).String(),
-				fmt.Sprintf("%t", entry.IsPro()),
 			})
 		}
 
@@ -98,7 +91,6 @@ func (cmd *ListCmd) Run(ctx context.Context) error {
 			"IDE",
 			"Last Used",
 			"Age",
-			"Pro",
 		}, tableEntries)
 	} else {
 		return fmt.Errorf("unexpected output format, choose either json or plain. Got %s", cmd.Output)

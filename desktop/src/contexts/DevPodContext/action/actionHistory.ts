@@ -7,15 +7,9 @@ export class ActionHistory {
   private active = new Map<string, Action>()
   private history: TActionObj[]
 
-  private localStorageKey: string
+  private localStorageKey = HISTORY_KEY
 
-  constructor(keySuffix?: string) {
-    let localStorageKey = HISTORY_KEY
-    if (keySuffix) {
-      localStorageKey = `${localStorageKey}-${keySuffix}`
-    }
-    this.localStorageKey = localStorageKey
-
+  constructor() {
     const maybeHistory = localStorage.getItem(this.localStorageKey)
     if (maybeHistory === null) {
       this.history = []

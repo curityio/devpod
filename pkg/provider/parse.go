@@ -3,7 +3,6 @@ package provider
 import (
 	"fmt"
 	"io"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -125,77 +124,6 @@ func validate(config *ProviderConfig) error {
 }
 
 func validateProviderType(config *ProviderConfig) error {
-	if config.IsProxyProvider() {
-		if !reflect.DeepEqual(config.Agent, ProviderAgentConfig{}) {
-			return fmt.Errorf("agent config is not allowed for proxy providers")
-		}
-		if len(config.Exec.Command) > 0 {
-			return fmt.Errorf("exec.command is not allowed in proxy providers")
-		}
-		if len(config.Exec.Create) > 0 {
-			return fmt.Errorf("exec.create is not allowed in proxy providers")
-		}
-		if len(config.Exec.Start) > 0 {
-			return fmt.Errorf("exec.create is not allowed in proxy providers")
-		}
-		if len(config.Exec.Stop) > 0 {
-			return fmt.Errorf("exec.create is not allowed in proxy providers")
-		}
-		if len(config.Exec.Status) > 0 {
-			return fmt.Errorf("exec.create is not allowed in proxy providers")
-		}
-		if len(config.Exec.Delete) > 0 {
-			return fmt.Errorf("exec.create is not allowed in proxy providers")
-		}
-		if len(config.Exec.Proxy.Status) == 0 {
-			return fmt.Errorf("exec.proxy.status is required for proxy providers")
-		}
-		if len(config.Exec.Proxy.Stop) == 0 {
-			return fmt.Errorf("exec.proxy.stop is required for proxy providers")
-		}
-		if len(config.Exec.Proxy.Delete) == 0 {
-			return fmt.Errorf("exec.proxy.delete is required for proxy providers")
-		}
-		if len(config.Exec.Proxy.Ssh) == 0 {
-			return fmt.Errorf("exec.proxy.ssh is required for proxy providers")
-		}
-		if len(config.Exec.Proxy.Up) == 0 {
-			return fmt.Errorf("exec.proxy.up is required for proxy providers")
-		}
-
-		return nil
-	}
-
-	// daemon provider
-	if config.IsDaemonProvider() {
-		if !reflect.DeepEqual(config.Agent, ProviderAgentConfig{}) {
-			return fmt.Errorf("agent config is not allowed for daemon providers")
-		}
-		if len(config.Exec.Command) > 0 {
-			return fmt.Errorf("exec.command is not allowed in daemon providers")
-		}
-		if len(config.Exec.Create) > 0 {
-			return fmt.Errorf("exec.create is not allowed in daemon providers")
-		}
-		if len(config.Exec.Start) > 0 {
-			return fmt.Errorf("exec.create is not allowed in daemon providers")
-		}
-		if len(config.Exec.Stop) > 0 {
-			return fmt.Errorf("exec.create is not allowed in daemon providers")
-		}
-		if len(config.Exec.Status) > 0 {
-			return fmt.Errorf("exec.create is not allowed in daemon providers")
-		}
-		if len(config.Exec.Delete) > 0 {
-			return fmt.Errorf("exec.create is not allowed in daemon providers")
-		}
-		if len(config.Exec.Daemon.Start) == 0 {
-			return fmt.Errorf("exec.daemon.start is required for daemon providers")
-		}
-
-		return nil
-	}
-
 	// validate driver
 	if config.Agent.Driver != "" && config.Agent.Driver != CustomDriver && config.Agent.Driver != DockerDriver && config.Agent.Driver != KubernetesDriver {
 		return fmt.Errorf("agent.driver can only be docker, kubernetes or custom")

@@ -1,30 +1,23 @@
 import { Box, Code, Container, Link, Text, VStack, useColorModeValue } from "@chakra-ui/react"
 import { useEffect, useMemo } from "react"
-import { Link as RouterLink, useMatch, useRouteError } from "react-router-dom"
+import { Link as RouterLink, useRouteError } from "react-router-dom"
 import {
   DevPodProvider,
-  ProInstancesProvider,
   WorkspaceStore,
   WorkspaceStoreProvider,
   useChangeSettings,
 } from "../contexts"
 import { Routes } from "../routes"
 import { OSSApp } from "./OSSApp"
-import { ProApp } from "./ProApp"
 import { usePreserveLocation } from "./usePreserveLocation"
 import { ErrorBoundary } from "react-error-boundary"
 import { ErrorMessageBox } from "@/components"
 
 export function App() {
-  const routeMatchPro = useMatch(`${Routes.PRO}/*`)
   usePreserveLocation()
   usePartyParrot()
 
-  const store = useMemo(() => {
-    if (routeMatchPro == null) {
-      return new WorkspaceStore()
-    }
-  }, [routeMatchPro])
+  const store = useMemo(() => new WorkspaceStore(), [])
 
   return (
     <ErrorBoundary
@@ -33,17 +26,11 @@ export function App() {
           error={error || new Error("Something went wrong. Please restart the application")}
         />
       )}>
-      {routeMatchPro == null ? (
-        <WorkspaceStoreProvider store={store!}>
-          <DevPodProvider>
-            <ProInstancesProvider>
-              <OSSApp />
-            </ProInstancesProvider>
-          </DevPodProvider>
-        </WorkspaceStoreProvider>
-      ) : (
-        <ProApp />
-      )}
+      <WorkspaceStoreProvider store={store}>
+        <DevPodProvider>
+          <OSSApp />
+        </DevPodProvider>
+      </WorkspaceStoreProvider>
     </ErrorBoundary>
   )
 }

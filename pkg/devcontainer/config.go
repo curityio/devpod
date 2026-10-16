@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/crane"
 	"github.com/loft-sh/devpod/pkg/language"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/pkg/errors"
@@ -33,16 +32,6 @@ func (r *runner) getRawConfig(options provider2.CLIOptions) (*config.DevContaine
 			},
 			Origin: "",
 		}, nil
-	} else if crane.ShouldUse(&options) {
-		localWorkspaceFolder, err := crane.PullConfigFromSource(r.WorkspaceConfig, &options, r.Log)
-		if err != nil {
-			return nil, err
-		}
-
-		return config.ParseDevContainerJSON(
-			localWorkspaceFolder,
-			r.WorkspaceConfig.Workspace.DevContainerPath,
-		)
 	}
 
 	localWorkspaceFolder := r.LocalWorkspaceFolder

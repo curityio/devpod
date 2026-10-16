@@ -9,7 +9,6 @@ import (
 	"github.com/loft-sh/devpod/cmd/completion"
 	"github.com/loft-sh/devpod/cmd/flags"
 	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
 	"github.com/loft-sh/devpod/pkg/config"
 	workspace2 "github.com/loft-sh/devpod/pkg/workspace"
 	"github.com/loft-sh/log"
@@ -35,11 +34,6 @@ func NewStatusCmd(flags *flags.GlobalFlags) *cobra.Command {
 		Use:   "status [flags] [workspace-path|workspace-name]",
 		Short: "Shows the status of a workspace",
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			_, err := clientimplementation.DecodeOptionsFromEnv(clientimplementation.DevPodFlagsStatus, &cmd.StatusOptions)
-			if err != nil {
-				return fmt.Errorf("decode status options: %w", err)
-			}
-
 			ctx := cobraCmd.Context()
 			devPodConfig, err := config.LoadConfig(cmd.Context, cmd.Provider)
 			if err != nil {
@@ -47,7 +41,7 @@ func NewStatusCmd(flags *flags.GlobalFlags) *cobra.Command {
 			}
 
 			logger := log.Default.ErrorStreamOnly()
-			client, err := workspace2.Get(ctx, devPodConfig, args, false, cmd.Owner, false, logger)
+			client, err := workspace2.Get(ctx, devPodConfig, args, false, false, logger)
 			if err != nil {
 				return err
 			}
@@ -55,7 +49,7 @@ func NewStatusCmd(flags *flags.GlobalFlags) *cobra.Command {
 			return cmd.Run(ctx, client, logger)
 		},
 		ValidArgsFunction: func(rootCmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, cmd.Owner, log.Default)
+			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, log.Default)
 		},
 	}
 

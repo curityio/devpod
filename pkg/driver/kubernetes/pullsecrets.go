@@ -101,7 +101,7 @@ func (k *KubernetesDriver) createPullSecret(
 	dockerCredentials *dockercredentials.Credentials,
 ) error {
 	authToken := dockerCredentials.AuthToken()
-	email := "noreply@loft.sh"
+	email := "noreply@curity.io"
 
 	encodedSecretData, err := PreparePullSecretData(dockerCredentials.ServerURL, authToken, email)
 	if err != nil {

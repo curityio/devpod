@@ -27,15 +27,12 @@ in `curityio/devpod`. Copy the relevant information into our docs (or recreate t
 - [ ] `docs/pages/troubleshooting/linux-troubleshooting.mdx`: issue [#1045](https://github.com/loft-sh/devpod/issues/1045) (SSH connection string too long)
 - [ ] `desktop/flatpak/DevPod.metainfo.xml`: release notes for [v0.6.10](https://github.com/loft-sh/devpod/releases/tag/v0.6.10)
 
-## Remove the `pro` features
+## Replace the desktop app update signing key
 
-Remove the DevPod Pro (Loft platform) features and every reference to them, including:
+The Tauri updater verifies every update against `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json`,
+which is still Loft's public key. Our releases are signed with the `TAURI_PRIVATE_KEY` secret, so the app will reject them
+unless the keys match:
 
-- [ ] CLI: `cmd/pro` and the `pro` subcommands registered in `cmd/root.go`
-- [ ] Platform code: `pkg/platform`, `pkg/loftconfig` and the platform parts of the daemon (`pkg/daemon/platform`)
-- [ ] Agent setup for platform access (`cmd/agent/container/setup_loft_platform_access.go`)
-- [ ] Provider: `providers/pro` and `hack/pro`
-- [ ] Desktop app: `desktop/src/lib/pro`, `desktop/src/views/Pro` and the Pro icons/badges
-- [ ] Loft endpoints: `charts.loft.sh`, `license.loft.sh`, `loft.sh/*` annotations
-- [ ] Docs pages about DevPod Pro
-- [ ] Go dependencies that are only needed for the platform (`github.com/loft-sh/api`, `agentapi`, `admin-apis`, `apiserver`, ...), then run `go mod tidy` and `go mod vendor`
+- [ ] Generate a new key pair with `tauri signer generate`
+- [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
+- [ ] Replace `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` with the new public key

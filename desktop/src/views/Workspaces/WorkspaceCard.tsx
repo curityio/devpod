@@ -1,32 +1,9 @@
-import { Template } from "@/icons"
 import { useStoreTroubleshoot } from "@/lib/useStoreTroubleshoot"
-import {
-  Box,
-  Card,
-  CardHeader,
-  Icon,
-  List,
-  ListItem,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-  useDisclosure,
-} from "@chakra-ui/react"
-import { useCallback, useMemo, useRef, useState } from "react"
-import { HiServerStack } from "react-icons/hi2"
+import { Card, CardHeader, Text } from "@chakra-ui/react"
+import { useCallback, useMemo, useState } from "react"
 import { useNavigate } from "react-router"
-import { IconTag, WorkspaceCardHeader } from "../../components"
-import {
-  TActionID,
-  useProvider,
-  useSettings,
-  useWorkspace,
-  useWorkspaceActions,
-} from "../../contexts"
+import { WorkspaceCardHeader } from "../../components"
+import { TActionID, useSettings, useWorkspace, useWorkspaceActions } from "../../contexts"
 import {
   getIDEName,
   getWorkspaceSourceName,
@@ -36,11 +13,8 @@ import {
   useStopWorkspaceModal,
 } from "../../lib"
 import { Routes } from "../../routes"
-import { TProvider, TWorkspace, TWorkspaceID } from "../../types"
+import { TWorkspace, TWorkspaceID } from "../../types"
 import { useIDEs } from "../../useIDEs"
-import { ConfigureProviderOptionsForm } from "../Providers"
-import { processDisplayOptions } from "../Providers/AddProvider/useProviderOptions"
-import { TOptionWithID, mergeOptionDefinitions } from "../Providers/helpers"
 import { WorkspaceControls } from "./WorkspaceControls"
 import { WorkspaceStatusBadge } from "./WorkspaceStatusBadge"
 
@@ -51,7 +25,6 @@ type TWorkspaceCardProps = Readonly<{
 }>
 
 export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TWorkspaceCardProps) {
-  const changeOptionsModalBodyRef = useRef<HTMLDivElement>(null)
   const settings = useSettings()
   const navigate = useNavigate()
   const { ides, defaultIDE } = useIDEs()
@@ -107,14 +80,8 @@ export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TW
       [navigateToAction, workspace]
     )
   )
-  const {
-    isOpen: isChangeOptionsOpen,
-    onOpen: handleChangeOptionsClicked,
-    onClose: onChangeOptionsClose,
-  } = useDisclosure()
   const { store: storeTroubleshoot } = useStoreTroubleshoot()
 
-  const [provider] = useProvider(workspace.data?.provider?.name)
   const [ideName, setIdeName] = useState<string | undefined>(() => {
     if (settings.fixedIDE && defaultIDE?.name) {
       return defaultIDE.name
@@ -171,36 +138,11 @@ export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TW
     return undefined
   }, [navigateToAction, workspace, workspaceActions])
 
-  const handleChangeOptionsFinishClicked = (extraProviderOptions: Record<string, string>) => {
-    // diff against current workspace options
-    let changedOptions: Record<string, string> | undefined = undefined
-    if (Object.keys(extraProviderOptions).length > 0) {
-      changedOptions = {}
-      const workspaceOptions = workspace.data?.provider?.options ?? {}
-      for (const [k, v] of Object.entries(extraProviderOptions)) {
-        // check if current workspace option doesn't contain option or it does but value is different
-        if (!workspaceOptions[k] || workspaceOptions[k]?.value !== v) {
-          changedOptions[k] = v
-        }
-      }
-    }
-    const actionID = workspace.start({
-      id: workspaceID,
-      providerConfig: { options: changedOptions },
-    })
-    onChangeOptionsClose()
-    navigateToAction(actionID)
-  }
-
   const isLoading = workspace.current?.status === "pending"
 
   if (workspace.data === undefined) {
     return null
   }
-
-  const maybeRunnerName = getRunnerName(workspace.data, provider)
-  const maybeTemplate = getTemplate(workspace.data, provider)
-  const maybeTemplateOptions = getTemplateOptions(workspace.data, provider)
 
   return (
     <>
@@ -245,7 +187,6 @@ export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TW
               <WorkspaceControls
                 id={workspace.data.id}
                 workspace={workspace}
-                provider={provider}
                 isLoading={isLoading}
                 isIDEFixed={settings.fixedIDE}
                 ides={ides}
@@ -258,47 +199,11 @@ export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TW
                 onStopClicked={openStopModal}
                 onLogsClicked={handleLogsClicked}
                 onTroubleshootClicked={handleTroubleshootClicked}
-                onChangeOptionsClicked={handleChangeOptionsClicked}
               />
             }>
             <WorkspaceCardHeader.Provider name={workspace.data.provider?.name ?? undefined} />
             <WorkspaceCardHeader.IDE name={ideDisplayName} />
             <WorkspaceCardHeader.LastUsed timestamp={workspace.data.lastUsed} />
-            {maybeTemplate && (
-              <IconTag
-                icon={<Template />}
-                label={maybeTemplate}
-                info={
-                  <Box width="full">
-                    Using {maybeTemplate} template with options: <br />
-                    {maybeTemplateOptions.length > 0 ? (
-                      <List mt="2" width="full">
-                        {maybeTemplateOptions.map((opt) => (
-                          <ListItem
-                            key={opt.id}
-                            width="full"
-                            display="flex"
-                            flexFlow="row nowrap"
-                            alignItems="space-between">
-                            <Text fontWeight="bold">{opt.value}</Text>
-                            <Text ml="4">({opt.displayName || opt.id})</Text>
-                          </ListItem>
-                        ))}
-                      </List>
-                    ) : (
-                      "No options configured"
-                    )}
-                  </Box>
-                }
-              />
-            )}
-            {maybeRunnerName && (
-              <IconTag
-                icon={<Icon as={HiServerStack} />}
-                label={maybeRunnerName}
-                info={`Running on ${maybeRunnerName}`}
-              />
-            )}
           </WorkspaceCardHeader>
         </CardHeader>
       </Card>
@@ -307,83 +212,6 @@ export function WorkspaceCard({ workspaceID, isSelected, onSelectionChange }: TW
       {rebuildModal}
       {deleteModal}
       {stopModal}
-
-      <Modal
-        onClose={onChangeOptionsClose}
-        isOpen={isChangeOptionsOpen}
-        isCentered
-        size="4xl"
-        scrollBehavior="inside">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Change Options</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody
-            ref={changeOptionsModalBodyRef}
-            overflowX="hidden"
-            overflowY="auto"
-            paddingBottom="0">
-            {workspace.data.provider?.name ? (
-              <ConfigureProviderOptionsForm
-                workspace={workspace.data}
-                showBottomActionBar
-                isModal
-                submitTitle="Update &amp; Open"
-                containerRef={changeOptionsModalBodyRef}
-                reuseMachine={false}
-                providerID={workspace.data.provider.name}
-                onFinish={handleChangeOptionsFinishClicked}
-              />
-            ) : (
-              <>Unable to find provider for this workspace</>
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
     </>
-  )
-}
-
-function getRunnerName(workspace: TWorkspace, provider: TProvider | undefined): string | undefined {
-  const options = mergeOptionDefinitions(
-    workspace.provider?.options ?? {},
-    provider?.config?.options ?? {}
-  )
-  const maybeRunnerOption = options["LOFT_RUNNER"]
-  if (!maybeRunnerOption) {
-    return undefined
-  }
-  const value = maybeRunnerOption.value
-
-  return maybeRunnerOption.enum?.find((e) => e.value === value)?.displayName ?? value ?? undefined
-}
-
-function getTemplate(workspace: TWorkspace, provider: TProvider | undefined): string | undefined {
-  const options = mergeOptionDefinitions(
-    workspace.provider?.options ?? {},
-    provider?.config?.options ?? {}
-  )
-  const maybeTemplateOption = options["LOFT_TEMPLATE"]
-  if (!maybeTemplateOption) {
-    return undefined
-  }
-  const value = maybeTemplateOption.value
-
-  return maybeTemplateOption.enum?.find((e) => e.value === value)?.displayName ?? value ?? undefined
-}
-
-function getTemplateOptions(
-  workspace: TWorkspace,
-  provider: TProvider | undefined
-): readonly TOptionWithID[] {
-  const options = mergeOptionDefinitions(
-    workspace.provider?.options ?? {},
-    provider?.config?.options ?? {}
-  )
-  const displayOptions = processDisplayOptions(options, [], true)
-
-  // shouldn't have groups here as we passed in empty array earlier
-  return [...displayOptions.required, ...displayOptions.other].filter(
-    (opt) => opt.id !== "LOFT_TEMPLATE"
   )
 }

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/api/v4/pkg/devpod"
 	"github.com/loft-sh/devpod/pkg/agent/tunnel"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/dockercredentials"
@@ -19,9 +18,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/gitcredentials"
 	"github.com/loft-sh/devpod/pkg/gitsshsigning"
 	"github.com/loft-sh/devpod/pkg/gpg"
-	"github.com/loft-sh/devpod/pkg/loftconfig"
 	"github.com/loft-sh/devpod/pkg/netstat"
-	"github.com/loft-sh/devpod/pkg/platform"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/stdio"
 	"github.com/loft-sh/log"
@@ -69,12 +66,8 @@ func newSetupServer(setupInfo *config.Result, log log.Logger, options ...Option)
 	opts := append(options, []Option{
 		WithMounts(config.GetMounts(setupInfo)),
 		WithWorkspaceMount(config.GetWorkspaceMount(setupInfo)),
-		WithAllowKubeConfig(true),
 	}...)
-	tunnelServ := New(log, opts...)
-	tunnelServ.allowPlatformOptions = true
-
-	return tunnelServ
+	return New(log, opts...)
 }
 
 func New(log log.Logger, options ...Option) *tunnelServer {
@@ -99,13 +92,9 @@ type tunnelServer struct {
 	forwarder              netstat.Forwarder
 	allowGitCredentials    bool
 	allowDockerCredentials bool
-	allowKubeConfig        bool
-	allowPlatformOptions   bool
 	result                 *config.Result
 	workspace              *provider2.Workspace
 	log                    log.Logger
-
-	platformOptions *devpod.PlatformOptions
 }
 
 func (t *tunnelServer) RunWithResult(ctx context.Context, reader io.Reader, writer io.WriteCloser) (*config.Result, error) {
@@ -223,46 +212,26 @@ func (t *tunnelServer) GitCredentials(ctx context.Context, message *tunnel.Messa
 		return nil, perrors.Wrap(err, "decode git credentials request")
 	}
 
-	if t.platformOptions != nil && t.platformOptions.Enabled {
-		gitHttpCredentials := append(t.platformOptions.UserCredentials.GitHttp, t.platformOptions.ProjectCredentials.GitHttp...)
-		if len(gitHttpCredentials) > 0 {
-			if len(gitHttpCredentials) == 1 {
-				credentials.Username = gitHttpCredentials[0].User
-				credentials.Password = gitHttpCredentials[0].Password
-				credentials.Path = gitHttpCredentials[0].Path
-			} else {
-				for _, credential := range gitHttpCredentials {
-					if credential.Host == credentials.Host {
-						credentials.Username = credential.User
-						credentials.Password = credential.Password
-						credentials.Path = credential.Path
-						break
-					}
-				}
-			}
-		}
-	} else {
-		if t.workspace != nil && t.workspace.Source.GitRepository != "" {
-			path, err := gitcredentials.GetHTTPPath(ctx, gitcredentials.GetHttpPathParameters{
-				Host:        credentials.Host,
-				Protocol:    credentials.Protocol,
-				CurrentPath: credentials.Path,
-				Repository:  t.workspace.Source.GitRepository,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("get http path: %w", err)
-			}
-			// Set the credentials `path` field to the path component of the git repository URL.
-			// This allows downstream credential helpers to figure out which passwords needs to be fetched
-			credentials.Path = path
-		}
-
-		response, err := gitcredentials.GetCredentials(credentials)
+	if t.workspace != nil && t.workspace.Source.GitRepository != "" {
+		path, err := gitcredentials.GetHTTPPath(ctx, gitcredentials.GetHttpPathParameters{
+			Host:        credentials.Host,
+			Protocol:    credentials.Protocol,
+			CurrentPath: credentials.Path,
+			Repository:  t.workspace.Source.GitRepository,
+		})
 		if err != nil {
-			return nil, perrors.Wrap(err, "get git response")
+			return nil, fmt.Errorf("get http path: %w", err)
 		}
-		credentials = response
+		// Set the credentials `path` field to the path component of the git repository URL.
+		// This allows downstream credential helpers to figure out which passwords needs to be fetched
+		credentials.Path = path
 	}
+
+	response, err := gitcredentials.GetCredentials(credentials)
+	if err != nil {
+		return nil, perrors.Wrap(err, "get git response")
+	}
+	credentials = response
 
 	out, err := json.Marshal(credentials)
 	if err != nil {
@@ -290,47 +259,6 @@ func (t *tunnelServer) GitSSHSignature(ctx context.Context, message *tunnel.Mess
 	}
 
 	return &tunnel.Message{Message: string(out)}, nil
-}
-
-func (t *tunnelServer) LoftConfig(ctx context.Context, message *tunnel.Message) (*tunnel.Message, error) {
-	loftConfigRequest := &loftconfig.LoftConfigRequest{}
-	err := json.Unmarshal([]byte(message.Message), loftConfigRequest)
-	if err != nil {
-		return nil, perrors.Wrap(err, "loft platform config request")
-	}
-
-	var response *loftconfig.LoftConfigResponse
-	if t.workspace != nil {
-		response, err = loftconfig.ReadFromWorkspace(t.workspace)
-		if err != nil {
-			return nil, fmt.Errorf("read loft config: %w", err)
-		}
-	} else {
-		response, err = loftconfig.Read(loftConfigRequest)
-		if err != nil {
-			return nil, fmt.Errorf("read loft config: %w", err)
-		}
-	}
-
-	out, err := json.Marshal(response)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tunnel.Message{Message: string(out)}, nil
-}
-
-func (t *tunnelServer) KubeConfig(ctx context.Context, message *tunnel.Message) (*tunnel.Message, error) {
-	if !t.allowKubeConfig {
-		return nil, fmt.Errorf("kube config forbidden")
-	}
-
-	kubeConfig, err := platform.NewInstanceKubeConfig(ctx, t.platformOptions)
-	if err != nil {
-		return nil, fmt.Errorf("create kube config: %w", err)
-	}
-
-	return &tunnel.Message{Message: string(kubeConfig)}, nil
 }
 
 func (t *tunnelServer) GPGPublicKeys(ctx context.Context, message *tunnel.Message) (*tunnel.Message, error) {
@@ -377,9 +305,6 @@ func (t *tunnelServer) Log(ctx context.Context, message *tunnel.LogMessage) (*tu
 }
 
 func (t *tunnelServer) StreamWorkspace(message *tunnel.Empty, stream tunnel.Tunnel_StreamWorkspaceServer) error {
-	if t.platformOptions != nil && t.platformOptions.Enabled && !t.allowPlatformOptions {
-		return fmt.Errorf("streaming workspace from local computer to platform workspace is not supported. Please specify a git repository to clone instead")
-	}
 	if t.workspace == nil {
 		return fmt.Errorf("workspace is nil")
 	}
@@ -397,10 +322,6 @@ func (t *tunnelServer) StreamWorkspace(message *tunnel.Empty, stream tunnel.Tunn
 }
 
 func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tunnel.Tunnel_StreamMountServer) error {
-	if t.platformOptions != nil && t.platformOptions.Enabled && !t.allowPlatformOptions {
-		return fmt.Errorf("streaming mounts from local computer to platform workspace is not supported. Please specify a git repository to clone instead")
-	}
-
 	var mount *config.Mount
 	for _, m := range t.mounts {
 		if m.String() == message.Mount {

@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/loft-sh/devpod/cmd/completion"
 	"github.com/loft-sh/devpod/cmd/flags"
 	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
 	"github.com/loft-sh/devpod/pkg/config"
 	"github.com/loft-sh/devpod/pkg/workspace"
 	"github.com/loft-sh/log"
@@ -31,26 +29,16 @@ func NewDeleteCmd(flags *flags.GlobalFlags) *cobra.Command {
 		Long: `Deletes an existing workspace. You can specify the workspace by its path or name.
 If the workspace is not found, you can use the --ignore-not-found flag to treat it as a successful delete.`,
 		RunE: func(_ *cobra.Command, args []string) error {
-			_, err := clientimplementation.DecodeOptionsFromEnv(clientimplementation.DevPodFlagsDelete, &cmd.DeleteOptions)
-			if err != nil {
-				return fmt.Errorf("decode up options: %w", err)
-			}
-
 			ctx := context.Background()
 			devPodConfig, err := config.LoadConfig(cmd.Context, cmd.Provider)
 			if err != nil {
 				return err
 			}
 
-			err = clientimplementation.DecodePlatformOptionsFromEnv(&cmd.Platform)
-			if err != nil {
-				return fmt.Errorf("decode platform options: %w", err)
-			}
-
 			return cmd.Run(ctx, devPodConfig, args)
 		},
 		ValidArgsFunction: func(rootCmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, cmd.Owner, log.Default)
+			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, log.Default)
 		},
 	}
 
@@ -63,7 +51,7 @@ If the workspace is not found, you can use the --ignore-not-found flag to treat 
 // Run runs the command logic
 func (cmd *DeleteCmd) Run(ctx context.Context, devPodConfig *config.Config, args []string) error {
 	if len(args) == 0 {
-		workspaceName, err := workspace.Delete(ctx, devPodConfig, args, cmd.IgnoreNotFound, cmd.Force, cmd.DeleteOptions, cmd.Owner, log.Default)
+		workspaceName, err := workspace.Delete(ctx, devPodConfig, args, cmd.IgnoreNotFound, cmd.Force, cmd.DeleteOptions, log.Default)
 		if err != nil {
 			return err
 		}
@@ -72,7 +60,7 @@ func (cmd *DeleteCmd) Run(ctx context.Context, devPodConfig *config.Config, args
 	}
 
 	for _, arg := range args {
-		workspaceName, err := workspace.Delete(ctx, devPodConfig, []string{arg}, cmd.IgnoreNotFound, cmd.Force, cmd.DeleteOptions, cmd.Owner, log.Default)
+		workspaceName, err := workspace.Delete(ctx, devPodConfig, []string{arg}, cmd.IgnoreNotFound, cmd.Force, cmd.DeleteOptions, log.Default)
 		if err != nil {
 			log.Default.Errorf("Failed to delete workspace '%s': %v", arg, err)
 			continue

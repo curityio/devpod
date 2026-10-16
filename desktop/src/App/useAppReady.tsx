@@ -1,8 +1,4 @@
-import { QueryKeys } from "@/queryKeys"
-import { TProInstance } from "@/types"
 import {
-  Button,
-  HStack,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -10,29 +6,21 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Text,
   useDisclosure,
   useToast,
 } from "@chakra-ui/react"
-import { useQuery } from "@tanstack/react-query"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
-import { matchPath, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { client } from "../client"
 import { ErrorMessageBox } from "../components"
 import { WORKSPACE_SOURCE_BRANCH_DELIMITER, WORKSPACE_SOURCE_COMMIT_DELIMITER } from "../constants"
-import {
-  startWorkspaceAction,
-  useChangeSettings,
-  useProInstances,
-  useWorkspaceStore,
-} from "../contexts"
-import { exists, hasCapability, useLoginProModal } from "../lib"
+import { startWorkspaceAction, useWorkspaceStore } from "../contexts"
+import { exists } from "../lib"
 import { Routes } from "../routes"
 import { useChangelogModal } from "./useChangelogModal"
 
 export function useAppReady() {
-  const [[proInstances]] = useProInstances()
   const { store } = useWorkspaceStore()
   const isReadyLockRef = useRef<boolean>(false)
   const viewID = useId()
@@ -40,69 +28,6 @@ export function useAppReady() {
   const toast = useToast()
   const { modal: errorModal, setFailedMessage } = useErrorModal()
   const { modal: changelogModal } = useChangelogModal(isReadyLockRef.current)
-  const { modal: proLoginModal, handleOpenLogin: handleProLogin } = useLoginProModal()
-  const { set: setSetting } = useChangeSettings()
-
-  // auto-update pro providers in the background
-  useQuery({
-    queryKey: QueryKeys.proProviderUpdates(proInstances),
-    queryFn: async () => {
-      if (!proInstances || proInstances.length === 0) {
-        return null
-      }
-
-      // let pro client check for updates without using the provider
-      // we don't really care about the result in the context of the GUI, just need to make sure it's updating
-      await Promise.allSettled(
-        proInstances
-          .filter(
-            (instance) =>
-              instance.provider && instance.host && hasCapability(instance, "update-provider")
-          )
-          .map(async (instance) => {
-            const proClient = client.getProClient(instance)
-            const checkUpdateRes = await proClient.checkUpdate()
-            if (checkUpdateRes.err) {
-              client.log(
-                "error",
-                `[${instance.host ?? ""}] Failed to check for upgrade: ${
-                  checkUpdateRes.val.message
-                }`
-              )
-
-              return null
-            }
-
-            const { available: updateAvailable, newVersion } = checkUpdateRes.val
-            if (!updateAvailable || !newVersion) {
-              return null
-            }
-            client.log(
-              "info",
-              `[${
-                instance.host ?? ""
-              }] New version available (${newVersion}). Attempting to update.`
-            )
-
-            const updateRes = await proClient.update(newVersion)
-            if (updateRes.err) {
-              client.log(
-                "error",
-                `[${instance.host ?? ""}] Failed to upgrade: ${updateRes.val.message}`
-              )
-
-              return null
-            }
-
-            client.log("info", `[${instance.host ?? ""}] Successfully updated to ${newVersion}`)
-          })
-      )
-
-      return null
-    },
-    enabled: proInstances && proInstances.length > 0,
-    refetchInterval: 1_000 * 60 * 5, // 5 minutes
-  })
 
   useEffect(() => {
     window.addEventListener("contextmenu", (e) => {
@@ -153,163 +78,9 @@ export function useAppReady() {
         return
       }
 
-      if (event.type === "LoginRequired") {
-        const proInstances = await client.pro.listProInstances()
-        if (proInstances.err) {
-          return
-        }
-        const existingInstance = proInstances.val.find((i) => i.host === event.host)
-        if (!existingInstance) {
-          return
-        }
-
-        await getCurrentWebviewWindow().setFocus()
-        const match = matchPath(Routes.toProInstance(event.host), location.pathname)
-        if (match != null) {
-          // only show toast if we're not on pro instance page anyway
-          return
-        }
-        toast({
-          title: "Login Required",
-          description: (
-            <HStack>
-              <Text>You have been logged out. Please log back in.</Text>
-              <Button
-                ml="2"
-                variant="ghost"
-                onClick={() => navigate(Routes.toProInstance(event.host))}>
-                Log in
-              </Button>
-            </HStack>
-          ),
-          status: "warning",
-          duration: 5_000,
-          isClosable: true,
-        })
-
-        return
-      }
-
-      if (event.type === "SetupPro") {
-        // check if host is already taken. If not, set window to foreground and pass evnet to pro login handler
-        const proInstances = await client.pro.listProInstances()
-        if (proInstances.err) {
-          return
-        }
-
-        const existingInstance = proInstances.val.find((i) => i.host === event.host)
-        if (existingInstance) {
-          // only warn in console, don't show modal
-          console.warn("Pro instance already exists", existingInstance)
-
-          return
-        }
-
-        const data: Parameters<typeof handleProLogin>[0] = {
-          host: event.host,
-          suggestedOptions: {},
-        }
-        if (event.accessKey) {
-          data.accessKey = event.accessKey
-        }
-        if (event.options) {
-          data.suggestedOptions = event.options
-        }
-
-        await getCurrentWebviewWindow().setFocus()
-        // ensure pro is enabled
-        setSetting("experimental_devPodPro", true)
-        handleProLogin(data)
-
-        return
-      }
-
-      if (event.type === "OpenProInstance") {
-        const proInstances = await client.pro.listProInstances()
-        if (proInstances.err) {
-          return
-        }
-
-        const existingInstance = proInstances.val.find((i) => i.host === event.host)
-        if (!existingInstance?.host) {
-          return
-        }
-
-        await getCurrentWebviewWindow().setFocus()
-        navigate(Routes.toProInstance(existingInstance.host))
-
-        return
-      }
-
-      if (event.type === "ImportWorkspace") {
-        await getCurrentWebviewWindow().setFocus()
-        // Do we already know the workspace?
-        let workspacesResult = await client.workspaces.listAll(false)
-        if (workspacesResult.err) {
-          const cleanedMsg = workspacesResult.val.message.split("\n").at(-1) ?? ""
-          setFailedMessage("Failed to list workspaces: " + cleanedMsg)
-
-          return
-        }
-        let maybeWorkspace = workspacesResult.val.find((w) => w.id === event.workspace_id)
-        // Is it a pro workspace?
-        if (maybeWorkspace && maybeWorkspace.provider?.name) {
-          const proInstance = await findProInstance(maybeWorkspace.provider.name)
-          if (proInstance && proInstance.host) {
-            navigate(Routes.toProWorkspace(proInstance.host, maybeWorkspace.id))
-
-            return
-          }
-        }
-
-        // At this point it can't be a new pro workspace anymore,
-        // we'll have to go through the old import flow
-        const importResult = await client.pro.importWorkspace({
-          workspaceID: event.workspace_id,
-          workspaceUID: event.workspace_uid,
-          devPodProHost: event.devpod_pro_host,
-          project: event.project,
-          options: event.options,
-        })
-        if (importResult.err) {
-          const cleanedMsg = importResult.val.message.split("\n").at(-1) ?? ""
-          setFailedMessage("Failed to import workspace: " + cleanedMsg)
-
-          return
-        }
-        workspacesResult = await client.workspaces.listAll(false)
-        if (workspacesResult.err) {
-          return
-        }
-        maybeWorkspace = workspacesResult.val.find((w) => w.id === event.workspace_id)
-        if (!maybeWorkspace) {
-          setFailedMessage("Could not find workspace after import")
-
-          return
-        }
-
-        const actionID = startWorkspaceAction({
-          workspaceID: maybeWorkspace.id,
-          streamID: viewID,
-          config: {
-            id: maybeWorkspace.id,
-            providerConfig: {
-              providerID: maybeWorkspace.provider?.name ?? undefined,
-            },
-            ideConfig: {
-              name: maybeWorkspace.ide?.name,
-            },
-          },
-          store,
-        })
-        navigate(Routes.toAction(actionID))
-
-        return
-      }
-
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (event.type === "OpenWorkspace") {
-        const workspacesResult = await client.workspaces.listAll(false)
+        const workspacesResult = await client.workspaces.listAll()
         if (workspacesResult.err) {
           return
         }
@@ -371,13 +142,6 @@ export function useAppReady() {
 
         const providerName = maybeWorkspace?.provider?.name
         if (maybeWorkspace !== undefined && providerName) {
-          const proInstance = await findProInstance(providerName)
-          if (proInstance && proInstance.host) {
-            navigate(Routes.toProWorkspace(proInstance.host, maybeWorkspace.id))
-
-            return
-          }
-
           const actionID = startWorkspaceAction({
             workspaceID: maybeWorkspace.id,
             streamID: viewID,
@@ -394,13 +158,6 @@ export function useAppReady() {
           return
         }
 
-        const match = matchPath(Routes.PRO_INSTANCE, location.pathname)
-        if (match && match.params.host) {
-          navigate(Routes.toProWorkspaceCreate(match.params.host))
-
-          return
-        }
-
         navigate(
           Routes.toWorkspaceCreate({
             workspaceID: event.workspace_id,
@@ -411,7 +168,7 @@ export function useAppReady() {
         )
       }
     },
-    [handleProLogin, navigate, setFailedMessage, setSetting, store, toast, viewID]
+    [navigate, setFailedMessage, store, toast, viewID]
   )
 
   // notifies underlying layer that ui is ready for communication
@@ -436,7 +193,7 @@ export function useAppReady() {
     }
   }, [handleMessage, navigate])
 
-  return { errorModal, changelogModal, proLoginModal }
+  return { errorModal, changelogModal }
 }
 
 function useErrorModal() {
@@ -472,21 +229,4 @@ function useErrorModal() {
   }, [onClose, onOpen, failedMessage])
 
   return { modal, handleOpen: onOpen, setFailedMessage }
-}
-
-async function findProInstance(providerName: string): Promise<TProInstance | null> {
-  const providersRes = await client.providers.listAll()
-  if (providersRes.err) return null
-  const provider = providersRes.val[providerName]
-  if (!provider || !provider.isProxyProvider) return null
-
-  // handle pro provider
-  const proInstanceRes = await client.pro.listProInstances()
-  if (proInstanceRes.err) return null
-  const proInstance = proInstanceRes.val.find(
-    (proInstance) => proInstance.provider === providerName
-  )
-  if (!proInstance?.host) return null
-
-  return proInstance
 }

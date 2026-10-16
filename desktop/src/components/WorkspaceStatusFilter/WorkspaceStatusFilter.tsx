@@ -13,23 +13,18 @@ import { WorkspaceStatus } from "@/icons"
 import { WORKSPACE_STATUSES } from "@/constants"
 import { WorkspaceStatusBadge } from "@/views/Workspaces/WorkspaceStatusBadge"
 import { useCallback } from "react"
-import { WorkspaceDisplayStatusBadge } from "@/views/Pro/Workspace/WorkspaceStatus"
 import { TWorkspace } from "@/types"
-import { TWorkspaceDisplayStatus, WorkspaceDisplayStatus } from "@/views/Pro/Workspace/status"
 
 export type TWorkspaceStatusFilterState = string[] | "all"
 
 export function WorkspaceStatusFilter({
   statusFilter,
   setStatusFilter,
-  variant = "oss",
 }: {
   statusFilter: TWorkspaceStatusFilterState
   setStatusFilter: (statusFilter: TWorkspaceStatusFilterState) => void
-  variant?: "oss" | "pro"
 }) {
-  const availableStatuses =
-    variant === "oss" ? WORKSPACE_STATUSES : Object.values(WorkspaceDisplayStatus)
+  const availableStatuses = WORKSPACE_STATUSES
 
   const onSelectAll = useCallback(() => {
     if (statusFilter === "all") {
@@ -73,20 +68,13 @@ export function WorkspaceStatusFilter({
           {availableStatuses.map((status) => (
             <MenuItemOption key={status} value={status}>
               <HStack>
-                {variant === "oss" ? (
-                  <WorkspaceStatusBadge
-                    status={status as TWorkspace["status"]}
-                    isLoading={false}
-                    hasError={false}
-                    showText={false}
-                  />
-                ) : (
-                  <WorkspaceDisplayStatusBadge
-                    compact={true}
-                    displayStatus={status as TWorkspaceDisplayStatus}
-                  />
-                )}{" "}
-                <Text> {status || "Waiting to Initialize"}</Text>
+                <WorkspaceStatusBadge
+                  status={status as TWorkspace["status"]}
+                  isLoading={false}
+                  hasError={false}
+                  showText={false}
+                />{" "}
+                <Text> {status}</Text>
               </HStack>
             </MenuItemOption>
           ))}

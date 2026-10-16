@@ -1,11 +1,5 @@
 package config
 
-import (
-	"strings"
-
-	"github.com/loft-sh/devpod/pkg/types"
-)
-
 const (
 	ContextOptionSSHAddPrivateKeys          = "SSH_ADD_PRIVATE_KEYS"
 	ContextOptionGPGAgentForwarding         = "GPG_AGENT_FORWARDING"
@@ -105,32 +99,4 @@ var ContextOptions = []ContextOption{
 		Default:     "false",
 		Enum:        []string{"true", "false"},
 	},
-}
-
-func MergeContextOptions(contextConfig *ContextConfig, environ []string) {
-	envVars := map[string]string{}
-	for _, v := range environ {
-		t := strings.SplitN(v, "=", 2)
-		if len(t) != 2 {
-			continue
-		}
-		envVars[t[0]] = t[1]
-	}
-
-	for _, o := range ContextOptions {
-		// look up in env
-		envVal, ok := envVars[o.Name]
-		if !ok {
-			continue
-		}
-		// look up in current context options, skip if already exists
-		if _, ok := contextConfig.Options[o.Name]; ok {
-			continue
-		}
-		contextConfig.Options[o.Name] = OptionValue{
-			Value:        envVal,
-			UserProvided: true,
-			Filled:       &[]types.Time{types.Now()}[0],
-		}
-	}
 }

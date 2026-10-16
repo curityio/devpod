@@ -20,7 +20,6 @@ import (
 	agentdaemon "github.com/loft-sh/devpod/pkg/daemon/agent"
 	"github.com/loft-sh/devpod/pkg/devcontainer"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/crane"
 	"github.com/loft-sh/devpod/pkg/dockercredentials"
 	"github.com/loft-sh/devpod/pkg/extract"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
@@ -70,16 +69,14 @@ func (cmd *UpCmd) Run(ctx context.Context) error {
 	}
 
 	// make sure daemon doesn't shut us down while we are doing things
-	if !workspaceInfo.CLIOptions.Platform.Enabled {
-		agent.CreateWorkspaceBusyFile(workspaceInfo.Origin)
-		defer agent.DeleteWorkspaceBusyFile(workspaceInfo.Origin)
-	}
+	agent.CreateWorkspaceBusyFile(workspaceInfo.Origin)
+	defer agent.DeleteWorkspaceBusyFile(workspaceInfo.Origin)
 
 	// initialize the workspace
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	tunnelClient, logger, credentialsDir, err := initWorkspace(cancelCtx, cancel, workspaceInfo, cmd.Debug, !workspaceInfo.CLIOptions.Platform.Enabled && !workspaceInfo.CLIOptions.DisableDaemon)
+	tunnelClient, logger, credentialsDir, err := initWorkspace(cancelCtx, cancel, workspaceInfo, cmd.Debug, !workspaceInfo.CLIOptions.DisableDaemon)
 	if err != nil {
 		err1 := clientimplementation.DeleteWorkspaceFolder(workspaceInfo.Workspace.Context, workspaceInfo.Workspace.ID, workspaceInfo.Workspace.SSHConfigPath, logger)
 		if err1 != nil {
@@ -259,12 +256,6 @@ func initWorkspace(ctx context.Context, cancel context.CancelFunc, workspaceInfo
 }
 
 func prepareWorkspace(ctx context.Context, workspaceInfo *provider2.AgentWorkspaceInfo, client tunnel.TunnelClient, helper string, log log.Logger) error {
-	// change content folder if source is local folder in proxy mode
-	// to a folder that's known ahead of time inside of DEVPOD_HOME
-	if workspaceInfo.CLIOptions.Platform.Enabled && workspaceInfo.Workspace.Source.LocalFolder != "" {
-		workspaceInfo.ContentFolder = agent.GetAgentWorkspaceContentDir(workspaceInfo.Origin)
-	}
-
 	// make sure content folder exists
 	exists, err := InitContentFolder(workspaceInfo, log)
 	if err != nil {
@@ -289,18 +280,12 @@ func prepareWorkspace(ctx context.Context, workspaceInfo *provider2.AgentWorkspa
 			return nil
 		}
 
-		if crane.ShouldUse(&workspaceInfo.CLIOptions) {
-			log.Infof("Pulling devcontainer spec from %v", workspaceInfo.CLIOptions.Platform.EnvironmentTemplate)
-			return nil
-		}
-
 		return agent.CloneRepositoryForWorkspace(ctx,
 			&workspaceInfo.Workspace.Source,
 			&workspaceInfo.Agent,
 			workspaceInfo.ContentFolder,
 			helper,
 			workspaceInfo.CLIOptions,
-			false,
 			log,
 		)
 	}

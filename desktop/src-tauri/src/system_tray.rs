@@ -1,6 +1,6 @@
 use crate::{
-    resource_watcher::{ProState, WorkspacesState},
-    ui_messages::{OpenProInstanceMsg, OpenWorkspaceMsg},
+    resource_watcher::WorkspacesState,
+    ui_messages::OpenWorkspaceMsg,
     util, AppHandle, AppState, UiMessage,
 };
 use log::{error, warn};
@@ -10,11 +10,6 @@ use tauri::{
     Manager, Wry,
 };
 use util::QUIT_EXIT_CODE;
-
-#[cfg(not(target_os = "macos"))]
-pub static WARNING_SYSTEM_TRAY_ICON_BYTES: &'static [u8] = include_bytes!("../icons/icon_warning_system_tray_color.png");
-#[cfg(target_os = "macos")]
-pub static WARNING_SYSTEM_TRAY_ICON_BYTES: &'static [u8] = include_bytes!("../icons/icon_warning_system_tray.png");
 
 #[cfg(not(target_os = "macos"))]
 pub static SYSTEM_TRAY_ICON_BYTES: &'static [u8] = include_bytes!("../icons/icon_system_tray_color.png");
@@ -56,11 +51,6 @@ impl SystemTray {
         let submenu = workspaces.to_submenu(app_handle)?;
         menu = menu.item(&submenu);
         workspaces.set_submenu(submenu);
-
-        let mut pro = state.pro.write().await;
-        let submenu = pro.to_submenu(app_handle)?;
-        menu = menu.item(&submenu);
-        pro.set_submenu(submenu);
 
         let quit = MenuItem::with_id(app_handle, Self::QUIT_ID, "Quit", true, None::<&str>)?;
         menu = menu.item(&quit);
@@ -110,18 +100,6 @@ impl SystemTray {
                                 error!("Failed to send create workspace message: {:?}", err);
                             };
                         }
-                    } else if id.starts_with(ProState::IDENTIFIER_PREFIX) {
-                        let tx = &app_state.ui_messages;
-
-                        let host = id.replace(ProState::IDENTIFIER_PREFIX, "");
-                        if let Err(err) = tx
-                            .send(UiMessage::OpenProInstance(OpenProInstanceMsg {
-                                host: Some(host),
-                            }))
-                            .await
-                        {
-                            error!("Failed to send open pro instance message: {:?}", err);
-                        };
                     } else {
                         warn!("Received unhandled click for ID: {}", id);
                     }

@@ -1,12 +1,5 @@
 import { debug, EventManager, SingleEventManager } from "../../../lib"
-import {
-  TProID,
-  TUnsubscribeFn,
-  TWorkspace,
-  TWorkspaceID,
-  TWorkspaceWithoutStatus,
-} from "../../../types"
-import { ProWorkspaceInstance } from "../Pro"
+import { TUnsubscribeFn, TWorkspace, TWorkspaceID, TWorkspaceWithoutStatus } from "../../../types"
 import { Action, TActionFn, TActionName, TActionObj } from "../action"
 import { ActionHistory } from "../action/actionHistory" // This is a workaround for how typescript resolves circular dependencies, usually the import should be from "./action"
 import { replaceEqualDeep } from "../helpers"
@@ -14,7 +7,7 @@ import { replaceEqualDeep } from "../helpers"
 type TLastActions = Readonly<{ active: readonly TActionObj[]; history: readonly TActionObj[] }>
 type TStartActionArgs = Readonly<{
   actionName: TActionName
-  workspaceKey: TInstanceID
+  workspaceKey: string
   actionFn: TActionFn
 }>
 
@@ -42,8 +35,8 @@ class InternalWorkspaceStore<TKey extends string, TWorkspace> {
   private lastWorkspaces: readonly TWorkspace[] = []
   private lastActions: TLastActions = { active: [], history: [] }
 
-  constructor(key?: string) {
-    this.actionsHistory = new ActionHistory(key)
+  constructor() {
+    this.actionsHistory = new ActionHistory()
     this.lastActions = this.actionsHistory.getAll()
   }
 
@@ -211,69 +204,6 @@ export class WorkspaceStore implements IWorkspaceStore<TWorkspaceID, TWorkspace>
 
   public getWorkspaceActions(workspaceID: TWorkspaceID): TActionObj[] {
     return this.store.getWorkspaceActions(workspaceID)
-  }
-
-  public startAction(args: TStartActionArgs): Action["id"] {
-    return this.store.startAction(args)
-  }
-}
-
-type TInstanceID = string
-export class ProWorkspaceStore implements IWorkspaceStore<TInstanceID, ProWorkspaceInstance> {
-  private store: InternalWorkspaceStore<TInstanceID, ProWorkspaceInstance>
-  constructor(id: TProID) {
-    this.store = new InternalWorkspaceStore<TInstanceID, ProWorkspaceInstance>(id)
-  }
-
-  public get(key: TInstanceID): ProWorkspaceInstance | undefined {
-    return this.store.get(key)
-  }
-
-  public getAll(): readonly ProWorkspaceInstance[] {
-    return this.store.getAll()
-  }
-
-  public setWorkspace(key: TInstanceID, newWorkspace: ProWorkspaceInstance): void {
-    return this.store.setWorkspace(key, newWorkspace)
-  }
-
-  public setWorkspaces(newInstances: readonly ProWorkspaceInstance[]): void {
-    const prevInstances = this.store.getAll()
-
-    const instances = replaceEqualDeep(prevInstances, newInstances)
-
-    if (Object.is(instances, prevInstances)) {
-      return
-    }
-
-    const newWorkspacesMap = new Map(instances.map((instance) => [instance.id, instance]))
-    this.store.setWorkspaces(newWorkspacesMap)
-  }
-
-  public removeWorkspace(workspaceKey: TInstanceID): void {
-    return this.store.removeWorkspace(workspaceKey)
-  }
-
-  public subscribe(listener: VoidFunction): TUnsubscribeFn {
-    return this.store.subscribe(listener)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public setStatus(_workspaceKey: TInstanceID, _status: string): void {
-    // noop
-    return
-  }
-
-  public getAllActions(): TLastActions {
-    return this.store.getAllActions()
-  }
-
-  public getCurrentAction(workspaceKey: TInstanceID): TActionObj | undefined {
-    return this.store.getCurrentAction(workspaceKey)
-  }
-
-  public getWorkspaceActions(workspaceKey: TInstanceID): TActionObj[] {
-    return this.store.getWorkspaceActions(workspaceKey)
   }
 
   public startAction(args: TStartActionArgs): Action["id"] {

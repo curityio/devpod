@@ -3,7 +3,6 @@ import { TActionObj } from "@/contexts/DevPodContext/action"
 import { TWorkspace } from "@/types"
 import { useToast } from "@chakra-ui/react"
 import { useMutation } from "@tanstack/react-query"
-import { ProWorkspaceInstance } from "@/contexts"
 import JSZip from "jszip"
 
 export function useStoreTroubleshoot() {
@@ -13,7 +12,7 @@ export function useStoreTroubleshoot() {
       workspace,
       workspaceActions,
     }: {
-      workspace: TWorkspace | ProWorkspaceInstance
+      workspace: TWorkspace
       workspaceActions: TActionObj[]
     }) => {
       const logFiles = await Promise.all(

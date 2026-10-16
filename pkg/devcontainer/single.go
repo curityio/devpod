@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/daemon/agent"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/devcontainer/metadata"
 	"github.com/loft-sh/devpod/pkg/driver"
@@ -96,7 +95,6 @@ func (r *runner) runSingleContainer(
 			CLIOptions: provider2.CLIOptions{
 				PrebuildRepositories: options.PrebuildRepositories,
 				ForceDockerless:      options.ForceDockerless,
-				Platform:             options.CLIOptions.Platform,
 			},
 			NoBuild:       options.NoBuild,
 			RegistryCache: options.RegistryCache,
@@ -125,18 +123,6 @@ func (r *runner) runSingleContainer(
 		mergedConfig, err = config.MergeConfiguration(parsedConfig.Config, buildInfo.ImageMetadata.Config)
 		if err != nil {
 			return nil, errors.Wrap(err, "merge config")
-		}
-
-		// Inject the daemon entrypoint if platform configuration is provided.
-		if options.CLIOptions.Platform.AccessKey != "" {
-			r.Log.Debugf("Platform config detected, injecting DevPod daemon entrypoint.")
-
-			data, err := agent.GetEncodedWorkspaceDaemonConfig(options.Platform, r.WorkspaceConfig.Workspace, substitutionContext, mergedConfig)
-			if err != nil {
-				r.Log.Errorf("Failed to marshal daemon config: %v", err)
-			} else {
-				mergedConfig.ContainerEnv[config.WorkspaceDaemonConfigExtraEnvVar] = data
-			}
 		}
 
 		// run dev container

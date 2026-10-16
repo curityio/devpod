@@ -1,5 +1,4 @@
 import { UseMutationResult } from "@tanstack/react-query"
-import { TStreamEventListenerFn } from "./client"
 
 type TMaybe<T> = T | null | undefined
 export type TUnsubscribeFn = VoidFunction
@@ -48,9 +47,7 @@ export type TProvider = Readonly<{
       options: TMaybe<TProviderOptions>
     }>
   >
-}> & {
-  isProxyProvider: boolean
-}
+}>
 export type TNamedProvider = TProvider & Readonly<{ name: string }>
 export type TProviderConfig = Readonly<{
   name: TMaybe<string>
@@ -61,10 +58,7 @@ export type TProviderConfig = Readonly<{
   options: TProviderOptions
   icon: TMaybe<string>
   home: TMaybe<string>
-  exec:
-    | TMaybe<Record<string, readonly string[]> & { proxy: never; daemon: never }>
-    | TMaybe<{ proxy: TMaybe<Record<string, readonly string[]>>; daemon: never }>
-    | TMaybe<{ daemon: TMaybe<Record<string, readonly string[]>>; proxy: never }>
+  exec: TMaybe<Record<string, readonly string[]>>
 }>
 export type TProviderOptionGroup = Readonly<{
   name: TMaybe<string>
@@ -200,13 +194,6 @@ export const SUPPORTED_IDES = [
   "windsurf",
 ] as const
 export type TSupportedIDE = (typeof SUPPORTED_IDES)[number]
-export type TImportWorkspaceConfig = Readonly<{
-  workspaceID: string
-  workspaceUID: string
-  devPodProHost: string
-  project: string
-  options: Record<string, string> | null
-}>
 
 //#endregion
 
@@ -227,43 +214,6 @@ export type TContextOption = Readonly<{
 }>
 //#endregion
 
-//#region Pro
-export type TProID = string
-export type TWithProID = Readonly<{ id: TProID }>
-export type TProInstance = Readonly<{
-  host: TMaybe<string>
-  provider: TMaybe<string>
-  creationTimestamp: TMaybe<string>
-  authenticated: TMaybe<boolean>
-  capabilities: TMaybe<readonly string[]>
-}>
-export type TProInstances = readonly TProInstance[]
-export type TProInstanceManager = Readonly<{
-  login: TRunnable<TProInstanceLoginConfig> &
-    Pick<UseMutationResult<TProvider, Error, unknown>, "status" | "error" | "reset"> & {
-      provider: TProvider | undefined
-    }
-  disconnect: TRunnable<TWithProID> &
-    Pick<UseMutationResult, "status" | "error"> & { target: TWithProID | undefined }
-}>
-export type TProInstanceLoginConfig = Readonly<{
-  host: string
-  accessKey?: string
-  streamListener?: TStreamEventListenerFn
-}>
-export type TListProInstancesConfig = Readonly<
-  | {
-      authenticate?: boolean
-    }
-  | undefined
->
-export type TPlatformVersionInfo = Readonly<{
-  serverVersion: TMaybe<string>
-  remoteProviderVersion: TMaybe<string>
-  currentProviderVersion: TMaybe<string>
-}>
-//#endregion
-
 export type TDevcontainerSetup = Readonly<{
   isGitRepository: boolean
   isLocal: boolean
@@ -278,35 +228,6 @@ export type TCommunityProvider = Readonly<{
   repository: string
 }>
 //#endregion
-export type TPlatformHealthCheck = Readonly<{
-  healthy: TMaybe<boolean>
-  online: TMaybe<boolean>
-  loginRequired: TMaybe<boolean>
-  details: TMaybe<string[]>
-}>
-export type TPlatformUpdateCheck = Readonly<{
-  available: TMaybe<boolean>
-  newVersion: TMaybe<string>
-}>
-export const UserSecret = {
-  GIT_HTTP: "devpod-git-http",
-  GIT_SSH: "devpod-git-ssh",
-} as const
-export type TUserSecretType = (typeof UserSecret)[keyof typeof UserSecret]
-export type TGitCredentialData = {
-  password?: string
-  key?: string
-  host?: string
-  user?: string
-  path?: string
-}
-export type TGitCredentialHelperData = Readonly<{
-  host: string
-  path?: string
-  username?: string
-  password: string
-}>
-
 export function isWithWorkspaceID(arg: unknown): arg is TWithWorkspaceID {
   return typeof arg === "object" && arg !== null && "workspaceID" in arg
 }

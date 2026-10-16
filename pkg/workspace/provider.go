@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -401,20 +400,4 @@ func LoadAllProviders(devPodConfig *config.Config, log log.Logger) (map[string]*
 	}
 
 	return retProviders, nil
-}
-
-func ProviderFromHost(ctx context.Context, devPodConfig *config.Config, proHost string, log log.Logger) (*providerpkg.ProviderConfig, error) {
-	proInstanceConfig, err := providerpkg.LoadProInstanceConfig(devPodConfig.DefaultContext, proHost)
-	if err != nil {
-		return nil, fmt.Errorf("load pro instance %s: %w", proHost, err)
-	}
-
-	provider, err := FindProvider(devPodConfig, proInstanceConfig.Provider, log)
-	if err != nil {
-		return nil, fmt.Errorf("find provider: %w", err)
-	} else if !provider.Config.IsProxyProvider() && !provider.Config.IsDaemonProvider() {
-		return nil, fmt.Errorf("provider is not a pro provider")
-	}
-
-	return provider.Config, nil
 }

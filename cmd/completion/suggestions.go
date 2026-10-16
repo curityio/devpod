@@ -7,20 +7,19 @@ import (
 
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/platform"
 	"github.com/loft-sh/devpod/pkg/workspace"
 	"github.com/loft-sh/log"
 )
 
 func RegisterFlagCompletionFuns(rootCmd *cobra.Command, globalFlags *flags.GlobalFlags) error {
 	if err := rootCmd.RegisterFlagCompletionFunc("provider", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return GetProviderSuggestions(rootCmd, globalFlags.Context, globalFlags.Provider, args, toComplete, globalFlags.Owner, log.Default)
+		return GetProviderSuggestions(rootCmd, globalFlags.Context, globalFlags.Provider, args, toComplete, log.Default)
 	}); err != nil {
 		return err
 	}
 
 	if err := rootCmd.RegisterFlagCompletionFunc("context", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return GetContextSuggestions(rootCmd, globalFlags.Context, globalFlags.Provider, args, toComplete, globalFlags.Owner, log.Default)
+		return GetContextSuggestions(rootCmd, globalFlags.Context, globalFlags.Provider, args, toComplete, log.Default)
 	}); err != nil {
 		return err
 	}
@@ -28,13 +27,13 @@ func RegisterFlagCompletionFuns(rootCmd *cobra.Command, globalFlags *flags.Globa
 	return nil
 }
 
-func GetWorkspaceSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, owner platform.OwnerFilter, logger log.Logger) ([]string, cobra.ShellCompDirective) {
+func GetWorkspaceSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, logger log.Logger) ([]string, cobra.ShellCompDirective) {
 	devPodConfig, err := config.LoadConfig(context, provider)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
 
-	workspaces, err := workspace.List(rootCmd.Context(), devPodConfig, false, owner, logger)
+	workspaces, err := workspace.List(rootCmd.Context(), devPodConfig, logger)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -48,7 +47,7 @@ func GetWorkspaceSuggestions(rootCmd *cobra.Command, context, provider string, a
 	return suggestions, cobra.ShellCompDirectiveNoFileComp
 }
 
-func GetProviderSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, owner platform.OwnerFilter, logger log.Logger) ([]string, cobra.ShellCompDirective) {
+func GetProviderSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, logger log.Logger) ([]string, cobra.ShellCompDirective) {
 	devPodConfig, err := config.LoadConfig(context, provider)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
@@ -68,7 +67,7 @@ func GetProviderSuggestions(rootCmd *cobra.Command, context, provider string, ar
 	return suggestions, cobra.ShellCompDirectiveNoFileComp
 }
 
-func GetContextSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, owner platform.OwnerFilter, logger log.Logger) ([]string, cobra.ShellCompDirective) {
+func GetContextSuggestions(rootCmd *cobra.Command, context, provider string, args []string, toComplete string, logger log.Logger) ([]string, cobra.ShellCompDirective) {
 	devPodConfig, err := config.LoadConfig(context, provider)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError

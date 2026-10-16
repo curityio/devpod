@@ -16,32 +16,20 @@ import {
   Portal,
   Text,
   Tooltip,
-  useToast,
 } from "@chakra-ui/react"
 import { useMemo, useCallback, useState } from "react"
-import { HiOutlineCode, HiShare } from "react-icons/hi"
+import { HiOutlineCode } from "react-icons/hi"
 import { client } from "@/client"
 import { IDEGroup, IDEIcon } from "@/components"
-import { TActionID, useProInstances } from "@/contexts"
-import {
-  ArrowCycle,
-  ArrowPath,
-  CommandLine,
-  Cog,
-  Ellipsis,
-  Pause,
-  Play,
-  Stack3D,
-  Trash,
-} from "@/icons"
+import { TActionID } from "@/contexts"
+import { ArrowCycle, ArrowPath, CommandLine, Cog, Ellipsis, Pause, Play, Trash } from "@/icons"
 import { getIDEDisplayName, useHover } from "@/lib"
-import { TIDE, TIDEs, TProInstance, TProvider, TWorkspace, TWorkspaceID } from "@/types"
+import { TIDE, TIDEs, TWorkspace, TWorkspaceID } from "@/types"
 import { useGroupIDEs } from "@/useIDEs"
 
 type TWorkspaceControlsProps = Readonly<{
   id: TWorkspaceID
   workspace: TWorkspaceResult<TWorkspace>
-  provider: TProvider | undefined
   isIDEFixed: boolean
   isLoading: boolean
   ides: TIDEs | undefined
@@ -54,7 +42,6 @@ type TWorkspaceControlsProps = Readonly<{
   onStopClicked: VoidFunction
   onLogsClicked: VoidFunction
   onTroubleshootClicked: VoidFunction
-  onChangeOptionsClicked?: VoidFunction
 }>
 export function WorkspaceControls({
   id,
@@ -63,7 +50,6 @@ export function WorkspaceControls({
   ides,
   ideName,
   isIDEFixed,
-  provider,
   setIdeName,
   navigateToAction,
   onRebuildClicked,
@@ -72,21 +58,7 @@ export function WorkspaceControls({
   onStopClicked,
   onLogsClicked,
   onTroubleshootClicked,
-  onChangeOptionsClicked,
 }: TWorkspaceControlsProps) {
-  const [[proInstances]] = useProInstances()
-  const proInstance = useMemo<TProInstance | undefined>(() => {
-    if (!provider?.isProxyProvider) {
-      return undefined
-    }
-
-    return proInstances?.find((instance) => instance.provider === provider.config?.name)
-  }, [proInstances, provider?.config?.name, provider?.isProxyProvider])
-  const { isEnabled: isShareEnabled, onClick: handleShareClicked } = useShareWorkspace(
-    workspace.data,
-    proInstance
-  )
-
   const handleOpenWithIDEClicked = useCallback(
     (id: TWorkspaceID, ide: TIDE["name"]) => async () => {
       if (!ide) {
@@ -128,9 +100,6 @@ export function WorkspaceControls({
   const ideGroupHovered = useMemo(() => {
     return Object.values(ideGroupHoverState).includes(true)
   }, [ideGroupHoverState])
-
-  const isChangeOptionsEnabled =
-    workspace.data?.provider?.options != null && proInstance !== undefined
 
   const groupedIDEs = useGroupIDEs(ides)
 
@@ -228,19 +197,6 @@ export function WorkspaceControls({
                 isDisabled={isOpenDisabled || isLoading}>
                 Reset
               </MenuItem>
-              {isChangeOptionsEnabled && (
-                <MenuItem
-                  icon={<Stack3D boxSize={4} />}
-                  onClick={onChangeOptionsClicked}
-                  isDisabled={isOpenDisabled || isLoading}>
-                  Change Options
-                </MenuItem>
-              )}
-              {isShareEnabled && (
-                <MenuItem icon={<Icon as={HiShare} boxSize={4} />} onClick={handleShareClicked}>
-                  Share
-                </MenuItem>
-              )}
               <MenuItem
                 fontWeight="normal"
                 icon={<CommandLine boxSize={4} />}
@@ -266,51 +222,4 @@ export function WorkspaceControls({
       </ButtonGroup>
     </HStack>
   )
-}
-
-function useShareWorkspace(
-  workspace: TWorkspace | undefined,
-  proInstance: TProInstance | undefined
-) {
-  const toast = useToast()
-
-  const handleShareClicked = useCallback(async () => {
-    const devpodProHost = proInstance?.host
-    const workspace_id = workspace?.id
-    const workspace_uid = workspace?.uid
-    if (!devpodProHost || !workspace_id || !workspace_uid) {
-      return
-    }
-
-    const searchParams = new URLSearchParams()
-    searchParams.set("workspace-uid", workspace_uid)
-    searchParams.set("workspace-id", workspace_id)
-    searchParams.set("devpod-pro-host", devpodProHost)
-
-    const link = `https://devpod.sh/import#${searchParams.toString()}`
-    const res = await client.writeToClipboard(link)
-    if (!res.ok) {
-      toast({
-        title: "Failed to share workspace",
-        description: res.val.message,
-        status: "error",
-        duration: 5_000,
-        isClosable: true,
-      })
-
-      return
-    }
-
-    toast({
-      title: "Copied workspace link to clipboard",
-      status: "success",
-      duration: 5_000,
-      isClosable: true,
-    })
-  }, [proInstance?.host, toast, workspace?.id, workspace?.uid])
-
-  return {
-    isEnabled: workspace !== undefined && proInstance !== undefined,
-    onClick: handleShareClicked,
-  }
 }

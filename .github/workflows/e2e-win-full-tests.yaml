@@ -26,7 +26,6 @@ jobs:
           - "up-docker"
           - "up-docker-build"
           - "up-docker-compose"
-          # - "up-docker-wsl"
 
     steps:
       - name: Git set line ending

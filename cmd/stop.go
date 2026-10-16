@@ -7,7 +7,6 @@ import (
 	"github.com/loft-sh/devpod/cmd/completion"
 	"github.com/loft-sh/devpod/cmd/flags"
 	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
 	"github.com/loft-sh/devpod/pkg/config"
 	workspace2 "github.com/loft-sh/devpod/pkg/workspace"
 	"github.com/loft-sh/log"
@@ -37,12 +36,7 @@ func NewStopCmd(flags *flags.GlobalFlags) *cobra.Command {
 				return err
 			}
 
-			err = clientimplementation.DecodePlatformOptionsFromEnv(&cmd.StopOptions.Platform)
-			if err != nil {
-				return fmt.Errorf("decode platform options: %w", err)
-			}
-
-			client, err := workspace2.Get(ctx, devPodConfig, args, false, cmd.Owner, false, log.Default)
+			client, err := workspace2.Get(ctx, devPodConfig, args, false, false, log.Default)
 			if err != nil {
 				return err
 			}
@@ -50,7 +44,7 @@ func NewStopCmd(flags *flags.GlobalFlags) *cobra.Command {
 			return cmd.Run(ctx, devPodConfig, client)
 		},
 		ValidArgsFunction: func(rootCmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, cmd.Owner, log.Default)
+			return completion.GetWorkspaceSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, log.Default)
 		},
 	}
 
@@ -60,13 +54,11 @@ func NewStopCmd(flags *flags.GlobalFlags) *cobra.Command {
 // Run runs the command logic
 func (cmd *StopCmd) Run(ctx context.Context, devPodConfig *config.Config, client client2.BaseWorkspaceClient) error {
 	// lock workspace
-	if !cmd.Platform.Enabled {
-		err := client.Lock(ctx)
-		if err != nil {
-			return err
-		}
-		defer client.Unlock()
+	err := client.Lock(ctx)
+	if err != nil {
+		return err
 	}
+	defer client.Unlock()
 
 	// get instance status
 	instanceStatus, err := client.Status(ctx, client2.StatusOptions{})
@@ -101,7 +93,7 @@ func (cmd *StopCmd) stopSingleMachine(ctx context.Context, client client2.BaseWo
 	}
 
 	// try to find other workspace with same machine
-	workspaces, err := workspace2.List(ctx, devPodConfig, false, cmd.Owner, log.Default)
+	workspaces, err := workspace2.List(ctx, devPodConfig, log.Default)
 	if err != nil {
 		return false, errors.Wrap(err, "list workspaces")
 	}

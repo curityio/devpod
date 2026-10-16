@@ -14,12 +14,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/blang/semver"
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/agent"
 	"github.com/loft-sh/devpod/pkg/agent/tunnelserver"
 	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
 	"github.com/loft-sh/devpod/pkg/config"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/devcontainer/sshtunnel"
@@ -31,14 +29,12 @@ import (
 	"github.com/loft-sh/devpod/pkg/ide/vscode"
 	"github.com/loft-sh/devpod/pkg/ide/zed"
 	open2 "github.com/loft-sh/devpod/pkg/open"
-	"github.com/loft-sh/devpod/pkg/platform"
 	"github.com/loft-sh/devpod/pkg/port"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	devssh "github.com/loft-sh/devpod/pkg/ssh"
 	"github.com/loft-sh/devpod/pkg/telemetry"
 	"github.com/loft-sh/devpod/pkg/tunnel"
 	"github.com/loft-sh/devpod/pkg/util"
-	"github.com/loft-sh/devpod/pkg/version"
 	workspace2 "github.com/loft-sh/devpod/pkg/workspace"
 	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
@@ -59,7 +55,6 @@ type UpCmd struct {
 	ConfigureSSH       bool
 	GPGAgentForwarding bool
 	OpenIDE            bool
-	Reconfigure        bool
 
 	SSHConfigPath string
 
@@ -110,7 +105,6 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 	upCmd.Flags().StringVar(&cmd.DevContainerImage, "devcontainer-image", "", "The container image to use, this will override the devcontainer.json value in the project")
 	upCmd.Flags().StringVar(&cmd.DevContainerPath, "devcontainer-path", "", "The path to the devcontainer.json relative to the project")
 	upCmd.Flags().StringArrayVar(&cmd.ProviderOptions, "provider-option", []string{}, "Provider option in the form KEY=VALUE")
-	upCmd.Flags().BoolVar(&cmd.Reconfigure, "reconfigure", false, "Reconfigure the options for this workspace. Only supported in DevPod Pro right now.")
 	upCmd.Flags().BoolVar(&cmd.Recreate, "recreate", false, "If true will remove any existing containers and recreate them")
 	upCmd.Flags().BoolVar(&cmd.Reset, "reset", false, "If true will remove any existing containers including sources, and recreate them")
 	upCmd.Flags().StringSliceVar(&cmd.PrebuildRepositories, "prebuild-repository", []string{}, "Docker repository that hosts devpod prebuilds for this workspace")
@@ -140,7 +134,7 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 func (cmd *UpCmd) Run(
 	ctx context.Context,
 	devPodConfig *config.Config,
-	client client2.BaseWorkspaceClient,
+	client client2.WorkspaceClient,
 	args []string,
 	log log.Logger,
 ) error {
@@ -155,11 +149,9 @@ func (cmd *UpCmd) Run(
 	if cmd.IDE != "" {
 		targetIDE = cmd.IDE
 	}
-	if !cmd.Platform.Enabled && ide.ReusesAuthSock(targetIDE) {
+	if ide.ReusesAuthSock(targetIDE) {
 		cmd.SSHAuthSockID = util.RandStringBytes(10)
 		log.Debug("Reusing SSH_AUTH_SOCK", cmd.SSHAuthSockID)
-	} else if cmd.Platform.Enabled && ide.ReusesAuthSock(targetIDE) {
-		log.Debug("Reusing SSH_AUTH_SOCK is not supported with platform mode, consider launching the IDE from the platform UI")
 	}
 
 	// run devpod agent up
@@ -168,8 +160,6 @@ func (cmd *UpCmd) Run(
 		return err
 	} else if result == nil {
 		return fmt.Errorf("didn't receive a result back from agent")
-	} else if cmd.Platform.Enabled {
-		return nil
 	}
 
 	// get user from result
@@ -338,41 +328,19 @@ func (cmd *UpCmd) Run(
 func (cmd *UpCmd) devPodUp(
 	ctx context.Context,
 	devPodConfig *config.Config,
-	client client2.BaseWorkspaceClient,
+	client client2.WorkspaceClient,
 	log log.Logger,
 ) (*config2.Result, error) {
-	var err error
-
-	// only lock if we are not in platform mode
-	if !cmd.Platform.Enabled {
-		err := client.Lock(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer client.Unlock()
+	err := client.Lock(ctx)
+	if err != nil {
+		return nil, err
 	}
+	defer client.Unlock()
 
 	// get result
-	var result *config2.Result
-
-	switch client := client.(type) {
-	case client2.WorkspaceClient:
-		result, err = cmd.devPodUpMachine(ctx, devPodConfig, client, log)
-		if err != nil {
-			return nil, err
-		}
-	case client2.ProxyClient:
-		result, err = cmd.devPodUpProxy(ctx, client, log)
-		if err != nil {
-			return nil, err
-		}
-	case client2.DaemonClient:
-		result, err = cmd.devPodUpDaemon(ctx, client)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unsupported client type: %T", client)
+	result, err := cmd.devPodUpMachine(ctx, devPodConfig, client, log)
+	if err != nil {
+		return nil, err
 	}
 
 	// save result to file
@@ -382,109 +350,6 @@ func (cmd *UpCmd) devPodUp(
 	}
 
 	return result, nil
-}
-
-func (cmd *UpCmd) devPodUpProxy(
-	ctx context.Context,
-	client client2.ProxyClient,
-	log log.Logger,
-) (*config2.Result, error) {
-	// create pipes
-	stdoutReader, stdoutWriter, err := os.Pipe()
-	if err != nil {
-		return nil, err
-	}
-	stdinReader, stdinWriter, err := os.Pipe()
-	if err != nil {
-		return nil, err
-	}
-	defer stdoutWriter.Close()
-	defer stdinWriter.Close()
-
-	// start machine on stdio
-	cancelCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// create up command
-	errChan := make(chan error, 1)
-	go func() {
-		defer log.Debugf("Done executing up command")
-		defer cancel()
-
-		// build devpod up options
-		workspace := client.WorkspaceConfig()
-		baseOptions := cmd.CLIOptions
-		baseOptions.ID = workspace.ID
-		baseOptions.DevContainerPath = workspace.DevContainerPath
-		baseOptions.DevContainerImage = workspace.DevContainerImage
-		baseOptions.IDE = workspace.IDE.Name
-		baseOptions.IDEOptions = nil
-		baseOptions.Source = workspace.Source.String()
-		for optionName, optionValue := range workspace.IDE.Options {
-			baseOptions.IDEOptions = append(
-				baseOptions.IDEOptions,
-				optionName+"="+optionValue.Value,
-			)
-		}
-
-		// run devpod up elsewhere
-		err = client.Up(ctx, client2.UpOptions{
-			CLIOptions: baseOptions,
-			Debug:      cmd.Debug,
-
-			Stdin:  stdinReader,
-			Stdout: stdoutWriter,
-		})
-		if err != nil {
-			errChan <- fmt.Errorf("executing up proxy command: %w", err)
-		} else {
-			errChan <- nil
-		}
-	}()
-
-	// create container etc.
-	result, err := tunnelserver.RunUpServer(
-		cancelCtx,
-		stdoutReader,
-		stdinWriter,
-		true,
-		true,
-		client.WorkspaceConfig(),
-		log,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "run tunnel machine")
-	}
-
-	// wait until command finished
-	return result, <-errChan
-}
-
-func (cmd *UpCmd) devPodUpDaemon(
-	ctx context.Context,
-	client client2.DaemonClient,
-) (*config2.Result, error) {
-	// build devpod up options
-	workspace := client.WorkspaceConfig()
-	baseOptions := cmd.CLIOptions
-	baseOptions.ID = workspace.ID
-	baseOptions.DevContainerPath = workspace.DevContainerPath
-	baseOptions.DevContainerImage = workspace.DevContainerImage
-	baseOptions.IDE = workspace.IDE.Name
-	baseOptions.IDEOptions = nil
-	baseOptions.Source = workspace.Source.String()
-	for optionName, optionValue := range workspace.IDE.Options {
-		baseOptions.IDEOptions = append(
-			baseOptions.IDEOptions,
-			optionName+"="+optionValue.Value,
-		)
-	}
-
-	// run devpod up elsewhere
-	return client.Up(ctx, client2.UpOptions{
-		CLIOptions: baseOptions,
-		Debug:      cmd.Debug,
-	})
 }
 
 func (cmd *UpCmd) devPodUpMachine(
@@ -507,11 +372,6 @@ func (cmd *UpCmd) devPodUpMachine(
 	// create container etc.
 	log.Infof("Creating devcontainer...")
 	defer log.Debugf("Done creating devcontainer")
-
-	// if we run on a platform, we need to pass the platform options
-	if cmd.Platform.Enabled {
-		return buildAgentClient(ctx, client, cmd.CLIOptions, "up", log, tunnelserver.WithPlatformOptions(&cmd.Platform))
-	}
 
 	// ssh tunnel command
 	sshTunnelCmd := fmt.Sprintf("'%s' helper ssh-server --stdio", client.AgentPath())
@@ -840,39 +700,12 @@ func startBrowserTunnel(
 ) error {
 	// Setup a backhaul SSH connection using the remote user so there is an AUTH SOCK to use
 	// With normal IDEs this would be the SSH connection made by the IDE
-	// authSockID is not set when in proxy mode since we cannot use the proxies ssh-agent
 	if authSockID != "" {
 		go func() {
 			if err := setupBackhaul(client, authSockID, logger); err != nil {
 				logger.Error("Failed to setup backhaul SSH connection: ", err)
 			}
 		}()
-	}
-
-	// handle this directly with the daemon client
-	daemonClient, ok := client.(client2.DaemonClient)
-	if ok {
-		toolClient, _, err := daemonClient.SSHClients(ctx, user)
-		if err != nil {
-			return err
-		}
-		defer toolClient.Close()
-
-		err = startServicesDaemon(ctx,
-			devPodConfig,
-			daemonClient,
-			toolClient,
-			user,
-			logger,
-			forwardPorts,
-			extraPorts,
-		)
-		if err != nil {
-			return err
-		}
-		<-ctx.Done()
-
-		return nil
 	}
 
 	err := tunnel.NewTunnel(
@@ -916,7 +749,6 @@ func startBrowserTunnel(
 				user,
 				forwardPorts,
 				extraPorts,
-				nil,
 				client.WorkspaceConfig(),
 				configureDockerCredentials,
 				configureGitCredentials,
@@ -957,29 +789,6 @@ func configureSSH(client client2.BaseWorkspaceClient, sshConfigPath, user, workd
 	)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func mergeDevPodUpOptions(baseOptions *provider2.CLIOptions) error {
-	oldOptions := *baseOptions
-	found, err := clientimplementation.DecodeOptionsFromEnv(
-		clientimplementation.DevPodFlagsUp,
-		baseOptions,
-	)
-	if err != nil {
-		return fmt.Errorf("decode up options: %w", err)
-	} else if found {
-		baseOptions.WorkspaceEnv = append(oldOptions.WorkspaceEnv, baseOptions.WorkspaceEnv...)
-		baseOptions.InitEnv = append(oldOptions.InitEnv, baseOptions.InitEnv...)
-		baseOptions.PrebuildRepositories = append(oldOptions.PrebuildRepositories, baseOptions.PrebuildRepositories...)
-		baseOptions.IDEOptions = append(oldOptions.IDEOptions, baseOptions.IDEOptions...)
-	}
-
-	err = clientimplementation.DecodePlatformOptionsFromEnv(&baseOptions.Platform)
-	if err != nil {
-		return fmt.Errorf("decode platform options: %w", err)
 	}
 
 	return nil
@@ -1247,99 +1056,8 @@ func performGpgForwarding(
 	return nil
 }
 
-// checkProviderUpdate currently only ensures the local provider is in sync with the remote for DevPod Pro instances
-// Potentially auto-upgrade other providers in the future.
-func checkProviderUpdate(devPodConfig *config.Config, proInstance *provider2.ProInstance, log log.Logger) error {
-	if version.GetVersion() == version.DevVersion {
-		log.Debugf("Skipping provider upgrade check during development")
-		return nil
-	}
-	if proInstance == nil {
-		log.Debugf("No pro instance available, skipping provider upgrade check")
-		return nil
-	}
-
-	// compare versions
-	newVersion, err := platform.GetProInstanceDevPodVersion(proInstance)
-	if err != nil {
-		return fmt.Errorf("version for pro instance %s: %w", proInstance.Host, err)
-	}
-
-	p, err := workspace2.FindProvider(devPodConfig, proInstance.Provider, log)
-	if err != nil {
-		return fmt.Errorf("get provider config for pro provider %s: %w", proInstance.Provider, err)
-	}
-	if p.Config.Version == version.DevVersion {
-		return nil
-	}
-	if p.Config.Source.Internal {
-		return nil
-	}
-
-	v1, err := semver.Parse(strings.TrimPrefix(newVersion, "v"))
-	if err != nil {
-		return fmt.Errorf("parse version %s: %w", newVersion, err)
-	}
-	v2, err := semver.Parse(strings.TrimPrefix(p.Config.Version, "v"))
-	if err != nil {
-		return fmt.Errorf("parse version %s: %w", p.Config.Version, err)
-	}
-	if v1.Compare(v2) == 0 {
-		return nil
-	}
-	log.Infof("New provider version available, attempting to update %s from %s to %s", proInstance.Provider, p.Config.Version, newVersion)
-
-	providerSource, err := workspace2.ResolveProviderSource(devPodConfig, proInstance.Provider, log)
-	if err != nil {
-		return fmt.Errorf("resolve provider source %s: %w", proInstance.Provider, err)
-	}
-
-	splitted := strings.Split(providerSource, "@")
-	if len(splitted) == 0 {
-		return fmt.Errorf("no provider source found %s", providerSource)
-	}
-	providerSource = splitted[0] + "@" + newVersion
-
-	_, err = workspace2.UpdateProvider(devPodConfig, proInstance.Provider, providerSource, log)
-	if err != nil {
-		return fmt.Errorf("update provider %s: %w", proInstance.Provider, err)
-	}
-
-	log.Donef("Successfully updated provider %s", proInstance.Provider)
-	return nil
-}
-
-func getProInstance(devPodConfig *config.Config, providerName string, log log.Logger) *provider2.ProInstance {
-	proInstances, err := workspace2.ListProInstances(devPodConfig, log)
-	if err != nil {
-		return nil
-	} else if len(proInstances) == 0 {
-		return nil
-	}
-
-	proInstance, ok := workspace2.FindProviderProInstance(proInstances, providerName)
-	if !ok {
-		return nil
-	}
-
-	return proInstance
-}
-
-func (cmd *UpCmd) prepareClient(ctx context.Context, devPodConfig *config.Config, args []string) (client2.BaseWorkspaceClient, log.Logger, error) {
-	// try to parse flags from env
-	if err := mergeDevPodUpOptions(&cmd.CLIOptions); err != nil {
-		return nil, nil, err
-	}
-
+func (cmd *UpCmd) prepareClient(ctx context.Context, devPodConfig *config.Config, args []string) (client2.WorkspaceClient, log.Logger, error) {
 	var logger log.Logger = log.Default
-	if cmd.Platform.Enabled {
-		logger = logger.ErrorStreamOnly()
-		logger.Debug("Running in platform mode")
-		logger.Debug("Using error output stream")
-
-		// merge context options from env
-		config.MergeContextOptions(devPodConfig.Current(), os.Environ())
-	}
 
 	if err := mergeEnvFromFiles(&cmd.CLIOptions); err != nil {
 		return nil, logger, err
@@ -1350,8 +1068,6 @@ func (cmd *UpCmd) prepareClient(ctx context.Context, devPodConfig *config.Config
 		source = provider2.ParseWorkspaceSource(cmd.Source)
 		if source == nil {
 			return nil, nil, fmt.Errorf("workspace source is missing")
-		} else if source.LocalFolder != "" && cmd.Platform.Enabled {
-			return nil, nil, fmt.Errorf("local folder is not supported in platform mode. Please specify a git repository instead")
 		}
 	}
 
@@ -1368,26 +1084,16 @@ func (cmd *UpCmd) prepareClient(ctx context.Context, devPodConfig *config.Config
 		cmd.ID,
 		cmd.Machine,
 		cmd.ProviderOptions,
-		cmd.Reconfigure,
 		cmd.DevContainerImage,
 		cmd.DevContainerPath,
 		cmd.SSHConfigPath,
 		source,
 		cmd.UID,
 		true,
-		cmd.Owner,
 		logger,
 	)
 	if err != nil {
 		return nil, logger, err
-	}
-
-	if !cmd.Platform.Enabled {
-		proInstance := getProInstance(devPodConfig, client.Provider(), logger)
-		err = checkProviderUpdate(devPodConfig, proInstance, logger)
-		if err != nil {
-			return nil, logger, err
-		}
 	}
 
 	return client, logger, nil
