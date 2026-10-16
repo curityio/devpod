@@ -202,7 +202,6 @@ export type TContextOptions = Record<TContextOptionName, TContextOption>
 // See pkg/config/context.go
 export type TContextOptionName =
   | "AGENT_URL"
-  | "TELEMETRY"
   | "SSH_INJECT_DOCKER_CREDENTIALS"
   | "SSH_INJECT_GIT_CREDENTIALS"
 export type TContextOption = Readonly<{

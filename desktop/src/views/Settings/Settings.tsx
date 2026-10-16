@@ -42,7 +42,6 @@ import {
   useAgentURLOption,
   useDockerCredentialsForwardingOption,
   useGitCredentialsForwardingOption,
-  useTelemetryOption,
 } from "./useContextOptions"
 import { useIDESettings } from "./useIDESettings"
 import {
@@ -91,7 +90,6 @@ function GeneralSettings() {
   const { modal: welcomeModal, show: showWelcomeModal } = useWelcomeModal()
   const { input: agentURLInput, helpText: agentURLHelpText } = useAgentURLOption()
   const { input: proxyInput, helpText: proxyHelpText } = useProxyOptions()
-  const { input: telemetryInput, helpText: telemetryHelpText } = useTelemetryOption()
   const {
     badge: installCLIBadge,
     button: installCLIButton,
@@ -135,10 +133,6 @@ function GeneralSettings() {
 
       <SettingSection title="Proxy Configuration" description={proxyHelpText}>
         {proxyInput}
-      </SettingSection>
-
-      <SettingSection title="Telemetry" description={telemetryHelpText}>
-        {telemetryInput}
       </SettingSection>
 
       <SettingSection

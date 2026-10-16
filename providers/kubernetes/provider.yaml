@@ -1,6 +1,6 @@
 name: kubernetes
 version: v0.0.1
-icon: https://devpod.sh/assets/kubernetes.svg
+icon: https://curityio.github.io/devpod/icons/kubernetes.svg
 home: https://github.com/curityio/devpod
 description: |-
   DevPod on Kubernetes
