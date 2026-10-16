@@ -7,6 +7,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+## v0.8.0-alpha.1 (2026-10-16)
+
+First release from `curityio/devpod`.
+
 ### Removed
 
 - **DevPod Pro (Loft platform)**
@@ -28,24 +32,28 @@ Add new entries to the top of the "Unreleased" section.
     Kubernetes server libraries. This removed 98 modules (about 1.1 million lines) from `vendor/`.
 - **JetBrains Fleet support**: JetBrains discontinued Fleet. Workspaces saved with `fleet` as their
   IDE fall back to `none` with a warning, and `--ide fleet` now fails.
-- **Telemetry**: the CLI no longer sends usage events to Loft. The `TELEMETRY` context option, the
-  `DEVPOD_DISABLE_TELEMETRY` environment variable and the desktop Telemetry setting are gone, so
-  `devpod context set-options -o TELEMETRY=false` now fails.
+- **Telemetry** ([#14](https://github.com/curityio/devpod/pull/14)): the CLI no longer sends usage
+  events to Loft. The `TELEMETRY` context option, the `DEVPOD_DISABLE_TELEMETRY` environment variable
+  and the desktop Telemetry setting are gone, so `devpod context set-options -o TELEMETRY=false` now
+  fails.
 - **Windows e2e jobs** in `e2e-tests.yaml`: they needed Loft's self-hosted Windows runner.
 
 ### Changed
 
 - The documentation is published on this repository's GitHub Pages site,
   [devpod.curityio.net](https://devpod.curityio.net/), instead of Loft's devpod.sh
-  ([#9](https://github.com/curityio/devpod/pull/9)). Links in the README, guides and desktop app point
-  there. The Netlify config and Loft's Algolia search are removed, so the docs have no search for now.
+  ([#9](https://github.com/curityio/devpod/pull/9), [#15](https://github.com/curityio/devpod/pull/15)).
+  Links in the README, guides and desktop app point there. The Netlify config and Loft's Algolia
+  search are removed, so the docs have no search for now.
 - The desktop app checks for updates in `curityio/devpod` GitHub releases instead of Loft's update
   server ([#7](https://github.com/curityio/devpod/pull/7)).
 - Links point to `curityio/devpod` instead of `loft-sh/devpod`, the README has a hard-fork note and
   Curity branding, and links to Loft's website, Slack, blog and X accounts are removed.
-- The desktop app verifies updates with Curity's signing key instead of Loft's.
+- The desktop app verifies updates with Curity's signing key instead of Loft's
+  ([#14](https://github.com/curityio/devpod/pull/14)).
 - The IDE and built-in provider icons are served from
-  [devpod.curityio.net/icons](https://devpod.curityio.net/icons/) instead of devpod.sh.
+  [devpod.curityio.net/icons](https://devpod.curityio.net/icons/) instead of devpod.sh
+  ([#14](https://github.com/curityio/devpod/pull/14)).
 - Kubernetes image pull secrets use `noreply@curity.io` as their email.
 
 ### Fixed
