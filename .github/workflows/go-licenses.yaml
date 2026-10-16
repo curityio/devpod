@@ -32,7 +32,9 @@ jobs:
           go install github.com/google/go-licenses@v1.6.0
 
       - name: Run go-licenses
-        run: go-licenses report ./... > docs/pages/licenses/devpod.mdx --template .github/licenses.tmpl --ignore github.com/loft-sh
+        # go.mod's toolchain directive makes `go` switch to a downloaded toolchain, so point
+        # GOROOT at it; otherwise go-licenses doesn't recognize standard library packages
+        run: GOROOT="$(go env GOROOT)" go-licenses report ./... > docs/pages/licenses/devpod.mdx --template .github/licenses.tmpl --ignore github.com/loft-sh
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v5

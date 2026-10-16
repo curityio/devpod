@@ -322,7 +322,6 @@ func (t *tunnelServer) StreamWorkspace(message *tunnel.Empty, stream tunnel.Tunn
 }
 
 func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tunnel.Tunnel_StreamMountServer) error {
-
 	var mount *config.Mount
 	for _, m := range t.mounts {
 		if m.String() == message.Mount {

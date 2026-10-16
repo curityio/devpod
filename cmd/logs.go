@@ -49,15 +49,11 @@ func (cmd *LogsCmd) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	baseClient, err := workspace.Get(ctx, devPodConfig, args, false, false, log.Default)
+	client, err := workspace.Get(ctx, devPodConfig, args, false, false, log.Default)
 	if err != nil {
 		return err
 	}
 
-	client, ok := baseClient.(clientpkg.WorkspaceClient)
-	if !ok {
-		return fmt.Errorf("this command is not supported for proxy providers")
-	}
 	log := log.Default
 
 	// create readers
