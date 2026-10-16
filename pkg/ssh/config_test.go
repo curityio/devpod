@@ -259,9 +259,10 @@ Host testhost
 			}
 
 			// addHostSection joins lines with \r\n on Windows
-			expected := tt.expected
+			expected, config := tt.expected, tt.config
 			if runtime.GOOS == "windows" {
 				expected = strings.ReplaceAll(expected, "\n", "\r\n")
+				config = strings.ReplaceAll(config, "\n", "\r\n")
 			}
 
 			if result != expected {
@@ -293,7 +294,7 @@ Host testhost
 				t.Errorf("Result does not contain gpg-agent-forwarding flag")
 			}
 
-			if tt.config != "" && !strings.Contains(result, tt.config) {
+			if config != "" && !strings.Contains(result, config) {
 				t.Errorf("Result does not contain the original config")
 			}
 		})
