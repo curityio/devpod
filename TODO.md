@@ -25,14 +25,17 @@ in `curityio/devpod`. Copy the relevant information into our docs (or recreate t
 
 - [ ] `docs/pages/troubleshooting/ide-troubleshooting.mdx`: issue [#1187](https://github.com/loft-sh/devpod/issues/1187) (NeoVim `$TERM` workaround)
 - [ ] `docs/pages/troubleshooting/linux-troubleshooting.mdx`: issue [#1045](https://github.com/loft-sh/devpod/issues/1045) (SSH connection string too long)
-- [ ] `desktop/flatpak/DevPod.metainfo.xml`: release notes for [v0.6.10](https://github.com/loft-sh/devpod/releases/tag/v0.6.10)
 
-## Store the desktop app update signing key in GitHub
+## Sign the release binaries
 
-`plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` is our own key. The release workflow signs updates with
-its private key, so the key must be available to it:
+`.github/workflows/release.yaml` builds unsigned installers and binaries. macOS Gatekeeper blocks the app until the user
+allows it in Privacy & Security settings, and Windows SmartScreen warns about the installer. To sign them again:
 
-- [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
+- [ ] macOS: add the `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID`,
+  `APPLE_ID` and `APPLE_PASSWORD` secrets and pass them to the macOS `tauri-action` step (also enables notarization)
+- [ ] Windows: set up a signing service (upstream used SSL.com's CodeSignTool through `desktop/src-tauri/sign.bat`),
+  restore `bundle.windows.signCommand` in `tauri.conf.json` and sign the sidecar CLI before uploading it
+- [ ] Linux: optionally sign the AppImage (`SIGN`, `SIGN_KEY` and `APPIMAGETOOL_SIGN_PASSPHRASE`)
 
 ## Enable telemetry again
 
