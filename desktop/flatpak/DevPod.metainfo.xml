@@ -9,7 +9,7 @@
   <metadata_license>FSFAP</metadata_license>
   <project_license>MPL-2.0</project_license>
 
-  <url type="homepage">https://devpod.sh</url>
+  <url type="homepage">https://github.com/curityio/devpod</url>
   <url type="vcs-browser">https://github.com/curityio/devpod</url>
   <url type="bugtracker">https://github.com/curityio/devpod/issues</url>
 
@@ -28,15 +28,15 @@
   <launchable type="desktop-id">sh.loft.devpod.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://devpod.sh/docs/media/devpod-architecture-2.png</image>
+      <image>https://curityio.github.io/devpod/media/devpod-architecture-2.png</image>
       <caption>Devpod Architecture</caption>
     </screenshot>
     <screenshot>
-      <image>https://devpod.sh/docs/media/add-provider-2.png</image>
+      <image>https://curityio.github.io/devpod/media/add-provider-2.png</image>
       <caption>Adding a Provider</caption>
     </screenshot>
     <screenshot>
-      <image>https://devpod.sh/docs/media/create-workspace-vscode-browser.png</image>
+      <image>https://curityio.github.io/devpod/media/create-workspace-vscode-browser.png</image>
       <caption>Using vscode in the browser</caption>
     </screenshot>
   </screenshots>

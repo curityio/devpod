@@ -6,7 +6,7 @@ sidebar_label: What is DevPod?
 DevPod is a tool used to create reproducible developer environments. Each developer environment runs in a separate container and is specified through a [devcontainer.json](https://containers.dev/). [DevPod providers](./managing-providers/what-are-providers) can create these containers on the local computer, any reachable remote machine, or in a public or private cloud. It's also possible to extend DevPod and write your own custom providers.
 
 <figure>
-  <img src="/docs/media/devpod-flow.gif" alt="DevPod Flow" />
+  <img src={require("@site/static/media/devpod-flow.gif").default} alt="DevPod Flow" />
   <figcaption>DevPod</figcaption>
 </figure>
 
@@ -14,7 +14,7 @@ You can think of DevPod as the glue connecting your local IDE to a machine you w
 
 
 <figure>
-  <img src="/docs/media/devpod-architecture-2.png" alt="DevPod Architecture" />
+  <img src={require("@site/static/media/devpod-architecture-2.png").default} alt="DevPod Architecture" />
   <figcaption>DevPod - Architecture</figcaption>
 </figure>
 
@@ -23,7 +23,7 @@ You can think of DevPod as the glue connecting your local IDE to a machine you w
 DevPod reuses the open [DevContainer standard](https://containers.dev/) to create a consistent developer experience no matter what backend you want to use.
 
 <figure>
-  <img src="/docs/media/codespaces-but.png" alt="What is DevPod" />
+  <img src={require("@site/static/media/codespaces-but.png").default} alt="What is DevPod" />
 </figure>
 
 Compared to hosted services such as Github Codespaces, JetBrains Spaces or Google Cloud Workstations, DevPod has the following advantages:

@@ -44,3 +44,10 @@ used in `pkg/telemetry`) unless the context option `TELEMETRY=false` or `DEVPOD_
 
 - [ ] Remove telemetry (and the `analytics-client` dependency), or point it at a Curity endpoint
 - [ ] Update the `TELEMETRY` context option and the docs that mention telemetry accordingly
+
+## Host the IDE and provider icons ourselves
+
+The IDE icons (`pkg/ide/ideparse/parse.go`) and the built-in provider icons (`providers/*/provider.yaml`) are loaded from
+Loft's website, `https://devpod.sh/assets/...`:
+
+- [ ] Copy the icons into this repository (e.g. the docs site's static files) and point the URLs at our copies

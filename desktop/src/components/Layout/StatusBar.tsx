@@ -112,7 +112,7 @@ function OSSDocs() {
         rounded="full"
         icon={<Icon as={HiDocumentMagnifyingGlass} color={iconColor} />}
         aria-label="How to DevPod - Docs"
-        onClick={() => client.open("https://devpod.sh/docs")}
+        onClick={() => client.open("https://curityio.github.io/devpod")}
       />
     </Tooltip>
   )

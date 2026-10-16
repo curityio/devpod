@@ -1,12 +1,12 @@
-__webpack_public_path__ = "/docs/";
+__webpack_public_path__ = "/devpod/";
 
 module.exports = {
   title: "DevPod docs | DevContainers everywhere",
   tagline: "DevContainers everywhere",
-  url: "https://devpod.sh",
+  url: "https://curityio.github.io",
   baseUrl: __webpack_public_path__,
   favicon: "/media/devpod-favicon.svg",
-  organizationName: "loft-sh", // Usually your GitHub org/user name.
+  organizationName: "curityio", // Usually your GitHub org/user name.
   projectName: "devpod", // Usually your repo name.
   themeConfig: {
     colorMode: {
@@ -19,18 +19,10 @@ module.exports = {
         alt: "devpod",
         src: "/media/devpod-logo-horizontal.svg",
         srcDark: "/media/devpod-logo-horizontal-dark.svg",
-        href: "https://devpod.sh/",
-        target: "_self",
       },
       items: [
         {
-          href: "https://devpod.sh/",
-          label: "Website",
-          position: "left",
-          target: "_self",
-        },
-        {
-          to: "/docs/what-is-devpod",
+          to: "/what-is-devpod",
           label: "Docs",
           position: "left",
         },
@@ -41,14 +33,6 @@ module.exports = {
           position: "right",
         },
       ],
-    },
-    algolia: {
-      appId: "Y3XX0IC1ZW",
-      apiKey: "cfc452201042c6b5483694d4d0492aa8",
-      indexName: "devpod",
-      algoliaOptions: {},
-      placeholder: "Search...",
-      contextualSearch: false,
     },
     footer: {
       style: "light",
@@ -79,7 +63,7 @@ module.exports = {
       async: true,
     },
     {
-      src: "/docs/js/custom.js",
+      src: __webpack_public_path__ + "js/custom.js",
       async: true,
     },
   ],
