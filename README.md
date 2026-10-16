@@ -1,32 +1,37 @@
+> [!NOTE]
+> This project is a fork of [loft-sh/devpod](https://github.com/loft-sh/devpod).
+> It is a **hard fork**: [Curity](https://curity.io/) plans to reduce the scope of the project and focus only on
+> setting up [devcontainers](https://containers.dev/) and making it simpler to run workloads in them.
+
 <br>
-<a href="https://www.devpod.sh">
-  <picture width="500">
-    <source media="(prefers-color-scheme: dark)" srcset="docs/static/media/devpod_dark.png">
-    <img alt="DevPod wordmark" width="500" src="docs/static/media/devpod.png">
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/static/media/devpod-logo-curity-dark.svg">
+    <img alt="DevPod logo" width="500" src="docs/static/media/devpod-logo-curity.svg">
   </picture>
-</a>
+</p>
+<p>
+  <a href="https://curity.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/static/media/curity-logo-dark.svg">
+      <img alt="Curity logo" width="200" src="docs/static/media/curity-logo.svg">
+    </picture>
+  </a>
+</p>
 
-### **[Website](https://www.devpod.sh)** • **[Quickstart](https://www.devpod.sh/docs/getting-started/install)** • **[Documentation](https://www.devpod.sh/docs/what-is-devpod)** • **[Blog](https://loft.sh/blog)** • **[𝕏 (Twitter)](https://x.com/loft_sh)** • **[Slack](https://slack.loft.sh/)**
-
-[![Join us on Slack!](docs/static/media/slack.svg)](https://slack.loft.sh/) [![Open in DevPod!](https://devpod.sh/assets/open-in-devpod.svg)](https://devpod.sh/open#https://github.com/loft-sh/devpod)
-
-**[We are hiring!](https://www.loft.sh/careers) Come build the future of remote development environments with us.**
+### **[Quickstart](https://www.devpod.sh/docs/getting-started/install)** • **[Documentation](https://www.devpod.sh/docs/what-is-devpod)** • **[Issues](https://github.com/curityio/devpod/issues)** • **[Curity](https://curity.io/)**
 
 DevPod is a client-only tool to create reproducible developer environments based on a [devcontainer.json](https://containers.dev/) on any backend. Each developer environment runs in a container and is specified through a [devcontainer.json](https://containers.dev/). Through DevPod providers, these environments can be created on any backend, such as the local computer, a Kubernetes cluster, any reachable remote machine, or in a VM in the cloud.
 
-![Codespaces](docs/static/media/codespaces-but.png)
-
 You can think of DevPod as the glue that connects your local IDE to a machine where you want to develop. So depending on the requirements of your project, you can either create a workspace locally on the computer, on a beefy cloud machine with many GPUs, or a spare remote computer. Within DevPod, every workspace is managed the same way, which also makes it easy to switch between workspaces that might be hosted somewhere else.
-
-![DevPod Flow](docs/static/media/devpod-flow.gif)
 
 ## Quickstart
 
 Download DevPod Desktop:
-- [MacOS Silicon/ARM](https://github.com/loft-sh/devpod/releases/latest/download/DevPod_macos_aarch64.dmg)
-- [MacOS Intel/AMD](https://github.com/loft-sh/devpod/releases/latest/download/DevPod_macos_x64.dmg)
-- [Windows](https://github.com/loft-sh/devpod/releases/latest/download/DevPod_windows_x64_en-US.msi)
-- [Linux AppImage](https://github.com/loft-sh/devpod/releases/latest/download/DevPod_linux_amd64.AppImage)
+- [MacOS Silicon/ARM](https://github.com/curityio/devpod/releases/latest/download/DevPod_macos_aarch64.dmg)
+- [MacOS Intel/AMD](https://github.com/curityio/devpod/releases/latest/download/DevPod_macos_x64.dmg)
+- [Windows](https://github.com/curityio/devpod/releases/latest/download/DevPod_windows_x64_en-US.msi)
+- [Linux AppImage](https://github.com/curityio/devpod/releases/latest/download/DevPod_linux_amd64.AppImage)
 
 Take a look at the [DevPod Docs](https://devpod.sh/docs/getting-started/install) for more information.
 

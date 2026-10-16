@@ -10,8 +10,8 @@
   <project_license>MPL-2.0</project_license>
 
   <url type="homepage">https://devpod.sh</url>
-  <url type="vcs-browser">https://github.com/loft-sh/devpod</url>
-  <url type="bugtracker">https://github.com/loft-sh/devpod/issues</url>
+  <url type="vcs-browser">https://github.com/curityio/devpod</url>
+  <url type="bugtracker">https://github.com/curityio/devpod/issues</url>
 
   <supports>
     <control>pointing</control>

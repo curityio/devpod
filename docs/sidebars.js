@@ -253,8 +253,8 @@ module.exports = {
     },
     {
       type: "link",
-      label: "Open Sourced by Loft",
-      href: "https://loft.sh/",
+      label: "Maintained by Curity",
+      href: "https://curity.io/",
     },
   ],
 };

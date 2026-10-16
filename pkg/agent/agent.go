@@ -30,7 +30,7 @@ const RemoteDevPodHelperLocation = "/tmp/devpod"
 
 const ContainerActivityFile = "/tmp/devpod.activity"
 
-const defaultAgentDownloadURL = "https://github.com/loft-sh/devpod/releases/download/"
+const defaultAgentDownloadURL = "https://github.com/curityio/devpod/releases/download/"
 
 const EnvDevPodAgentURL = "DEVPOD_AGENT_URL"
 
@@ -43,7 +43,7 @@ func DefaultAgentDownloadURL() string {
 	}
 
 	if version.GetVersion() == version.DevVersion {
-		return "https://github.com/loft-sh/devpod/releases/latest/download/"
+		return "https://github.com/curityio/devpod/releases/latest/download/"
 	}
 
 	return defaultAgentDownloadURL + version.GetVersion()

@@ -604,7 +604,7 @@ jobs:
 
                 latest.platforms[info.target] = {
                   signature: await sig.text(),
-                  url: `https://github.com/loft-sh/devpod/releases/download/${process.env.GITHUB_REF_NAME}/${assetName}`,
+                  url: `https://github.com/curityio/devpod/releases/download/${process.env.GITHUB_REF_NAME}/${assetName}`,
                 }
 
                 // once we're done with the sig file, delete it

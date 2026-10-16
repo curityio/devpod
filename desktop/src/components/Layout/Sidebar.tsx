@@ -17,7 +17,7 @@ import { LinkProps, NavLink as RouterLink } from "react-router-dom"
 import { useSettings } from "../../contexts"
 import { DevpodWordmark } from "../../icons"
 import { useBorderColor } from "../../Theme"
-import { LoftOSSBadge } from "../LoftOSSBadge"
+import { CurityBadge } from "../CurityBadge"
 
 type TSidebarProps = Readonly<{ children?: readonly ReactElement[] }> & BoxProps
 export function Sidebar({ children, ...boxProps }: TSidebarProps) {
@@ -60,7 +60,7 @@ export function Sidebar({ children, ...boxProps }: TSidebarProps) {
         {children}
       </VStack>
       <HStack alignSelf="end" paddingTop="4" paddingLeft="8" paddingBottom="4">
-        <LoftOSSBadge />
+        <CurityBadge />
       </HStack>
 
       {/* Background Material */}
