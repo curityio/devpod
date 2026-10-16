@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -257,9 +258,15 @@ Host testhost
 				t.Errorf("Failed with err: %v", err)
 			}
 
-			if result != tt.expected {
-				t.Errorf("addHostSection result does not match expected.\nGot:\n%s\nExpected:\n%s", result, tt.expected)
-				t.Errorf("addHostSection result does not match expected:\n%s", cmp.Diff(result, tt.expected))
+			// addHostSection joins lines with \r\n on Windows
+			expected := tt.expected
+			if runtime.GOOS == "windows" {
+				expected = strings.ReplaceAll(expected, "\n", "\r\n")
+			}
+
+			if result != expected {
+				t.Errorf("addHostSection result does not match expected.\nGot:\n%s\nExpected:\n%s", result, expected)
+				t.Errorf("addHostSection result does not match expected:\n%s", cmp.Diff(result, expected))
 			}
 
 			if !strings.Contains(result, MarkerEndPrefix+tt.host) {
