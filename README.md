@@ -19,7 +19,7 @@
   </a>
 </p>
 
-### **[Quickstart](https://curityio.github.io/devpod/getting-started/install)** • **[Documentation](https://curityio.github.io/devpod/what-is-devpod)** • **[Issues](https://github.com/curityio/devpod/issues)** • **[Curity](https://curity.io/)**
+### **[Quickstart](https://devpod.curityio.net/getting-started/install)** • **[Documentation](https://devpod.curityio.net/what-is-devpod)** • **[Issues](https://github.com/curityio/devpod/issues)** • **[Curity](https://curity.io/)**
 
 DevPod is a client-only tool to create reproducible developer environments based on a [devcontainer.json](https://containers.dev/) on any backend. Each developer environment runs in a container and is specified through a [devcontainer.json](https://containers.dev/). Through DevPod providers, these environments can be created on any backend, such as the local computer, a Kubernetes cluster, any reachable remote machine, or in a VM in the cloud.
 
@@ -33,7 +33,7 @@ Download DevPod Desktop:
 - [Windows](https://github.com/curityio/devpod/releases/latest/download/DevPod_windows_x64_en-US.msi)
 - [Linux AppImage](https://github.com/curityio/devpod/releases/latest/download/DevPod_linux_amd64.AppImage)
 
-Take a look at the [DevPod Docs](https://curityio.github.io/devpod/getting-started/install) for more information.
+Take a look at the [DevPod Docs](https://devpod.curityio.net/getting-started/install) for more information.
 
 ## Why DevPod?
 

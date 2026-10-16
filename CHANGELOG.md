@@ -36,7 +36,7 @@ Add new entries to the top of the "Unreleased" section.
 ### Changed
 
 - The documentation is published on this repository's GitHub Pages site,
-  [curityio.github.io/devpod](https://curityio.github.io/devpod/), instead of Loft's devpod.sh
+  [devpod.curityio.net](https://devpod.curityio.net/), instead of Loft's devpod.sh
   ([#9](https://github.com/curityio/devpod/pull/9)). Links in the README, guides and desktop app point
   there. The Netlify config and Loft's Algolia search are removed, so the docs have no search for now.
 - The desktop app checks for updates in `curityio/devpod` GitHub releases instead of Loft's update
@@ -45,7 +45,7 @@ Add new entries to the top of the "Unreleased" section.
   Curity branding, and links to Loft's website, Slack, blog and X accounts are removed.
 - The desktop app verifies updates with Curity's signing key instead of Loft's.
 - The IDE and built-in provider icons are served from
-  [curityio.github.io/devpod/icons](https://curityio.github.io/devpod/icons/) instead of devpod.sh.
+  [devpod.curityio.net/icons](https://devpod.curityio.net/icons/) instead of devpod.sh.
 - Kubernetes image pull secrets use `noreply@curity.io` as their email.
 
 ### Fixed

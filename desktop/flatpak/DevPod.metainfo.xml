@@ -28,11 +28,11 @@
   <launchable type="desktop-id">sh.loft.devpod.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://curityio.github.io/devpod/media/add-provider-2.png</image>
+      <image>https://devpod.curityio.net/media/add-provider-2.png</image>
       <caption>Adding a Provider</caption>
     </screenshot>
     <screenshot>
-      <image>https://curityio.github.io/devpod/media/create-workspace-vscode-browser.png</image>
+      <image>https://devpod.curityio.net/media/create-workspace-vscode-browser.png</image>
       <caption>Using vscode in the browser</caption>
     </screenshot>
   </screenshots>

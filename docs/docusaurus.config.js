@@ -1,9 +1,9 @@
-__webpack_public_path__ = "/devpod/";
+__webpack_public_path__ = "/";
 
 module.exports = {
   title: "DevPod docs | DevContainers everywhere",
   tagline: "DevContainers everywhere",
-  url: "https://curityio.github.io",
+  url: "https://devpod.curityio.net",
   baseUrl: __webpack_public_path__,
   favicon: "/media/devpod-favicon.svg",
   organizationName: "curityio", // Usually your GitHub org/user name.
