@@ -4,19 +4,14 @@ package container
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/loft-sh/devpod/cmd/flags"
@@ -42,7 +37,6 @@ import (
 	"github.com/loft-sh/devpod/pkg/ide/vscode"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/single"
-	"github.com/loft-sh/devpod/pkg/ts"
 	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -60,9 +54,6 @@ type SetupContainerCmd struct {
 	InjectGitCredentials   bool
 	ContainerWorkspaceInfo string
 	SetupInfo              string
-	AccessKey              string
-	PlatformHost           string
-	WorkspaceHost          string
 }
 
 // NewSetupContainerCmd creates a new command
@@ -83,9 +74,6 @@ func NewSetupContainerCmd(flags *flags.GlobalFlags) *cobra.Command {
 	setupContainerCmd.Flags().BoolVar(&cmd.InjectGitCredentials, "inject-git-credentials", false, "If DevPod should inject git credentials during setup")
 	setupContainerCmd.Flags().StringVar(&cmd.ContainerWorkspaceInfo, "container-workspace-info", "", "The container workspace info")
 	setupContainerCmd.Flags().StringVar(&cmd.SetupInfo, "setup-info", "", "The container setup info")
-	setupContainerCmd.Flags().StringVar(&cmd.AccessKey, "access-key", "", "Access Key to use")
-	setupContainerCmd.Flags().StringVar(&cmd.WorkspaceHost, "workspace-host", "", "Workspace hostname to use")
-	setupContainerCmd.Flags().StringVar(&cmd.PlatformHost, "platform-host", "", "Platform host")
 	_ = setupContainerCmd.MarkFlagRequired("setup-info")
 	return setupContainerCmd
 }
@@ -172,29 +160,8 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 		}
 	}
 
-	if b, err := workspaceInfo.PullFromInsideContainer.Bool(); err == nil && b {
-		// check if workspace folder exists and is a git repository.
-		// skip cloning if it does
-		_, err := os.Stat(filepath.Join(setupInfo.SubstitutionContext.ContainerWorkspaceFolder, ".git"))
-		if err == nil && !workspaceInfo.CLIOptions.Recreate {
-			logger.Debugf("Workspace repository already checked out %s, skipping clone", setupInfo.SubstitutionContext.ContainerWorkspaceFolder)
-		} else {
-			if err := agent.CloneRepositoryForWorkspace(ctx,
-				&workspaceInfo.Source,
-				&workspaceInfo.Agent,
-				setupInfo.SubstitutionContext.ContainerWorkspaceFolder,
-				"",
-				workspaceInfo.CLIOptions,
-				true,
-				logger,
-			); err != nil {
-				return err
-			}
-		}
-	}
-
 	// setup container
-	err = setup.SetupContainer(ctx, setupInfo, workspaceInfo.CLIOptions.WorkspaceEnv, cmd.ChownWorkspace, &workspaceInfo.CLIOptions.Platform, tunnelClient, logger)
+	err = setup.SetupContainer(ctx, setupInfo, workspaceInfo.CLIOptions.WorkspaceEnv, cmd.ChownWorkspace, logger)
 	if err != nil {
 		return err
 	}
@@ -206,7 +173,7 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 	}
 
 	// start container daemon if necessary
-	if !workspaceInfo.CLIOptions.Platform.Enabled && !workspaceInfo.CLIOptions.DisableDaemon && workspaceInfo.ContainerTimeout != "" {
+	if !workspaceInfo.CLIOptions.DisableDaemon && workspaceInfo.ContainerTimeout != "" {
 		err = single.Single("devpod.daemon.pid", func() (*exec.Cmd, error) {
 			logger.Debugf("Start DevPod Container Daemon with Inactivity Timeout %s", workspaceInfo.ContainerTimeout)
 			binaryPath, err := os.Executable()
@@ -590,60 +557,6 @@ func configureSystemGitCredentials(ctx context.Context, cancel context.CancelFun
 }
 
 func streamMount(ctx context.Context, workspaceInfo *provider2.ContainerWorkspaceInfo, m *config.Mount, tunnelClient tunnel.TunnelClient, logger log.Logger) error {
-	// if we have a platform workspace socket we connect directly to it
-	if workspaceInfo.CLIOptions.Platform.Enabled {
-		// check if the runner proxy socket exists
-		httpClient := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-
-		// build the url
-		logger.Infof("Download %s into DevContainer %s", m.Source, m.Target)
-		url := fmt.Sprintf(
-			"https://%s/kubernetes/management/apis/management.loft.sh/v1/namespaces/%s/devpodworkspaceinstances/%s/download?path=%s",
-			ts.RemoveProtocol(workspaceInfo.CLIOptions.Platform.PlatformHost),
-			workspaceInfo.CLIOptions.Platform.InstanceNamespace,
-			workspaceInfo.CLIOptions.Platform.InstanceName,
-			url.QueryEscape(m.Source),
-		)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return fmt.Errorf("create request: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", workspaceInfo.CLIOptions.Platform.AccessKey))
-
-		// send the request
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("download workspace: %w", err)
-		}
-		defer resp.Body.Close()
-
-		// check if the response is ok
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("download workspace: body = %s, status = %s", string(body), resp.Status)
-		}
-
-		// create progress reader
-		progressReader := &progressReader{
-			Reader: resp.Body,
-			Log:    logger,
-		}
-
-		// target folder
-		err = extract.Extract(progressReader, m.Target)
-		if err != nil {
-			return fmt.Errorf("stream mount %s: %w", m.String(), err)
-		}
-
-		return nil
-	}
-
 	// stream mount
 	logger.Infof("Copy %s into DevContainer %s", m.Source, m.Target)
 	stream, err := tunnelClient.StreamMount(ctx, &tunnel.StreamMountRequest{Mount: m.String()})
@@ -658,23 +571,4 @@ func streamMount(ctx context.Context, workspaceInfo *provider2.ContainerWorkspac
 	}
 
 	return nil
-}
-
-type progressReader struct {
-	Reader io.Reader
-	Log    log.Logger
-
-	lastMessage time.Time
-	bytesRead   int64
-}
-
-func (p *progressReader) Read(b []byte) (n int, err error) {
-	n, err = p.Reader.Read(b)
-	p.bytesRead += int64(n)
-	if time.Since(p.lastMessage) > time.Second*4 {
-		p.Log.Infof("Downloaded %.2f MB", float64(p.bytesRead)/1024/1024)
-		p.lastMessage = time.Now()
-	}
-
-	return n, err
 }

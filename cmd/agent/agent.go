@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var AgentExecutedAnnotation = "loft.sh/agent-executed"
+var AgentExecutedAnnotation = "devpod.sh/agent-executed"
 
 // NewAgentCmd returns a new root command
 func NewAgentCmd(globalFlags *flags.GlobalFlags) *cobra.Command {

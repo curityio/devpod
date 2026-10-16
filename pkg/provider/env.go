@@ -38,10 +38,6 @@ const (
 	PROVIDER_ID      = "PROVIDER_ID"
 	PROVIDER_CONTEXT = "PROVIDER_CONTEXT"
 	PROVIDER_FOLDER  = "PROVIDER_FOLDER"
-
-	// pro
-	LOFT_PROJECT         = "LOFT_PROJECT"
-	LOFT_FILTER_BY_OWNER = "LOFT_FILTER_BY_OWNER"
 )
 
 const (
@@ -117,9 +113,6 @@ func ToOptionsWorkspace(workspace *Workspace) map[string]string {
 			retVars[MACHINE_ID] = workspace.Machine.ID
 			machineDir, _ := GetMachineDir(workspace.Context, workspace.Machine.ID)
 			retVars[MACHINE_FOLDER] = filepath.ToSlash(machineDir)
-		}
-		if workspace.Pro != nil && workspace.Pro.Project != "" {
-			retVars[LOFT_PROJECT] = workspace.Pro.Project
 		}
 		for k, v := range GetBaseEnvironment(workspace.Context, workspace.Provider.Name) {
 			retVars[k] = v

@@ -1,7 +1,6 @@
 package tunnelserver
 
 import (
-	"github.com/loft-sh/api/v4/pkg/devpod"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/netstat"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
@@ -37,13 +36,6 @@ func WithAllowDockerCredentials(allowDockerCredentials bool) Option {
 	}
 }
 
-func WithAllowKubeConfig(allow bool) Option {
-	return func(s *tunnelServer) *tunnelServer {
-		s.allowKubeConfig = allow
-		return s
-	}
-}
-
 func WithMounts(mounts []*config.Mount) Option {
 	return func(s *tunnelServer) *tunnelServer {
 		s.mounts = mounts
@@ -56,13 +48,6 @@ func WithMounts(mounts []*config.Mount) Option {
 func WithWorkspaceMount(mount *config.Mount) Option {
 	return func(s *tunnelServer) *tunnelServer {
 		s.workspaceMount = mount
-		return s
-	}
-}
-
-func WithPlatformOptions(options *devpod.PlatformOptions) Option {
-	return func(s *tunnelServer) *tunnelServer {
-		s.platformOptions = options
 		return s
 	}
 }

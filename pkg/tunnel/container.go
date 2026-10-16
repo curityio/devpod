@@ -150,7 +150,7 @@ func (c *ContainerTunnel) updateConfig(ctx context.Context, sshClient *ssh.Clien
 			c.log.Debugf("Start refresh")
 
 			// update options
-			err := c.client.RefreshOptions(ctx, nil, false)
+			err := c.client.RefreshOptions(ctx, nil)
 			if err != nil {
 				c.log.Errorf("Error refreshing workspace options: %v", err)
 				break

@@ -8,7 +8,6 @@ import (
 	"github.com/loft-sh/devpod/cmd/completion"
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/platform"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/workspace"
 	logpkg "github.com/loft-sh/log"
@@ -35,7 +34,7 @@ func NewDeleteCmd(flags *flags.GlobalFlags) *cobra.Command {
 			return cmd.Run(context.Background(), args)
 		},
 		ValidArgsFunction: func(rootCmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GetProviderSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, cmd.Owner, logpkg.Default)
+			return completion.GetProviderSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, logpkg.Default)
 		},
 	}
 
@@ -73,21 +72,10 @@ func (cmd *DeleteCmd) Run(ctx context.Context, args []string) error {
 }
 
 func DeleteProvider(ctx context.Context, devPodConfig *config.Config, provider string, ignoreNotFound, force bool, log logpkg.Logger) error {
-	// if force is not set, check if the provider is associated with a pro instance or workspace
+	// if force is not set, check if the provider is associated with a workspace
 	if !force {
-		// check if this provider is associated with a pro instance
-		proInstances, err := workspace.ListProInstances(devPodConfig, logpkg.Default)
-		if err != nil {
-			return fmt.Errorf("list pro instances: %w", err)
-		}
-		for _, instance := range proInstances {
-			if instance.Provider == provider {
-				return fmt.Errorf("cannot delete provider '%s', because it is connected to Pro instance '%s'. Removing the Pro instance will automatically delete this provider", instance.Provider, instance.Host)
-			}
-		}
-
 		// check if there are workspaces that still use this provider
-		workspaces, err := workspace.List(ctx, devPodConfig, true, platform.AllOwnerFilter, log)
+		workspaces, err := workspace.List(ctx, devPodConfig, log)
 		if err != nil {
 			return err
 		}

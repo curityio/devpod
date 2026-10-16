@@ -11,7 +11,6 @@ mod action_logs;
 mod commands;
 mod community_contributions;
 mod custom_protocol;
-mod daemon;
 mod file_exists;
 mod fix_env;
 mod get_env;
@@ -31,7 +30,7 @@ mod window;
 use community_contributions::CommunityContributions;
 use custom_protocol::CustomProtocol;
 use log::{error, info};
-use resource_watcher::{ProState, WorkspacesState};
+use resource_watcher::WorkspacesState;
 use std::sync::{Arc, Mutex};
 use system_tray::{SystemTray, SYSTEM_TRAY_ICON_BYTES};
 use tauri::{image::Image, tray::TrayIconBuilder, Manager, Wry};
@@ -46,7 +45,6 @@ pub type AppHandle = tauri::AppHandle<Wry>;
 
 pub struct AppState {
     workspaces: Arc<RwLock<WorkspacesState>>,
-    pro: Arc<RwLock<ProState>>,
     community_contributions: Arc<Mutex<CommunityContributions>>,
     ui_messages: Sender<UiMessage>,
     releases: Arc<Mutex<updates::Releases>>,
@@ -84,7 +82,6 @@ fn main() -> anyhow::Result<()> {
     app_builder = app_builder
         .manage(AppState {
             workspaces: Arc::new(RwLock::new(WorkspacesState::default())),
-            pro: Arc::new(RwLock::new(ProState::default())),
             community_contributions: Arc::new(Mutex::new(contributions)),
             ui_messages: tx.clone(),
             releases: Arc::new(Mutex::new(updates::Releases::default())),

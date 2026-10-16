@@ -132,9 +132,7 @@ export function ListWorkspaces() {
     [selection, workspaces, viewID, store]
   )
 
-  const availableProviders = Object.entries(providers ?? {}).filter(
-    ([, provider]) => !provider.isProxyProvider
-  )
+  const availableProviders = Object.entries(providers ?? {})
   const allProvidersCount = availableProviders.length
 
   return (

@@ -98,13 +98,8 @@ func (r *runner) Up(ctx context.Context, options UpOptions, timeout time.Duratio
 	}
 	defer cleanupBuildInformation(substitutedConfig.Config)
 
-	// do not run initialize command in platform mode
-	if !options.CLIOptions.Platform.Enabled {
-		if err := runInitializeCommand(r.LocalWorkspaceFolder, substitutedConfig.Config, options.InitEnv, r.Log); err != nil {
-			return nil, err
-		}
-	} else if len(substitutedConfig.Config.InitializeCommand) > 0 {
-		r.Log.Info("Skipping initializeCommand on platform")
+	if err := runInitializeCommand(r.LocalWorkspaceFolder, substitutedConfig.Config, options.InitEnv, r.Log); err != nil {
+		return nil, err
 	}
 
 	switch {

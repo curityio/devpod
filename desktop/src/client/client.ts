@@ -13,13 +13,11 @@ import { Command } from "@tauri-apps/plugin-shell"
 import * as updater from "@tauri-apps/plugin-updater"
 import { TSettings } from "../contexts"
 import { Release } from "../gen"
-import { Result, Return, hasCapability, isError, noop } from "../lib"
-import { TCommunityContributions, TProInstance, TUnsubscribeFn } from "../types"
+import { Result, Return, isError, noop } from "../lib"
+import { TCommunityContributions, TUnsubscribeFn } from "../types"
 import { Command as DevPodCommand } from "./command"
 import { ContextClient } from "./context"
 import { IDEsClient } from "./ides"
-import { ProClient } from "./pro"
-import { DaemonClient } from "./pro/client"
 import { ProvidersClient } from "./providers"
 import { TAURI_SERVER_URL } from "./tauriClient"
 import { WorkspacesClient } from "./workspaces"
@@ -41,29 +39,6 @@ type TChannels = {
         provider_id: string | null
         ide: string | null
         source: string
-      }>
-    | Readonly<{
-        type: "ImportWorkspace"
-        workspace_id: string
-        workspace_uid: string
-        devpod_pro_host: string
-        project: string
-        options: Record<string, string> | null
-      }>
-    | Readonly<{
-        type: "SetupPro"
-        host: string
-        accessKey: string | null
-        options: Record<string, string> | null
-      }>
-    | Readonly<{
-        type: "OpenProInstance"
-        host: string | null
-      }>
-    | Readonly<{
-        type: "LoginRequired"
-        host: string
-        provider: string
       }>
 }
 type TChannelName = keyof TChannels
@@ -87,7 +62,6 @@ class Client {
   public readonly providers = new ProvidersClient()
   public readonly ides = new IDEsClient()
   public readonly context = new ContextClient()
-  public readonly pro = new ProClient("")
 
   public setSetting<TSettingName extends keyof TClientSettings>(
     name: TSettingName,
@@ -98,7 +72,6 @@ class Client {
       this.workspaces.setDebug(debug)
       this.providers.setDebug(debug)
       this.ides.setDebug(debug)
-      this.pro.setDebug(debug)
     }
     if (name === "additionalCliFlags") {
       this.workspaces.setAdditionalFlags(value as string)
@@ -405,14 +378,6 @@ class Client {
   public log(level: "debug" | "info" | "warn" | "error", message: string) {
     const logFn = log[level]
     logFn(message)
-  }
-
-  public getProClient(proInstance: TProInstance): ProClient | DaemonClient {
-    if (hasCapability(proInstance, "daemon")) {
-      return new DaemonClient(proInstance.host!)
-    } else {
-      return new ProClient(proInstance.host!)
-    }
   }
 }
 

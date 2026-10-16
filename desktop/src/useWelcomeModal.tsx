@@ -37,29 +37,16 @@ export function useWelcomeModal() {
     navigate(Routes.WORKSPACE_CREATE)
   }, [navigate, onClose])
 
-  // Open the welcome modal on first visit, except if we start with a `SetupPro` event
+  // Open the welcome modal on first visit
   useEffect(() => {
     const maybeFirstVisit = localStorage.getItem(IS_FIRST_VISIT_KEY)
-    let shouldShowWelcomeModal = maybeFirstVisit === null && !isOpen
-
-    const listenerPromise = client.subscribe("event", (event) => {
-      if (event.type === "SetupPro") {
-        shouldShowWelcomeModal = false
-        onClose()
-      }
-    })
+    const shouldShowWelcomeModal = maybeFirstVisit === null && !isOpen
 
     if (shouldShowWelcomeModal) {
       onOpen()
       localStorage.setItem(IS_FIRST_VISIT_KEY, "false")
-
-      return
     }
-
-    return () => {
-      listenerPromise.then((unsubscribe) => unsubscribe())
-    }
-  }, [isOpen, onClose, onOpen])
+  }, [isOpen, onOpen])
 
   const modal = useMemo(() => {
     return (

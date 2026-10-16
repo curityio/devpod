@@ -46,7 +46,7 @@ func NewUseCmd(flags *flags.GlobalFlags) *cobra.Command {
 			return cmd.Run(context.Background(), args[0])
 		},
 		ValidArgsFunction: func(rootCmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GetProviderSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, cmd.Owner, log.Default)
+			return completion.GetProviderSuggestions(rootCmd, cmd.Context, cmd.Provider, args, toComplete, log.Default)
 		},
 	}
 

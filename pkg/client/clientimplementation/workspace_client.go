@@ -102,7 +102,7 @@ func (s *workspaceClient) Context() string {
 	return s.workspace.Context
 }
 
-func (s *workspaceClient) RefreshOptions(ctx context.Context, userOptionsRaw []string, reconfigure bool) error {
+func (s *workspaceClient) RefreshOptions(ctx context.Context, userOptionsRaw []string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -198,16 +198,10 @@ func (s *workspaceClient) agentInfo(cliOptions provider.CLIOptions) *provider.Ag
 		Options:                s.devPodConfig.ProviderOptions(s.Provider()),
 	}
 
-	// if we are running platform mode
-	if cliOptions.Platform.Enabled {
-		agentInfo.Agent.InjectGitCredentials = "true"
-		agentInfo.Agent.InjectDockerCredentials = "true"
-	}
-
-	// we don't send any provider options if proxy because these could contain
+	// we don't send any provider options if the daemon is disabled because these could contain
 	// sensitive information and we don't want to allow privileged containers that
 	// have access to the host to save these.
-	if agentInfo.Agent.Driver != provider.CustomDriver && (cliOptions.Platform.Enabled || cliOptions.DisableDaemon) {
+	if agentInfo.Agent.Driver != provider.CustomDriver && cliOptions.DisableDaemon {
 		agentInfo.Options = map[string]config.OptionValue{}
 		agentInfo.Workspace = provider.CloneWorkspace(agentInfo.Workspace)
 		agentInfo.Workspace.Provider.Options = map[string]config.OptionValue{}
@@ -654,4 +648,30 @@ func DeleteWorkspaceFolder(context string, workspaceID string, sshConfigPath str
 	}
 
 	return nil
+}
+
+var DevPodDebug = "DEVPOD_DEBUG"
+
+func tryLock(ctx context.Context, lock *flock.Flock, name string, log log.Logger) error {
+	done := printLogMessagePeriodically(fmt.Sprintf("Trying to lock %s, seems like another process is running that blocks this %s", name, name), log)
+	defer close(done)
+
+	now := time.Now()
+	for time.Since(now) < time.Minute*5 {
+		locked, err := lock.TryLock()
+		if err != nil {
+			return err
+		} else if locked {
+			return nil
+		}
+
+		select {
+		case <-time.After(time.Second):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return fmt.Errorf("timed out waiting to lock %s, seems like there is another process running on this machine that blocks it", name)
 }

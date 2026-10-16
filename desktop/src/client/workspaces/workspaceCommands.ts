@@ -30,7 +30,6 @@ import {
   DEVPOD_FLAG_PROVIDER_OPTION,
   DEVPOD_FLAG_RECREATE,
   DEVPOD_FLAG_RESET,
-  DEVPOD_FLAG_SKIP_PRO,
   DEVPOD_FLAG_SOURCE,
   DEVPOD_FLAG_TIMEOUT,
   WORKSPACE_COMMAND_ADDITIONAL_FLAGS_KEY,
@@ -52,14 +51,8 @@ export class WorkspaceCommands {
     return new Command([...args, ...extraFlags])
   }
 
-  static async ListWorkspaces(skipPro: boolean): Promise<Result<TWorkspaceWithoutStatus[]>> {
-    const maybeSkipProFlag = skipPro ? [DEVPOD_FLAG_SKIP_PRO] : []
-
-    const result = await new Command([
-      DEVPOD_COMMAND_LIST,
-      DEVPOD_FLAG_JSON_OUTPUT,
-      ...maybeSkipProFlag,
-    ]).run()
+  static async ListWorkspaces(): Promise<Result<TWorkspaceWithoutStatus[]>> {
+    const result = await new Command([DEVPOD_COMMAND_LIST, DEVPOD_FLAG_JSON_OUTPUT]).run()
     if (result.err) {
       return result
     }

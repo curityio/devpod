@@ -15,12 +15,10 @@ import (
 	"github.com/loft-sh/devpod/pkg/agent/tunnelserver"
 	"github.com/loft-sh/devpod/pkg/compress"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/crane"
 	"github.com/loft-sh/devpod/pkg/devcontainer/sshtunnel"
 	"github.com/loft-sh/devpod/pkg/driver"
 	"github.com/loft-sh/devpod/pkg/ide"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -55,13 +53,6 @@ func (r *runner) setupContainer(
 		ContainerDetails:    containerDetails,
 	}
 
-	// Ensure workspace mounts cannot escape their content folder for local agents in proxy mode.
-	// There _might_ be a use-case that requires an allowlist for certain directories
-	// when running as a standalone runner with docker-in-docker set up. Let's add it when/if the time comes.
-	if r.WorkspaceConfig.Agent.Local == "true" && r.WorkspaceConfig.CLIOptions.Platform.Enabled {
-		result.MergedConfig.Mounts = filterWorkspaceMounts(result.MergedConfig.Mounts, r.WorkspaceConfig.ContentFolder, r.Log)
-	}
-
 	marshalled, err := json.Marshal(result)
 	if err != nil {
 		return nil, err
@@ -79,9 +70,6 @@ func (r *runner) setupContainer(
 		Source:           r.WorkspaceConfig.Workspace.Source,
 		Agent:            r.WorkspaceConfig.Agent,
 		ContentFolder:    r.WorkspaceConfig.ContentFolder,
-	}
-	if crane.ShouldUse(&r.WorkspaceConfig.CLIOptions) && r.WorkspaceConfig.Workspace.Source.GitRepository != "" {
-		workspaceConfig.PullFromInsideContainer = "true"
 	}
 	// compress container workspace info
 	workspaceConfigRaw, err := json.Marshal(workspaceConfig)
@@ -114,11 +102,6 @@ func (r *runner) setupContainer(
 	if r.WorkspaceConfig.Agent.InjectGitCredentials != "false" {
 		setupCommand += " --inject-git-credentials"
 	}
-	if r.WorkspaceConfig.CLIOptions.Platform.AccessKey != "" &&
-		r.WorkspaceConfig.CLIOptions.Platform.WorkspaceHost != "" &&
-		r.WorkspaceConfig.CLIOptions.Platform.PlatformHost != "" {
-		setupCommand += fmt.Sprintf(" --access-key '%s' --workspace-host '%s' --platform-host '%s'", r.WorkspaceConfig.CLIOptions.Platform.AccessKey, r.WorkspaceConfig.CLIOptions.Platform.WorkspaceHost, r.WorkspaceConfig.CLIOptions.Platform.PlatformHost)
-	}
 	if r.Log.GetLevel() == logrus.DebugLevel {
 		setupCommand += " --debug"
 	}
@@ -133,7 +116,6 @@ func (r *runner) setupContainer(
 			r.WorkspaceConfig.Agent.InjectDockerCredentials != "false",
 			result,
 			r.Log,
-			tunnelserver.WithPlatformOptions(&r.WorkspaceConfig.CLIOptions.Platform),
 			tunnelserver.WithWorkspace(r.WorkspaceConfig.Workspace),
 		)
 	}
@@ -165,19 +147,4 @@ func (r *runner) setupContainer(
 func getRelativeDevContainerJson(origin, localWorkspaceFolder string) string {
 	relativePath := strings.TrimPrefix(filepath.ToSlash(origin), filepath.ToSlash(localWorkspaceFolder))
 	return strings.TrimPrefix(relativePath, "/")
-}
-
-func filterWorkspaceMounts(mounts []*config.Mount, baseFolder string, log log.Logger) []*config.Mount {
-	retMounts := []*config.Mount{}
-	for _, mount := range mounts {
-		rel, err := filepath.Rel(baseFolder, mount.Source)
-		if err != nil || strings.Contains(rel, "..") {
-			log.Infof("Dropping workspace mount %s because it possibly accesses data outside of it's content directory", mount.Source)
-			continue
-		}
-
-		retMounts = append(retMounts, mount)
-	}
-
-	return retMounts
 }

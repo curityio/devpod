@@ -46,8 +46,6 @@ pub struct Settings {
     experimental_rstudio: bool,
     #[serde(rename = "experimental_windsurf")]
     experimental_windsurf: bool,
-    #[serde(rename = "experimental_devPodPro")]
-    experimental_devpod_pro: bool,
     #[serde(rename = "experimental_colorMode")]
     experimental_color_mode: ColorMode,
 }

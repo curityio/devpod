@@ -20,7 +20,6 @@ export function usePreserveLocation() {
         { path: Routes.PROVIDER },
         { path: Routes.PROVIDERS },
         { path: Routes.WORKSPACES },
-        { path: Routes.PRO_INSTANCE },
       ],
       location
     )

@@ -37,7 +37,7 @@ import { RECOMMENDED_PROVIDER_SOURCES, SIDEBAR_WIDTH } from "../../../constants"
 import { useProvider, useProviders, useWorkspace, useWorkspaces } from "../../../contexts"
 import { Plus } from "../../../icons"
 import { CommunitySvg, ProviderPlaceholderSvg } from "../../../images"
-import { canHealthCheck, exists, getKeys, isEmpty, useFormErrors } from "../../../lib"
+import { exists, getKeys, isEmpty, useFormErrors } from "../../../lib"
 import { Routes } from "../../../routes"
 import { TIDE, TWorkspace, TWorkspaceSourceType } from "../../../types"
 import { useIDEs } from "../../../useIDEs"
@@ -112,7 +112,7 @@ export function CreateWorkspace() {
     }
 
     const installed = Object.entries(providers)
-      .filter(([, p]) => !!p.state?.initialized && !canHealthCheck(p.config))
+      .filter(([, p]) => !!p.state?.initialized)
       .map(([key, value]) => ({ name: key, ...value }))
 
     return {

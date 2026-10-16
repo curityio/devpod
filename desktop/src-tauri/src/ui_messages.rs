@@ -1,10 +1,9 @@
 use crate::AppState;
 use crate::{custom_protocol::ParseError, window::WindowHelper, AppHandle};
-use log::{error, info, warn};
-use serde::{de, Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use log::{error, warn};
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use tauri::{Emitter, Manager, State};
-use tauri_plugin_notification::NotificationExt;
 use tokio::sync::mpsc::Receiver;
 
 pub async fn send_ui_message(
@@ -54,30 +53,6 @@ impl UiMessageHelper {
                 UiMessage::ExitRequested => {
                     self.is_ready = false;
                 }
-                UiMessage::LoginRequired(msg) => {
-                    info!("Login required: {} {}", msg.host, msg.provider);
-
-                    let main_window = self.app_handle.get_webview_window("main");
-                    if !self.is_ready || main_window.is_none() {
-                        // send os notification if we aren't ready to display the main window
-                        let title = "Login required".to_string();
-                        let body = format!(
-                            "You have been logged out. Please log back in to {}",
-                            msg.host,
-                        );
-                        let _ = self
-                            .app_handle
-                            .notification()
-                            .builder()
-                            .title(title)
-                            .body(body)
-                            .show();
-                        continue;
-                    }
-
-                    // let main window handle
-                    let _ = self.app_handle.emit("event", UiMessage::LoginRequired(msg));
-                }
                 // send all other messages to the UI
                 _ => self.handle_msg(ui_msg),
             }
@@ -110,11 +85,7 @@ pub enum UiMessage {
     ShowDashboard,
     ShowToast(ShowToastMsg),
     OpenWorkspace(OpenWorkspaceMsg),
-    OpenProInstance(OpenProInstanceMsg),
-    SetupPro(SetupProMsg),
-    ImportWorkspace(ImportWorkspaceMsg),
     CommandFailed(ParseError),
-    LoginRequired(LoginRequiredMsg),
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -157,107 +128,6 @@ pub struct OpenWorkspaceMsg {
     pub source: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct OpenProInstanceMsg {
-    pub host: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct ImportWorkspaceMsg {
-    pub workspace_id: String,
-    pub workspace_uid: String,
-    pub devpod_pro_host: String,
-    pub project: String,
-    pub options: HashMap<String, String>,
-}
-
-impl<'de> Deserialize<'de> for ImportWorkspaceMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let mut options = HashMap::deserialize(deserializer)?;
-
-        let workspace_id = options
-            .remove("workspace-id")
-            .ok_or_else(|| de::Error::missing_field("workspace-id"))?;
-
-        let workspace_uid = options
-            .remove("workspace-uid")
-            .ok_or_else(|| de::Error::missing_field("workspace-uid"))?;
-
-        let devpod_pro_host = options
-            .remove("devpod-pro-host")
-            .ok_or_else(|| de::Error::missing_field("devpod-pro-host"))?;
-
-        let project = options
-            .remove("project")
-            .ok_or_else(|| de::Error::missing_field("project"))?;
-
-        Ok(ImportWorkspaceMsg {
-            workspace_id,
-            workspace_uid,
-            devpod_pro_host,
-            project,
-            options,
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct SetupProMsg {
-    pub host: String,
-    #[serde(rename(serialize = "accessKey"))]
-    pub access_key: Option<String>,
-    pub options: Option<HashMap<String, String>>,
-}
-
-impl<'de> Deserialize<'de> for SetupProMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let mut all_fields = HashMap::<String, String>::deserialize(deserializer)?;
-
-        let host = all_fields
-            .remove("host")
-            .ok_or_else(|| de::Error::missing_field("host"))?;
-
-        let mut access_key = all_fields.remove("access_key");
-        if access_key.is_none() {
-            access_key = all_fields.remove("accessKey");
-        }
-
-        // Options are urlencoded
-        let options = all_fields.remove("options");
-        if let Some(options) = options {
-            let options =
-                serde_urlencoded::from_str::<Vec<(String, String)>>(&options).map_err(|err| {
-                    de::Error::custom(format!("Failed to url decode options: {}", err))
-                })?;
-            let options =
-                serde_json::from_str::<HashMap<String, String>>(&options[0].0).map_err(|err| {
-                    de::Error::custom(format!("Failed to json parse options: {}", err))
-                })?;
-
-            Ok(SetupProMsg {
-                host,
-                access_key,
-                options: Some(options),
-            })
-        } else {
-            Ok(SetupProMsg {
-                host,
-                access_key,
-                options: None,
-            })
-        }
-    }
-}
-
 impl OpenWorkspaceMsg {
     pub fn empty() -> OpenWorkspaceMsg {
         OpenWorkspaceMsg {
@@ -275,11 +145,4 @@ impl OpenWorkspaceMsg {
             source: None,
         }
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct LoginRequiredMsg {
-    pub host: String,
-    pub provider: String,
 }

@@ -18,14 +18,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useEffect, useMemo } from "react"
 import { Outlet, Link as RouterLink, useMatch, useNavigate } from "react-router-dom"
 import { useBorderColor } from "../Theme"
-import {
-  Notifications,
-  ProSwitcher,
-  Sidebar,
-  SidebarMenuItem,
-  StatusBar,
-  Toolbar,
-} from "../components"
+import { Notifications, Sidebar, SidebarMenuItem, StatusBar, Toolbar } from "../components"
 import { SIDEBAR_WIDTH, STATUS_BAR_HEIGHT } from "../constants"
 import { ToolbarProvider, useProviders, useSettings } from "../contexts"
 import { Briefcase, Cog, Stack3D } from "../icons"
@@ -37,7 +30,7 @@ import { useAppReady } from "./useAppReady"
 
 export function OSSApp() {
   const navigate = useNavigate()
-  const { errorModal, changelogModal, proLoginModal } = useAppReady()
+  const { errorModal, changelogModal } = useAppReady()
   const rootRouteMatch = useMatch(Routes.ROOT)
   const { sidebarPosition } = useSettings()
   const contentBackgroundColor = useColorModeValue("white", "background.darkest")
@@ -159,7 +152,6 @@ export function OSSApp() {
                             }
                           />
                         </Box>
-                        <ProSwitcher />
                       </GridItem>
                     </Grid>
                   </Toolbar>
@@ -205,7 +197,6 @@ export function OSSApp() {
       {welcomeModal}
       {errorModal}
       {changelogModal}
-      {proLoginModal}
     </>
   )
 }
@@ -248,12 +239,10 @@ function useProviderUpdates() {
       }
 
       const results = await Promise.allSettled(
-        Object.entries(providers)
-          .filter(([, provider]) => !provider.isProxyProvider)
-          .map(async ([p]) => ({
-            name: p,
-            update: await client.providers.checkUpdate(p),
-          }))
+        Object.keys(providers).map(async (p) => ({
+          name: p,
+          update: await client.providers.checkUpdate(p),
+        }))
       )
 
       return results

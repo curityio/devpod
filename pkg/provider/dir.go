@@ -6,33 +6,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/id"
 )
 
 const (
-	WorkspaceConfigFile   = "workspace.json"
-	WorkspaceResultFile   = "workspace_result.json"
-	MachineConfigFile     = "machine.json"
-	ProInstanceConfigFile = "pro.json"
-	ProviderConfigFile    = "provider.json"
-
-	DaemonStateFile = "devpod_ts.state"
+	WorkspaceConfigFile = "workspace.json"
+	WorkspaceResultFile = "workspace_result.json"
+	MachineConfigFile   = "machine.json"
+	ProviderConfigFile  = "provider.json"
 )
-
-func GetProInstancesDir(context string) (string, error) {
-	configDir, err := config.GetConfigDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(configDir, "contexts", context, "pro"), nil
-}
 
 func GetMachinesDir(context string) (string, error) {
 	configDir, err := config.GetConfigDir()
@@ -79,15 +64,6 @@ func GetProviderDir(context, providerName string) (string, error) {
 	return filepath.Join(configDir, "contexts", context, "providers", providerName), nil
 }
 
-func GetDaemonDir(context, providerName string) (string, error) {
-	configDir, err := config.GetConfigDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(configDir, "contexts", context, "providers", providerName, "daemon"), nil
-}
-
 func GetProviderBinariesDir(context, providerName string) (string, error) {
 	providerDir, err := GetProviderDir(context, providerName)
 	if err != nil {
@@ -123,30 +99,6 @@ func GetWorkspaceDir(context, workspaceID string) (string, error) {
 	return filepath.Join(configDir, "contexts", context, "workspaces", workspaceID), nil
 }
 
-func GetProInstanceDir(context, proInstanceHost string) (string, error) {
-	if proInstanceHost == "" {
-		return "", fmt.Errorf("pro instance host is empty")
-	}
-
-	configDir, err := config.GetConfigDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(configDir, "contexts", context, "pro", ToProInstanceID(proInstanceHost)), nil
-}
-
-var proInstanceIDRegEx1 = regexp.MustCompile(`[^\w\-]`)
-var proInstanceIDRegEx2 = regexp.MustCompile(`[^0-9a-z\-]+`)
-
-func ToProInstanceID(url string) string {
-	url = strings.TrimPrefix(url, "https://")
-	url = strings.ToLower(url)
-	url = proInstanceIDRegEx2.ReplaceAllString(proInstanceIDRegEx1.ReplaceAllString(url, "-"), "")
-	url = strings.Trim(url, "-")
-	return id.SafeConcatNameMax([]string{url}, 32)
-}
-
 func WorkspaceExists(context, workspaceID string) bool {
 	workspaceDir, err := GetWorkspaceDir(context, workspaceID)
 	if err != nil {
@@ -154,16 +106,6 @@ func WorkspaceExists(context, workspaceID string) bool {
 	}
 
 	_, err = os.Stat(workspaceDir)
-	return err == nil
-}
-
-func ProInstanceExists(context, proInstanceID string) bool {
-	proDir, err := GetProInstanceDir(context, proInstanceID)
-	if err != nil {
-		return false
-	}
-
-	_, err = os.Stat(proDir)
 	return err == nil
 }
 
@@ -185,31 +127,6 @@ func SaveProviderConfig(context string, provider *ProviderConfig) error {
 
 	providerConfigFile := filepath.Join(providerDir, ProviderConfigFile)
 	err = file.WriteFileAtomic(providerConfigFile, providerDirBytes, 0600)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func SaveProInstanceConfig(context string, proInstance *ProInstance) error {
-	providerDir, err := GetProInstanceDir(context, proInstance.Host)
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(providerDir, 0755)
-	if err != nil {
-		return err
-	}
-
-	proInstanceBytes, err := json.Marshal(proInstance)
-	if err != nil {
-		return err
-	}
-
-	proInstanceConfigFile := filepath.Join(providerDir, ProInstanceConfigFile)
-	err = file.WriteFileAtomic(proInstanceConfigFile, proInstanceBytes, 0600)
 	if err != nil {
 		return err
 	}
@@ -353,27 +270,6 @@ func LoadMachineConfig(context, machineID string) (*Machine, error) {
 	machineConfig.Context = context
 	machineConfig.Origin = machineConfigFile
 	return machineConfig, nil
-}
-
-func LoadProInstanceConfig(context, proInstanceHost string) (*ProInstance, error) {
-	proDir, err := GetProInstanceDir(context, proInstanceHost)
-	if err != nil {
-		return nil, err
-	}
-
-	proConfigFile := filepath.Join(proDir, ProInstanceConfigFile)
-	proConfigBytes, err := os.ReadFile(proConfigFile)
-	if err != nil {
-		return nil, err
-	}
-
-	proInstanceConfig := &ProInstance{}
-	err = json.Unmarshal(proConfigBytes, proInstanceConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return proInstanceConfig, nil
 }
 
 func LoadWorkspaceConfig(context, workspaceID string) (*Workspace, error) {

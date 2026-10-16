@@ -6,17 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 
-	"github.com/loft-sh/devpod/cmd/agent/container"
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/gitcredentials"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/ts"
 	"github.com/loft-sh/log"
 	"github.com/spf13/cobra"
 )
@@ -61,10 +57,9 @@ func (cmd *GitCredentialsCmd) Run(ctx context.Context, args []string, log log.Lo
 		return err
 	}
 
-	// try to get the credentials from the workspace server first
-	credentials := getCredentialsFromWorkspaceServer(credentialsReq)
-	if credentials == nil && cmd.Port != 0 {
-		// try to get the credentials from the local machine
+	// try to get the credentials from the local machine
+	var credentials *gitcredentials.GitCredentials
+	if cmd.Port != 0 {
 		credentials = getCredentialsFromLocalMachine(credentialsReq, cmd.Port)
 	}
 
@@ -76,36 +71,6 @@ func (cmd *GitCredentialsCmd) Run(ctx context.Context, args []string, log log.Lo
 	// print response to stdout
 	fmt.Print(gitcredentials.ToString(credentials))
 	return nil
-}
-
-func getCredentialsFromWorkspaceServer(credentials *gitcredentials.GitCredentials) *gitcredentials.GitCredentials {
-	if _, err := os.Stat(filepath.Join(container.RootDir, ts.RunnerProxySocket)); err != nil {
-		// workspace server is not running
-		return nil
-	}
-
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", filepath.Join(container.RootDir, ts.RunnerProxySocket))
-			},
-		},
-	}
-
-	credentials, credentialsErr := doRequest(httpClient, credentials, "http://runner-proxy/git-credentials")
-	if credentialsErr != nil {
-		// append error to /tmp/git-credentials.log
-		file, err := os.OpenFile("/tmp/git-credentials-error.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil
-		}
-		defer file.Close()
-
-		_, _ = file.WriteString(fmt.Sprintf("get credentials from workspace server: %v\n", credentialsErr))
-		return nil
-	}
-
-	return credentials
 }
 
 func getCredentialsFromLocalMachine(credentials *gitcredentials.GitCredentials, port int) *gitcredentials.GitCredentials {

@@ -114,10 +114,8 @@ export class WorkspacesClient implements TDebuggable {
     WorkspaceCommands.ADDITIONAL_FLAGS.set(DEVPOD_FLAG_GIT_SIGNING_KEY, sshKeyPath)
   }
 
-  public async listAll(
-    skipPro: boolean = true
-  ): Promise<Result<readonly TWorkspaceWithoutStatus[]>> {
-    return WorkspaceCommands.ListWorkspaces(skipPro)
+  public async listAll(): Promise<Result<readonly TWorkspaceWithoutStatus[]>> {
+    return WorkspaceCommands.ListWorkspaces()
   }
 
   public async getStatus(id: TWorkspaceID): Promise<Result<TWorkspace["status"]>> {
