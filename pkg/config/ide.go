@@ -17,7 +17,6 @@ const (
 	IDERider           IDE = "rider"
 	IDEWebStorm        IDE = "webstorm"
 	IDEDataSpell       IDE = "dataspell"
-	IDEFleet           IDE = "fleet"
 	IDEJupyterNotebook IDE = "jupyternotebook"
 	IDECursor          IDE = "cursor"
 	IDEPositron        IDE = "positron"

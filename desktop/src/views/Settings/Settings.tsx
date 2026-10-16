@@ -394,16 +394,6 @@ function ExperimentalSettings() {
       <SettingSection
         title="Experimental IDEs"
         description=" Enable experimental IDEs. These IDEs are not officially supported by DevPod and might be unstable. We are working on making them generally available">
-        <HStack>
-          <Switch
-            isChecked={settings.experimental_fleet}
-            onChange={(e) => set("experimental_fleet", e.target.checked)}
-          />
-          <FormLabel marginBottom="0" whiteSpace="nowrap" fontSize="sm">
-            JetBrains Fleet
-          </FormLabel>
-        </HStack>
-
         <HStack width="full" align="center">
           <Switch
             isChecked={settings.experimental_jupyterNotebooks}

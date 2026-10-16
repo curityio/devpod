@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -21,12 +20,10 @@ import (
 	"github.com/loft-sh/devpod/pkg/agent/tunnelserver"
 	client2 "github.com/loft-sh/devpod/pkg/client"
 	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
-	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/config"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/devcontainer/sshtunnel"
 	"github.com/loft-sh/devpod/pkg/ide"
-	"github.com/loft-sh/devpod/pkg/ide/fleet"
 	"github.com/loft-sh/devpod/pkg/ide/jetbrains"
 	"github.com/loft-sh/devpod/pkg/ide/jupyter"
 	"github.com/loft-sh/devpod/pkg/ide/openvscode"
@@ -46,7 +43,6 @@ import (
 	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 )
@@ -309,8 +305,6 @@ func (cmd *UpCmd) Run(
 			return jetbrains.NewWebStormServer(config2.GetRemoteUser(result), ideConfig.Options, log).OpenGateway(result.SubstitutionContext.ContainerWorkspaceFolder, client.Workspace())
 		case string(config.IDEDataSpell):
 			return jetbrains.NewDataSpellServer(config2.GetRemoteUser(result), ideConfig.Options, log).OpenGateway(result.SubstitutionContext.ContainerWorkspaceFolder, client.Workspace())
-		case string(config.IDEFleet):
-			return startFleet(ctx, client, log)
 		case string(config.IDEZed):
 			return zed.Open(ctx, ideConfig.Options, config2.GetRemoteUser(result), result.SubstitutionContext.ContainerWorkspaceFolder, client.Workspace(), log)
 		case string(config.IDEJupyterNotebook):
@@ -694,41 +688,6 @@ func startRStudioInBrowser(
 		authSockID,
 		logger,
 	)
-}
-
-func startFleet(ctx context.Context, client client2.BaseWorkspaceClient, logger log.Logger) error {
-	// create ssh command
-	stdout := &bytes.Buffer{}
-	cmd, err := createSSHCommand(
-		ctx,
-		client,
-		logger,
-		[]string{"--command", "cat " + fleet.FleetURLFile},
-	)
-	if err != nil {
-		return err
-	}
-	cmd.Stdout = stdout
-	err = cmd.Run()
-	if err != nil {
-		return command.WrapCommandError(stdout.Bytes(), err)
-	}
-
-	url := strings.TrimSpace(stdout.String())
-	if len(url) == 0 {
-		return fmt.Errorf("seems like fleet is not running within the container")
-	}
-
-	logger.Warnf(
-		"Fleet is exposed at a publicly reachable URL, please make sure to not disclose this URL to anyone as they will be able to reach your workspace from that",
-	)
-	logger.Infof("Starting Fleet at %s ...", url)
-	err = open.Run(url)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func startVSCodeInBrowser(

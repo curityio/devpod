@@ -74,7 +74,7 @@ func Resolve(
 	}
 
 	// configure ide
-	workspace, err = ideparse.RefreshIDEOptions(devPodConfig, workspace, ide, ideOptions)
+	workspace, err = ideparse.RefreshIDEOptions(devPodConfig, workspace, ide, ideOptions, log)
 	if err != nil {
 		return nil, err
 	}

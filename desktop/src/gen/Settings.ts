@@ -19,7 +19,6 @@ export interface Settings {
   httpsProxyUrl: string
   noProxy: string
   experimental_multiDevcontainer: boolean
-  experimental_fleet: boolean
   experimental_jupyterNotebooks: boolean
   experimental_vscodeInsiders: boolean
   experimental_cursor: boolean

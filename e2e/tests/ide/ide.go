@@ -43,9 +43,6 @@ var _ = DevPodDescribe("devpod ide test suite", func() {
 			err = f.DevPodUpWithIDE(ctx, tempDir, "--open-ide=false", "--ide=jupyternotebook")
 			framework.ExpectNoError(err)
 
-			err = f.DevPodUpWithIDE(ctx, tempDir, "--open-ide=false", "--ide=fleet")
-			framework.ExpectNoError(err)
-
 			// check if ssh works
 			err = f.DevPodSSHEchoTestString(ctx, tempDir)
 			framework.ExpectNoError(err)

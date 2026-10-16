@@ -197,7 +197,6 @@ export const SUPPORTED_IDES = [
   "webstorm",
   "openvscode",
   "jupyternotebook",
-  "fleet",
   "windsurf",
 ] as const
 export type TSupportedIDE = (typeof SUPPORTED_IDES)[number]
