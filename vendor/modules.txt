@@ -583,9 +583,6 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/kr/fs v0.1.0
 ## explicit
 github.com/kr/fs
-# github.com/loft-sh/analytics-client v0.0.0-20240219162240-2f4c64b2494e
-## explicit; go 1.21
-github.com/loft-sh/analytics-client/client
 # github.com/loft-sh/log v0.0.0-20250409101748-50124f882858
 ## explicit; go 1.20
 github.com/loft-sh/log

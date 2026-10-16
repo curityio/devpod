@@ -54,11 +54,6 @@ func NewRootCmd() *cobra.Command {
 				_ = os.Setenv(config.DEVPOD_HOME, globalFlags.DevPodHome)
 			}
 
-			devPodConfig, err := config.LoadConfig(globalFlags.Context, globalFlags.Provider)
-			if err == nil {
-				telemetry.StartCLI(devPodConfig, cobraCmd)
-			}
-
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {

@@ -25,13 +25,11 @@ require (
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20240418155129-98dd3e91704f
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/loft-sh/analytics-client v0.0.0-20240219162240-2f4c64b2494e
 	github.com/loft-sh/log v0.0.0-20250409101748-50124f882858
 	github.com/loft-sh/programming-language-detection v0.0.5
 	github.com/loft-sh/ssh v0.0.5
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/buildkit v0.20.1
-	github.com/moby/term v0.5.2
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
 	github.com/otiai10/copy v1.7.0
@@ -151,6 +149,7 @@ require (
 	github.com/moby/sys/capability v0.3.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/moby/sys/user v0.3.0 // indirect
+	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
