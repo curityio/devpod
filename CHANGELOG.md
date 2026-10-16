@@ -54,6 +54,8 @@ First release from `curityio/devpod`.
 - The IDE and built-in provider icons are served from
   [devpod.curityio.net/icons](https://devpod.curityio.net/icons/) instead of devpod.sh
   ([#14](https://github.com/curityio/devpod/pull/14)).
+- Release installers and binaries are not code-signed, because the fork has no Apple or Windows signing
+  certificates yet. macOS and Windows show a warning the first time the desktop app is opened or installed.
 - Kubernetes image pull secrets use `noreply@curity.io` as their email.
 
 ### Fixed
