@@ -67,10 +67,6 @@ devpod up my-workspace --ide goland --ide-option VERSION=2022.3.3
 If for whatever reason this does not work you can also use the regular SSH connection with `WORKSPACE_NAME.devpod` to connect your JetBrains IDE with a workspace
 :::
 
-:::info Fleet Support
-Fleet currently only works by manually adding an SSH connection with `WORKSPACE_NAME.devpod`
-:::
-
 ### SSH
 
 Upon workspace creation, DevPod will automatically modify the `~/.ssh/config` to include an entry for `WORKSPACE_NAME.devpod`, which allows you to use the following command to connect to your workspace:

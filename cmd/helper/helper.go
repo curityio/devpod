@@ -32,7 +32,6 @@ func NewHelperCmd(globalFlags *flags.GlobalFlags) *cobra.Command {
 	helperCmd.AddCommand(NewSSHClientCmd())
 	helperCmd.AddCommand(NewShellCmd())
 	helperCmd.AddCommand(NewSSHGitCloneCmd())
-	helperCmd.AddCommand(NewFleetServerCmd(globalFlags))
 	helperCmd.AddCommand(NewDockerCredentialsHelperCmd(globalFlags))
 	helperCmd.AddCommand(NewGetImageCmd(globalFlags))
 	return helperCmd

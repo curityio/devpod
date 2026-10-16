@@ -30,8 +30,6 @@ pub struct Settings {
     no_proxy: String,
     #[serde(rename = "experimental_multiDevcontainer")]
     experimental_multi_devcontainer: bool,
-    #[serde(rename = "experimental_fleet")]
-    experimental_fleet: bool,
     #[serde(rename = "experimental_jupyterNotebooks")]
     experimental_jupyter_notebooks: bool,
     #[serde(rename = "experimental_vscodeInsiders")]
@@ -46,6 +44,8 @@ pub struct Settings {
     experimental_positron: bool,
     #[serde(rename = "experimental_rstudio")]
     experimental_rstudio: bool,
+    #[serde(rename = "experimental_windsurf")]
+    experimental_windsurf: bool,
     #[serde(rename = "experimental_devPodPro")]
     experimental_devpod_pro: bool,
     #[serde(rename = "experimental_colorMode")]

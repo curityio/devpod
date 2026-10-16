@@ -9,13 +9,13 @@ import (
 	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/config"
 	"github.com/loft-sh/devpod/pkg/ide"
-	"github.com/loft-sh/devpod/pkg/ide/fleet"
 	"github.com/loft-sh/devpod/pkg/ide/jetbrains"
 	"github.com/loft-sh/devpod/pkg/ide/jupyter"
 	"github.com/loft-sh/devpod/pkg/ide/openvscode"
 	"github.com/loft-sh/devpod/pkg/ide/rstudio"
 	"github.com/loft-sh/devpod/pkg/ide/vscode"
 	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 )
 
@@ -112,14 +112,6 @@ var AllowedIDEs = []AllowedIDE{
 		Group:       config.IDEGroupJetBrains,
 	},
 	{
-		Name:         config.IDEFleet,
-		DisplayName:  "Fleet",
-		Options:      fleet.Options,
-		Icon:         "https://devpod.sh/assets/fleet.svg",
-		Experimental: true,
-		Group:        config.IDEGroupJetBrains,
-	},
-	{
 		Name:        config.IDEGoland,
 		DisplayName: "Goland",
 		Options:     jetbrains.GolandOptions,
@@ -204,7 +196,13 @@ var AllowedIDEs = []AllowedIDE{
 	},
 }
 
-func RefreshIDEOptions(devPodConfig *config.Config, workspace *provider.Workspace, ide string, options []string) (*provider.Workspace, error) {
+// discontinuedIDEs are IDEs that were once supported and may still be stored
+// in existing workspaces or as the default IDE, but are no longer available.
+var discontinuedIDEs = map[string]string{
+	"fleet": "JetBrains discontinued Fleet",
+}
+
+func RefreshIDEOptions(devPodConfig *config.Config, workspace *provider.Workspace, ide string, options []string, log log.Logger) (*provider.Workspace, error) {
 	ide = strings.ToLower(ide)
 	if ide == "" {
 		if workspace.IDE.Name != "" {
@@ -213,6 +211,12 @@ func RefreshIDEOptions(devPodConfig *config.Config, workspace *provider.Workspac
 			ide = devPodConfig.Current().DefaultIDE
 		} else {
 			ide = detect()
+		}
+
+		// a stored IDE that is no longer supported falls back to none
+		if reason, ok := discontinuedIDEs[strings.ToLower(ide)]; ok {
+			log.Warnf("IDE '%s' is no longer supported (%s), using '%s' instead. Use --ide to choose another IDE", ide, reason, config.IDENone)
+			ide = string(config.IDENone)
 		}
 	}
 
