@@ -28,6 +28,9 @@ Add new entries to the top of the "Unreleased" section.
     Kubernetes server libraries. This removed 98 modules (about 1.1 million lines) from `vendor/`.
 - **JetBrains Fleet support**: JetBrains discontinued Fleet. Workspaces saved with `fleet` as their
   IDE fall back to `none` with a warning, and `--ide fleet` now fails.
+- **Telemetry**: the CLI no longer sends usage events to Loft. The `TELEMETRY` context option, the
+  `DEVPOD_DISABLE_TELEMETRY` environment variable and the desktop Telemetry setting are gone, so
+  `devpod context set-options -o TELEMETRY=false` now fails.
 - **Windows e2e jobs** in `e2e-tests.yaml`: they needed Loft's self-hosted Windows runner.
 
 ### Changed
@@ -40,6 +43,9 @@ Add new entries to the top of the "Unreleased" section.
   server ([#7](https://github.com/curityio/devpod/pull/7)).
 - Links point to `curityio/devpod` instead of `loft-sh/devpod`, the README has a hard-fork note and
   Curity branding, and links to Loft's website, Slack, blog and X accounts are removed.
+- The desktop app verifies updates with Curity's signing key instead of Loft's.
+- The IDE and built-in provider icons are served from
+  [curityio.github.io/devpod/icons](https://curityio.github.io/devpod/icons/) instead of devpod.sh.
 - Kubernetes image pull secrets use `noreply@curity.io` as their email.
 
 ### Fixed

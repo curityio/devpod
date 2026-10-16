@@ -84,11 +84,10 @@ cd src-tauri && cargo +stable check
 - **DevPod Pro is gone.** The workspace client in `pkg/client/clientimplementation` is the only workspace client
   left, and there are no proxy or daemon providers. Code or docs from upstream that mention Pro, the platform,
   `devpod pro`, proxy providers or Tailscale no longer apply.
-- **Telemetry still goes to Loft.** Release builds send CLI usage events to `analytics.loft.rocks` (through
-  `github.com/loft-sh/analytics-client`, in `pkg/telemetry`) unless the context option `TELEMETRY=false` or
-  `DEVPOD_DISABLE_TELEMETRY=true` is set. Dev builds don't send any (tracked in `TODO.md`).
-- **The desktop updater can't verify our releases yet.** The public key in `desktop/src-tauri/tauri.conf.json` is
-  still Loft's, so updates will be rejected until it is replaced (tracked in `TODO.md`).
+- **Telemetry is disabled.** `pkg/telemetry` only has a no-op collector; the hooks stay so it can be re-enabled
+  when Curity has a backend for it (tracked in `TODO.md`).
+- **Icons are served from the docs site.** The IDE and provider icon URLs point at `docs/static/icons/`, published at
+  `https://curityio.github.io/devpod/icons/`. Add new icons there (Docusaurus uses `/assets/` for its own output).
 - **External providers are still upstream's.** Providers other than `docker` and `kubernetes` (aws, gcloud, ssh,
   ...) are still under the `loft-sh` GitHub organization (tracked in `TODO.md`).
 - **Where state lives.** Local state is in `~/.devpod` (override with `DEVPOD_HOME`): contexts, provider configs,

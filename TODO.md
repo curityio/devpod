@@ -27,27 +27,17 @@ in `curityio/devpod`. Copy the relevant information into our docs (or recreate t
 - [ ] `docs/pages/troubleshooting/linux-troubleshooting.mdx`: issue [#1045](https://github.com/loft-sh/devpod/issues/1045) (SSH connection string too long)
 - [ ] `desktop/flatpak/DevPod.metainfo.xml`: release notes for [v0.6.10](https://github.com/loft-sh/devpod/releases/tag/v0.6.10)
 
-## Replace the desktop app update signing key
+## Store the desktop app update signing key in GitHub
 
-The Tauri updater verifies every update against `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json`,
-which is still Loft's public key. Our releases are signed with the `TAURI_PRIVATE_KEY` secret, so the app will reject them
-unless the keys match:
+`plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` is our own key. The release workflow signs updates with
+its private key, so the key must be available to it:
 
-- [ ] Generate a new key pair with `tauri signer generate`
 - [ ] Store the private key and its password as the `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` repository secrets
-- [ ] Replace `plugins.updater.pubkey` in `desktop/src-tauri/tauri.conf.json` with the new public key
 
-## Stop sending telemetry to Loft
+## Enable telemetry again
 
-Release builds send CLI usage events to Loft's `analytics.loft.rocks` (through `github.com/loft-sh/analytics-client`,
-used in `pkg/telemetry`) unless the context option `TELEMETRY=false` or `DEVPOD_DISABLE_TELEMETRY=true` is set:
+Telemetry is disabled: `pkg/telemetry` only has a no-op collector, and the hooks in `cmd/root.go` and `cmd/up.go` call it.
+Once a Curity server can collect usage events:
 
-- [ ] Remove telemetry (and the `analytics-client` dependency), or point it at a Curity endpoint
-- [ ] Update the `TELEMETRY` context option and the docs that mention telemetry accordingly
-
-## Host the IDE and provider icons ourselves
-
-The IDE icons (`pkg/ide/ideparse/parse.go`) and the built-in provider icons (`providers/*/provider.yaml`) are loaded from
-Loft's website, `https://devpod.sh/assets/...`:
-
-- [ ] Copy the icons into this repository (e.g. the docs site's static files) and point the URLs at our copies
+- [ ] Implement a collector that sends events to it, with an opt-out (context option and environment variable)
+- [ ] Add the opt-out back to the desktop settings and describe the data in `docs/pages/other-topics/telemetry.mdx`
