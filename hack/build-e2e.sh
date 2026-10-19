@@ -20,6 +20,12 @@ chmod +x $BUILD_DIR/devpod-linux-amd64
 chmod +x $BUILD_DIR/devpod-linux-arm64
 chmod +x $BUILD_DIR/devpod-darwin-arm64
 chmod +x $BUILD_DIR/devpod-darwin-amd64
-mkdir -p /tmp/devpod-cache
-cp $BUILD_DIR/devpod-linux-amd64 /tmp/devpod-cache/devpod-linux-amd64
-cp $BUILD_DIR/devpod-linux-arm64 /tmp/devpod-cache/devpod-linux-arm64
+
+# The CLI injects the agent from os.TempDir()/devpod-cache, and dev builds never refresh it,
+# so put the new binaries where Go looks: $TMPDIR when set (as on macOS), /tmp otherwise.
+CACHE_DIR="${TMPDIR:-/tmp}"
+CACHE_DIR="${CACHE_DIR%/}/devpod-cache"
+mkdir -p "$CACHE_DIR"
+cp $BUILD_DIR/devpod-linux-amd64 "$CACHE_DIR/devpod-linux-amd64"
+cp $BUILD_DIR/devpod-linux-arm64 "$CACHE_DIR/devpod-linux-arm64"
+echo "Copied the linux agent binaries to $CACHE_DIR"
