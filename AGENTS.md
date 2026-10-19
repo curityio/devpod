@@ -11,7 +11,7 @@ VMs). [CHANGELOG.md](CHANGELOG.md) lists what the fork changed and [TODO.md](TOD
 | Path | What it is |
 | --- | --- |
 | `main.go`, `cmd/` | The `devpod` CLI (cobra). `cmd/agent/` and `cmd/helper/` hold the hidden commands run on the remote machine and inside the container. |
-| `pkg/` | Core Go code: `devcontainer/` (parsing, building and running dev containers), `driver/` (docker, kubernetes, custom), `workspace/`, `provider/`, `client/`, `agent/` (agent injection and the gRPC tunnel between CLI and agent), `ide/`, `ssh/`, `credentials/`, `config/`. |
+| `pkg/` | Core Go code: `devcontainer/` (parsing, building and running dev containers), `driver/` (docker, kubernetes, custom), `kubeclient/` (minimal Kubernetes API client), `workspace/`, `provider/`, `client/`, `agent/` (agent injection and the gRPC tunnel between CLI and agent), `ide/`, `ssh/`, `credentials/`, `config/`. |
 | `providers/` | The built-in `docker` and `kubernetes` provider definitions, embedded into the binary. Other providers live in separate repos. |
 | `desktop/` | The desktop app: Tauri 2 (Rust, `desktop/src-tauri`) with a React/TypeScript UI (`desktop/src`). It runs the `devpod` CLI as a sidecar. |
 | `docs/` | Docusaurus documentation site, deployed to [devpod.curityio.net](https://devpod.curityio.net/) (GitHub Pages with a custom domain, so `baseUrl` is `/`) by `.github/workflows/docs.yaml` on pushes to `main`. |
@@ -73,6 +73,11 @@ cd src-tauri && cargo +stable check
   linux) copy fresh binaries there; if you build some other way, copy them yourself. Also, all dev builds report
   version `v0.0.0`, so a container that already has an agent keeps it: recreate the workspace to test agent
   changes.
+- **Don't import `k8s.io/client-go/kubernetes`** (or its typed clients, or anything that uses them, such as
+  go-containerregistry's `authn/kubernetes`). Its scheme links every Kubernetes API group and adds over 20 MB to
+  the binary, which also runs as the agent. Use `pkg/kubeclient`, which only registers core/v1 and rbac/v1; add a
+  resource or group there if you need one. `go list -deps . | grep '^k8s.io/client-go/kubernetes'` must print
+  nothing.
 - **gRPC tunnel code is generated.** After editing `pkg/agent/tunnel/tunnel.proto`, regenerate with
   `hack/build-grpc.sh` (needs `protoc`; existing code uses protoc-gen-go v1.36.4 and protoc-gen-go-grpc v1.5.1).
 - **CI quirks:**
