@@ -17,6 +17,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- `devpod upgrade` and the CLI's newer-version check use this fork's releases on `curityio/devpod`. Before,
+  they used upstream `loft-sh/devpod`, so `devpod upgrade` replaced the CLI with an upstream binary.
 - `postStartCommand` now runs again when DevPod starts a stopped dev container, e.g. on `devpod ssh` or
   `devpod up`. It was skipped because DevPod compared the container's start time from before it was started.
 - Ending a session no longer removes credential helpers that the user or the dev container added to the
