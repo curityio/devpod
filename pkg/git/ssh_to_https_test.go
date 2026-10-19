@@ -30,7 +30,12 @@ func TestSSHPrefix(t *testing.T) {
 		{in: "/tmp/repo"},
 		{in: "../repo"},
 		{in: "C:/repo"},
+		{in: `C:\repo`},
 		{in: "ssh://git@github.com"},
+		{in: "git@[::1]:team/repo.git", expectedPrefix: "git@[::1]:", expectedHost: "[::1]", expectedOK: true},
+		{in: "[fd00::1]:team/repo.git", expectedPrefix: "[fd00::1]:", expectedHost: "[fd00::1]", expectedOK: true},
+		{in: "ssh://alice@git.example.com:2222/repo.git", expectedPrefix: "ssh://alice@git.example.com:2222/", expectedHost: "git.example.com", expectedOK: true},
+		{in: "ssh://git@[::1]:22/repo.git", expectedPrefix: "ssh://git@[::1]:22/", expectedHost: "[::1]", expectedOK: true},
 	}
 
 	for _, testCase := range testCases {
@@ -51,18 +56,51 @@ func TestSSHToHTTPSRewrites(t *testing.T) {
 		[]string{
 			"bitbucket.org",
 			"ssh://git@git.example.com:7999/=https://git.example.com/scm/",
+			// invalid entries are skipped
+			"broken=",
+			"https://gitlab.com",
 		},
 	)
 
 	assert.DeepEqual(t, rewrites, map[string]string{
 		"git@github.com:":                 "https://github.com/",
+		"git@github.com:/":                "https://github.com/",
 		"ssh://git@github.com/":           "https://github.com/",
 		"git@bitbucket.org:":              "https://bitbucket.org/",
+		"git@bitbucket.org:/":             "https://bitbucket.org/",
 		"ssh://git@bitbucket.org/":        "https://bitbucket.org/",
 		"git@git.example.com:":            "https://git.example.com/",
+		"git@git.example.com:/":           "https://git.example.com/",
 		"ssh://git@git.example.com/":      "https://git.example.com/",
 		"ssh://git@git.example.com:7999/": "https://git.example.com/scm/",
 	})
+}
+
+func TestValidateSSHToHTTPSHost(t *testing.T) {
+	for _, valid := range []string{
+		"github.com",
+		"git.example.com",
+		"localhost",
+		"[::1]",
+		"ssh://git@git.example.com:7999/=https://git.example.com/scm/",
+		" git@host: = http://host/ ",
+	} {
+		assert.NilError(t, ValidateSSHToHTTPSHost(valid), valid)
+	}
+
+	for _, invalid := range []string{
+		"",
+		"https://github.com",
+		"github.com/org",
+		"git@github.com",
+		"github.com:22",
+		"host=",
+		"=https://host/",
+		"ssh://git@host/=host",
+		"-host",
+	} {
+		assert.Assert(t, ValidateSSHToHTTPSHost(invalid) != nil, invalid)
+	}
 }
 
 func TestFormatSSHToHTTPSConfig(t *testing.T) {
@@ -90,6 +128,7 @@ func TestSSHToHTTPSAppliedByGit(t *testing.T) {
 	runGit(t, repo, "remote", "add", "origin", "git@github.com:curityio/devpod.git")
 	runGit(t, repo, "remote", "add", "server", "ssh://git@git.example.com:7999/proj/repo.git")
 	runGit(t, repo, "remote", "add", "web", "https://bitbucket.org/team/repo.git")
+	runGit(t, repo, "remote", "add", "slash", "git@github.com:/curityio/devpod.git")
 	err := os.WriteFile(filepath.Join(repo, ".gitmodules"), []byte(`[submodule "lib"]
 	path = lib
 	url = git@bitbucket.org:team/lib.git
@@ -101,6 +140,7 @@ func TestSSHToHTTPSAppliedByGit(t *testing.T) {
 		"git@github.com:curityio/devpod.git",
 		"ssh://git@git.example.com:7999/proj/repo.git",
 		"https://bitbucket.org/team/repo.git",
+		"git@github.com:/curityio/devpod.git",
 		"git@bitbucket.org:team/lib.git",
 	})
 
@@ -113,6 +153,7 @@ func TestSSHToHTTPSAppliedByGit(t *testing.T) {
 		"origin": "https://github.com/curityio/devpod.git",
 		"server": "https://git.example.com/scm/proj/repo.git",
 		"web":    "https://bitbucket.org/team/repo.git",
+		"slash":  "https://github.com/curityio/devpod.git",
 	} {
 		cmd := exec.Command("git", "remote", "get-url", "--push", remote)
 		cmd.Dir = repo

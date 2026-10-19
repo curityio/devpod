@@ -81,8 +81,6 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 			if devPodConfig.ContextOption(config.ContextOptionSSHStrictHostKeyChecking) == "true" {
 				cmd.StrictHostKeyChecking = true
 			}
-			cmd.GitSSHToHTTPS = devPodConfig.GitSSHToHTTPS()
-			cmd.GitSSHToHTTPSHosts = devPodConfig.GitSSHToHTTPSHosts()
 
 			ctx, cancel := WithSignals(cobraCmd.Context())
 			defer cancel()
@@ -92,6 +90,11 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 				return fmt.Errorf("prepare workspace client: %w", err)
 			}
 			telemetry.CollectorCLI.SetClient(client)
+
+			err = provider2.ApplyContextOptions(ctx, &cmd.CLIOptions, devPodConfig, client.WorkspaceConfig().Source)
+			if err != nil {
+				return err
+			}
 
 			return cmd.Run(ctx, devPodConfig, client, args, logger)
 		},
@@ -185,7 +188,7 @@ func (cmd *UpCmd) Run(
 		}
 		setupGPGAgentForwarding := cmd.GPGAgentForwarding || devPodConfig.ContextOption(config.ContextOptionGPGAgentForwarding) == "true"
 
-		err = configureSSH(client, cmd.SSHConfigPath, user, workdir, setupGPGAgentForwarding, devPodHome)
+		err = configureSSH(client, cmd.SSHConfigPath, user, workdir, setupGPGAgentForwarding, !cmd.DisableSSHAgentForwarding, devPodHome)
 		if err != nil {
 			return err
 		}
@@ -420,6 +423,9 @@ func (cmd *UpCmd) devPodUpMachine(
 		ctx,
 		client,
 		devPodConfig.ContextOption(config.ContextOptionSSHAddPrivateKeys) == "true",
+		// the agent on the machine may need it to clone the source, it isn't forwarded into the container when
+		// SSH_AGENT_FORWARDING is false
+		true,
 		agentInjectFunc,
 		sshTunnelCmd,
 		agentCommand,
@@ -772,7 +778,7 @@ func startBrowserTunnel(
 	return nil
 }
 
-func configureSSH(client client2.BaseWorkspaceClient, sshConfigPath, user, workdir string, gpgagent bool, devPodHome string) error {
+func configureSSH(client client2.BaseWorkspaceClient, sshConfigPath, user, workdir string, gpgagent, forwardAgent bool, devPodHome string) error {
 	path, err := devssh.ResolveSSHConfigPath(sshConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "Invalid ssh config path")
@@ -786,6 +792,7 @@ func configureSSH(client client2.BaseWorkspaceClient, sshConfigPath, user, workd
 		user,
 		workdir,
 		gpgagent,
+		forwardAgent,
 		devPodHome,
 		log.Default,
 	)

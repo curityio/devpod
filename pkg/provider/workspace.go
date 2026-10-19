@@ -198,8 +198,12 @@ type CLIOptions struct {
 	GitSSHSigningKey            string            `json:"gitSshSigningKey,omitempty"`
 	SSHAuthSockID               string            `json:"sshAuthSockID,omitempty"` // ID to use when looking for SSH_AUTH_SOCK, defaults to a new random ID if not set (only used for browser IDEs)
 	StrictHostKeyChecking       bool              `json:"strictHostKeyChecking,omitempty"`
-	GitSSHToHTTPS               bool              `json:"gitSshToHttps,omitempty"`
-	GitSSHToHTTPSHosts          []string          `json:"gitSshToHttpsHosts,omitempty"`
+	// GitSSHToHTTPS is "true" or "false" to turn GIT_SSH_TO_HTTPS on or off. When it is empty, e.g. when the
+	// container is started by an older CLI, the agent leaves the current rewrites in place.
+	GitSSHToHTTPS             string   `json:"gitSshToHttps,omitempty"`
+	GitSSHToHTTPSHosts        []string `json:"gitSshToHttpsHosts,omitempty"`
+	GitSSHToHTTPSRemotes      []string `json:"gitSshToHttpsRemotes,omitempty"` // remote urls of the local folder source, read on the host
+	DisableSSHAgentForwarding bool     `json:"disableSshAgentForwarding,omitempty"`
 
 	// build options
 	Repository string   `json:"repository,omitempty"`

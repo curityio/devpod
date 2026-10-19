@@ -22,6 +22,7 @@ func SSHToHTTPSRewrites(remoteURLs []string, extraHosts []string) map[string]str
 	rewrites := map[string]string{}
 	addHost := func(host string) {
 		rewrites["git@"+host+":"] = "https://" + host + "/"
+		rewrites["git@"+host+":/"] = "https://" + host + "/"
 		rewrites["ssh://git@"+host+"/"] = "https://" + host + "/"
 	}
 
@@ -31,15 +32,24 @@ func SSHToHTTPSRewrites(remoteURLs []string, extraHosts []string) map[string]str
 			continue
 		}
 		rewrites[prefix] = "https://" + host + "/"
+		if !strings.Contains(prefix, "://") {
+			// `git@host:/org/repo.git` is the same repository as `git@host:org/repo.git`
+			rewrites[prefix+"/"] = "https://" + host + "/"
+		}
 		addHost(host)
 	}
 
 	explicit := map[string]string{}
 	for _, extraHost := range extraHosts {
+		extraHost = strings.TrimSpace(extraHost)
+		// the CLI rejects invalid entries, skip them in case an older one sent them
+		if ValidateSSHToHTTPSHost(extraHost) != nil {
+			continue
+		}
 		if from, to, ok := strings.Cut(extraHost, "="); ok {
 			explicit[strings.TrimSpace(from)] = strings.TrimSpace(to)
 		} else {
-			addHost(strings.TrimSpace(extraHost))
+			addHost(extraHost)
 		}
 	}
 	for from, to := range explicit {
@@ -47,6 +57,32 @@ func SSHToHTTPSRewrites(remoteURLs []string, extraHosts []string) map[string]str
 	}
 
 	return rewrites
+}
+
+// scpIPv6Pattern matches the start of an scp-like url with an IPv6 address, e.g. `git@[::1]:`.
+var scpIPv6Pattern = regexp.MustCompile(`^(?:[^@/\[\]]*@)?(\[[0-9A-Fa-f:.]+\]):`)
+
+// hostPattern matches a host name or a bracketed IPv6 address.
+var hostPattern = regexp.MustCompile(`^(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)$`)
+
+// ValidateSSHToHTTPSHost checks an entry of GIT_SSH_TO_HTTPS_HOSTS: a host, e.g. `git.example.com`, or an explicit
+// `from=to` rewrite to an http(s) base, e.g. `ssh://git@git.example.com:7999/=https://git.example.com/scm/`.
+func ValidateSSHToHTTPSHost(entry string) error {
+	entry = strings.TrimSpace(entry)
+	if from, to, ok := strings.Cut(entry, "="); ok {
+		from, to = strings.TrimSpace(from), strings.TrimSpace(to)
+		if from == "" {
+			return fmt.Errorf("invalid GIT_SSH_TO_HTTPS_HOSTS entry %q: the url prefix before = is empty", entry)
+		}
+		if !strings.HasPrefix(to, "https://") && !strings.HasPrefix(to, "http://") {
+			return fmt.Errorf("invalid GIT_SSH_TO_HTTPS_HOSTS entry %q: the base after = must start with https://", entry)
+		}
+		return nil
+	}
+	if !hostPattern.MatchString(entry) {
+		return fmt.Errorf("invalid GIT_SSH_TO_HTTPS_HOSTS entry %q: expected a host such as git.example.com, or an explicit rewrite such as ssh://git@git.example.com:7999/=https://git.example.com/scm/", entry)
+	}
+	return nil
 }
 
 // sshPrefix returns the part of an ssh remote url up to and including the separator before the repository path,
@@ -77,6 +113,9 @@ func sshPrefix(remoteURL string) (prefix string, host string, ok bool) {
 	// scp-like syntax: [user@]host:path, where the host part has no slash
 	if strings.Contains(remoteURL, "://") {
 		return "", "", false
+	}
+	if match := scpIPv6Pattern.FindStringSubmatch(remoteURL); match != nil {
+		return match[0], match[1], true
 	}
 	authority, _, found := strings.Cut(remoteURL, ":")
 	if !found || authority == "" || strings.Contains(authority, "/") {

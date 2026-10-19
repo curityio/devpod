@@ -319,6 +319,8 @@ func isDevPodCredentialHelper(line string) bool {
 	return found && strings.TrimSpace(key) == "helper" && strings.Contains(value, " agent git-credentials")
 }
 
+// getGlobalGitConfigPath resolves the global git config for the specified user according to
+// https://git-scm.com/docs/git-config/#Documentation/git-config.txt-XDGCONFIGHOMEgitconfig
 func getGlobalGitConfigPath(userName string) (string, error) {
 	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
 		return filepath.Join(xdgConfigHome, "git", "config"), nil

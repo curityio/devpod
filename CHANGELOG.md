@@ -18,7 +18,16 @@ Add new entries to the top of the "Unreleased" section.
 ### Fixed
 
 - Ending a session no longer removes credential helpers that the user or the dev container added to the
-  `[credential]` section of the global git config; only DevPod's own helper is removed.
+  `[credential]` section of the global git config; only DevPod's own helper is removed. While a session is
+  active, git asks those helpers before DevPod's.
+- `SSH_AGENT_FORWARDING=false` now also stops forwarding the ssh-agent into the dev container's lifecycle
+  commands and into IDE connections: the workspace's entry in `~/.ssh/config` gets `ForwardAgent no`.
+  Before, it only applied to `devpod ssh` sessions.
+- git in the dev container no longer refuses to use the workspace folder with "detected dubious ownership" when
+  the folder isn't owned by the container user, e.g. with Docker Desktop on macOS and Windows. DevPod adds the
+  workspace folder to `safe.directory` in the system git config.
+- The workspace config that the agent saves on the machine no longer contains the CLI options of the last
+  `devpod up`, such as `--workspace-env` values, as was intended.
 
 ### Changed
 

@@ -39,15 +39,16 @@ service you use, and the credentials don't depend on your computer.
 
 ### What DevPod changes
 
-On every `devpod up`, before any of the dev container's lifecycle commands (such as `postCreateCommand`) run,
-DevPod:
+Whenever DevPod starts the dev container, with `devpod up` or when `devpod ssh` or an IDE starts a stopped
+workspace, and before any of the dev container's lifecycle commands (such as `postCreateCommand`) run, DevPod:
 
 1. Collects the remote urls it can find: the workspace's git source, and the `remote.*.url` and
-   `submodule.*.url` entries of the repository in the workspace folder.
+   `submodule.*.url` entries of the repository in the workspace folder. For a local folder, DevPod reads them on
+   your computer, so this also works when the folder is a git worktree or a submodule checkout.
 2. For each host that uses ssh, adds [`url.<base>.insteadOf`](https://git-scm.com/docs/git-config#Documentation/git-config.txt-urlltbasegtinsteadOf)
    rules that rewrite these prefixes to `https://<host>/`:
    - the prefix of the url itself, e.g. `ssh://git@git.example.com:7999/`
-   - `git@<host>:`
+   - `git@<host>:` and `git@<host>:/`
    - `ssh://git@<host>/`
 3. Writes the rules to `/var/devpod/ssh-to-https.gitconfig` and includes that file from the system git config
    (`/etc/gitconfig`), so they apply to every user in the container.
@@ -60,14 +61,15 @@ also cover submodules, other remotes and repositories cloned later. You can see 
 git remote get-url --push origin
 ```
 
-If the option is turned off again, the next `devpod up` removes the file and the include.
+If the option is turned off again, the next `devpod up` removes the file and the include. A container started
+by an older DevPod version keeps the rules as they are.
 
 ### Options
 
 | Context option | Default | Meaning |
 | --- | --- | --- |
 | `GIT_SSH_TO_HTTPS` | `auto` | `true` always rewrites, `false` never does, and `auto` rewrites when `SSH_AGENT_FORWARDING` is `false`. |
-| `GIT_SSH_TO_HTTPS_HOSTS` | | Comma-separated list of extra hosts to rewrite, e.g. `github.com,bitbucket.org`, for repositories the workspace clones later. An entry `from=to` adds an explicit rewrite instead. |
+| `GIT_SSH_TO_HTTPS_HOSTS` | | Comma-separated list of extra hosts to rewrite, e.g. `github.com,bitbucket.org`, for repositories the workspace clones later. An entry `from=to` adds an explicit rewrite instead, where `to` starts with `https://`. `devpod up` fails on entries that are neither. |
 
 The default rewrite assumes that a repository has the same path over ssh and https, which is true for GitHub,
 Bitbucket Cloud and GitLab. Servers that use different paths, such as Bitbucket Data Center
@@ -90,8 +92,11 @@ devpod context set-options \
   -o GIT_SSH_SIGNATURE_FORWARDING=false
 ```
 
-- `SSH_AGENT_FORWARDING=false` stops forwarding your ssh-agent into `devpod ssh` sessions and, because
-  `GIT_SSH_TO_HTTPS` is `auto` by default, makes git use https.
+- `SSH_AGENT_FORWARDING=false` stops forwarding your ssh-agent into the dev container: into `devpod ssh`
+  sessions, into the lifecycle commands, and into IDE and `ssh <workspace>.devpod` connections, whose entry in
+  `~/.ssh/config` gets `ForwardAgent no` on the next `devpod up`. Because `GIT_SSH_TO_HTTPS` is `auto` by
+  default, it also makes git use https. DevPod itself still uses your ssh-agent during `devpod up` to clone the
+  repository, on your computer or on the provider's machine, but not in the container.
 - `SSH_INJECT_GIT_CREDENTIALS=false` stops DevPod from installing its credential helper. When it is on, git tries
   DevPod's helper as well, which fails once your computer is gone.
 - `GIT_SSH_SIGNATURE_FORWARDING=false` stops DevPod from configuring commit signing through your computer. If you

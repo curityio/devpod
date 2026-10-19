@@ -136,6 +136,7 @@ func (r *runner) setupContainer(
 		ctx,
 		nil,
 		false,
+		!r.WorkspaceConfig.CLIOptions.DisableSSHAgentForwarding,
 		agentInjectFunc,
 		sshTunnelCmd,
 		setupCommand,

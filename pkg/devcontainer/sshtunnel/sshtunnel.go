@@ -26,6 +26,7 @@ func ExecuteCommand(
 	ctx context.Context,
 	client client2.WorkspaceClient,
 	addPrivateKeys bool,
+	forwardAgent bool,
 	agentInject AgentInjectFunc,
 	sshCommand,
 	command string,
@@ -110,7 +111,9 @@ func ExecuteCommand(
 		log.Debugf("SSH session created")
 
 		identityAgent := devsshagent.GetSSHAuthSocket()
-		if identityAgent != "" {
+		if !forwardAgent {
+			log.Debugf("Not forwarding ssh-agent, enable via 'devpod context set-options -o SSH_AGENT_FORWARDING=true'")
+		} else if identityAgent != "" {
 			log.Debugf("Forwarding ssh-agent using %s", identityAgent)
 			err = devsshagent.ForwardToRemote(sshClient, identityAgent)
 			if err != nil {

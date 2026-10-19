@@ -24,15 +24,15 @@ var (
 	MarkerEndPrefix   = "# DevPod End "
 )
 
-func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent bool, devPodHome string, log log.Logger) error {
-	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, devPodHome, log)
+func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent, forwardAgent bool, devPodHome string, log log.Logger) error {
+	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, forwardAgent, devPodHome, log)
 }
 
-func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent bool, devPodHome string, log log.Logger) error {
+func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent, forwardAgent bool, devPodHome string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent, devPodHome)
+	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent, forwardAgent, devPodHome)
 	if err != nil {
 		return errors.Wrap(err, "parse ssh config")
 	}
@@ -46,7 +46,7 @@ type DevPodSSHEntry struct {
 	Workspace string
 }
 
-func addHost(path, host, user, context, workspace, workdir, command string, gpgagent bool, devPodHome string) (string, error) {
+func addHost(path, host, user, context, workspace, workdir, command string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
 	newConfig, err := removeFromConfig(path, host)
 	if err != nil {
 		return "", err
@@ -58,17 +58,21 @@ func addHost(path, host, user, context, workspace, workdir, command string, gpga
 		return "", err
 	}
 
-	return addHostSection(newConfig, execPath, host, user, context, workspace, workdir, command, gpgagent, devPodHome)
+	return addHostSection(newConfig, execPath, host, user, context, workspace, workdir, command, gpgagent, forwardAgent, devPodHome)
 }
 
-func addHostSection(config, execPath, host, user, context, workspace, workdir, command string, gpgagent bool, devPodHome string) (string, error) {
+func addHostSection(config, execPath, host, user, context, workspace, workdir, command string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
 	newLines := []string{}
 	// add new section
 	startMarker := MarkerStartPrefix + host
 	endMarker := MarkerEndPrefix + host
 	newLines = append(newLines, startMarker)
 	newLines = append(newLines, "Host "+host)
-	newLines = append(newLines, "  ForwardAgent yes")
+	if forwardAgent {
+		newLines = append(newLines, "  ForwardAgent yes")
+	} else {
+		newLines = append(newLines, "  ForwardAgent no")
+	}
 	newLines = append(newLines, "  LogLevel error")
 	newLines = append(newLines, "  StrictHostKeyChecking no")
 	newLines = append(newLines, "  UserKnownHostsFile /dev/null")
