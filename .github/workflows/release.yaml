@@ -155,6 +155,12 @@ jobs:
         with:
           go-version: 1.21.8
 
+      # The CLI embeds the Linux agents, which must have the same version as the CLI
+      - name: Build Linux agents
+        shell: bash
+        run: |
+          LDFLAGS="-s -w -X github.com/loft-sh/devpod/pkg/version.version=v${{ needs.create-release.outputs.original_package_version }} -X github.com/loft-sh/devpod/pkg/devcontainer/crane.craneSigningKey=${{ secrets.CRANE_PRIVATE_KEY }}" ./hack/build-agents.sh
+
       - name: Build Sidecar CLI
         if: matrix.settings.host != 'windows-latest'
         run: |

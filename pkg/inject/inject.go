@@ -21,7 +21,17 @@ var Script string
 
 type ExecFunc func(ctx context.Context, command string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 
-type LocalFile func(arm bool) (io.ReadCloser, error)
+// BinaryRequest is what the inject script asks for when the agent needs to be installed.
+type BinaryRequest struct {
+	// Arm is true if the target needs the arm64 binary.
+	Arm bool
+
+	// PreviousVersion is the version of the agent that gets replaced: empty if there was none, "unknown" if it
+	// didn't report its version.
+	PreviousVersion string
+}
+
+type LocalFile func(request BinaryRequest) (io.ReadCloser, error)
 
 type injectResult struct {
 	wasExecuted bool
@@ -45,10 +55,6 @@ func InjectAndExecute(
 	}
 
 	log.Debugf("execute inject script")
-	if scriptParams.PreferAgentDownload {
-		log.Debugf("download agent from %s", scriptParams.DownloadURLs.Base)
-	}
-
 	defer log.Debugf("done injecting")
 
 	// start script
@@ -169,7 +175,7 @@ func inject(
 		log.Debugf("Inject binary")
 		defer log.Debugf("Done injecting binary")
 
-		fileReader, err := getFileReader(localFile, lineStr)
+		fileReader, err := localFile(parseBinaryRequest(lineStr))
 		if err != nil {
 			return false, err
 		}
@@ -204,9 +210,13 @@ func isInjectingOfBinaryNeeded(lineStr string) bool {
 	return strings.HasPrefix(lineStr, "ARM-")
 }
 
-func getFileReader(localFile LocalFile, lineStr string) (io.ReadCloser, error) {
-	isArm := strings.TrimPrefix(lineStr, "ARM-") == "true"
-	return localFile(isArm)
+// parseBinaryRequest parses the "ARM-<true|false> [previous version]" line of the inject script.
+func parseBinaryRequest(lineStr string) BinaryRequest {
+	arm, previousVersion, _ := strings.Cut(strings.TrimPrefix(lineStr, "ARM-"), " ")
+	return BinaryRequest{
+		Arm:             arm == "true",
+		PreviousVersion: strings.TrimSpace(previousVersion),
+	}
 }
 
 func performMutualHandshake(line string, stdin io.WriteCloser) error {

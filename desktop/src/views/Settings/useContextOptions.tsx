@@ -1,12 +1,9 @@
-import { Code, Switch } from "@chakra-ui/react"
+import { Switch } from "@chakra-ui/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useCallback, useMemo } from "react"
+import { useMemo } from "react"
 import { client } from "../../client"
 import { QueryKeys } from "../../queryKeys"
 import { TContextOptionName } from "../../types"
-import { ClearableInput } from "./ClearableInput"
-
-const DEFAULT_DEVPOD_AGENT_URL = "https://github.com/curityio/devpod/releases/latest/download/"
 
 export function useContextOptions() {
   const queryClient = useQueryClient()
@@ -30,41 +27,6 @@ export function useContextOptions() {
     }),
     [options, updateOption]
   )
-}
-
-export function useAgentURLOption() {
-  const { options, updateOption } = useContextOptions()
-
-  const handleChanged = useCallback(
-    (newValue: string) => {
-      const value = newValue.trim()
-      updateOption({ option: "AGENT_URL", value })
-    },
-    [updateOption]
-  )
-
-  const input = useMemo(
-    () => (
-      <ClearableInput
-        placeholder="Override Agent URL"
-        defaultValue={options?.AGENT_URL.value ?? ""}
-        onChange={handleChanged}
-      />
-    ),
-    [handleChanged, options?.AGENT_URL.value]
-  )
-
-  const helpText = useMemo(
-    () => (
-      <>
-        Set the Agent URL. If you leave this empty, it will be pulled from{" "}
-        <Code>{DEFAULT_DEVPOD_AGENT_URL}</Code>
-      </>
-    ),
-    []
-  )
-
-  return { input, helpText }
 }
 
 export function useDockerCredentialsForwardingOption() {

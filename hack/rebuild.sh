@@ -2,10 +2,6 @@
 
 set -e
 
-if [[ -z "${TMPDIR}" ]]; then
-    TMPDIR="/tmp"
-fi
-
 if [[ -z "${BUILD_PLATFORMS}" ]]; then
     BUILD_PLATFORMS="linux windows darwin"
 fi
@@ -13,6 +9,9 @@ fi
 if [[ -z "${BUILD_ARCHS}" ]]; then
     BUILD_ARCHS="amd64 arm64"
 fi
+
+# the CLI embeds the Linux agents, so they're always needed
+./hack/build-agents.sh
 
 for os in $BUILD_PLATFORMS; do
     for arch in $BUILD_ARCHS; do
@@ -43,11 +42,6 @@ else
     echo "[INFO] Skipping install of devpod binary"
 fi
 
-if [[ $BUILD_PLATFORMS == *"linux"* ]]; then
-    cp test/devpod-cli-linux-amd64 test/devpod-linux-amd64 
-    cp test/devpod-cli-linux-arm64 test/devpod-linux-arm64
-fi
-
 if [ -d "desktop/src-tauri/bin" ]; then
     if [[ $BUILD_PLATFORMS == *"linux"* ]]; then
         cp test/devpod-cli-linux-amd64 desktop/src-tauri/bin/devpod-cli-x86_64-unknown-linux-gnu
@@ -61,12 +55,4 @@ if [ -d "desktop/src-tauri/bin" ]; then
         cp test/devpod-cli-darwin-arm64 desktop/src-tauri/bin/devpod-cli-aarch64-apple-darwin
     fi
 echo "[INFO] Copied binaries to desktop/src-tauri/bin"
-fi
-
-if [[ $BUILD_PLATFORMS == *"linux"* ]]; then
-    rm -R $TMPDIR/devpod-cache 2>/dev/null || true
-    mkdir -p $TMPDIR/devpod-cache
-    cp test/devpod-cli-linux-amd64 $TMPDIR/devpod-cache/devpod-linux-amd64
-    cp test/devpod-cli-linux-arm64 $TMPDIR/devpod-cache/devpod-linux-arm64
-    echo "[INFO] Copied binaries to $TMPDIR/devpod-cache"
 fi

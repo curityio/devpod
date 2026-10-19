@@ -84,9 +84,6 @@ type ProviderAgentConfig struct {
 	// DataPath is the agent path where data is stored
 	DataPath string `json:"dataPath,omitempty"`
 
-	// DownloadURL is the base url where to download the agent from
-	DownloadURL string `json:"downloadURL,omitempty"`
-
 	// Timeout is the timeout in minutes to wait until the agent tries
 	// to turn of the server.
 	Timeout string `json:"inactivityTimeout,omitempty"`

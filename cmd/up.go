@@ -408,8 +408,6 @@ func (cmd *UpCmd) devPodUpMachine(
 			},
 			client.AgentLocal(),
 			client.AgentPath(),
-			client.AgentURL(),
-			true,
 			sshCmd,
 			sshTunnelStdinReader,
 			sshTunnelStdoutWriter,

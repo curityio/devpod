@@ -14,11 +14,7 @@ func GenerateScript(script string, params *Params) (string, error) {
 		"ExistsCheck":     params.ExistsCheck,
 		"InstallDir":      params.InstallDir(),
 		"InstallFilename": params.InstallFilename(),
-		"PreferDownload":  params.PreferDownload(),
 		"ChmodPath":       params.ChmodPath(),
-		"DownloadBase":    params.DownloadURLs.Base,
-		"DownloadAmd":     params.DownloadURLs.Amd,
-		"DownloadArm":     params.DownloadURLs.Arm,
 	})
 	if err != nil {
 		return "", err
@@ -30,11 +26,9 @@ func GenerateScript(script string, params *Params) (string, error) {
 type Params struct {
 	Command         string
 	AgentRemotePath string
-	DownloadURLs    *DownloadURLs
 
-	ExistsCheck         string
-	PreferAgentDownload bool
-	ShouldChmodPath     bool
+	ExistsCheck     string
+	ShouldChmodPath bool
 }
 
 func (p *Params) InstallDir() string {
@@ -43,10 +37,6 @@ func (p *Params) InstallDir() string {
 
 func (p *Params) InstallFilename() string {
 	return path.Base(p.AgentRemotePath)
-}
-
-func (p *Params) PreferDownload() string {
-	return strconv.FormatBool(p.PreferAgentDownload)
 }
 
 func (p *Params) ChmodPath() string {

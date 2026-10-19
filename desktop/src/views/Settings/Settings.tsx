@@ -39,7 +39,6 @@ import {
 } from "../../lib"
 import { useWelcomeModal } from "../../useWelcomeModal"
 import {
-  useAgentURLOption,
   useDockerCredentialsForwardingOption,
   useGitCredentialsForwardingOption,
 } from "./useContextOptions"
@@ -88,7 +87,6 @@ export function Settings() {
 function GeneralSettings() {
   const { settings, set } = useChangeSettings()
   const { modal: welcomeModal, show: showWelcomeModal } = useWelcomeModal()
-  const { input: agentURLInput, helpText: agentURLHelpText } = useAgentURLOption()
   const { input: proxyInput, helpText: proxyHelpText } = useProxyOptions()
   const {
     badge: installCLIBadge,
@@ -125,10 +123,6 @@ function GeneralSettings() {
         <Button variant="outline" onClick={() => client.openDir("AppLog")}>
           Open Logs
         </Button>
-      </SettingSection>
-
-      <SettingSection title="Agent URL" description={agentURLHelpText}>
-        {agentURLInput}
       </SettingSection>
 
       <SettingSection title="Proxy Configuration" description={proxyHelpText}>

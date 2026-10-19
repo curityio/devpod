@@ -1,0 +1,3 @@
+# The agent binaries that hack/build-agents.sh builds here are not committed.
+*
+!.gitignore

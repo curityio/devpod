@@ -75,10 +75,6 @@ func (s *machineClient) AgentLocal() bool {
 	return options.ResolveAgentConfig(s.devPodConfig, s.config, nil, s.machine).Local == "true"
 }
 
-func (s *machineClient) AgentURL() string {
-	return options.ResolveAgentConfig(s.devPodConfig, s.config, nil, s.machine).DownloadURL
-}
-
 func (s *machineClient) Context() string {
 	return s.machine.Context
 }

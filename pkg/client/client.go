@@ -38,9 +38,6 @@ type Client interface {
 	// AgentPath returns the agent path
 	AgentPath() string
 
-	// AgentURL returns the agent download url
-	AgentURL() string
-
 	// Create creates a new workspace
 	Create(ctx context.Context, options CreateOptions) error
 

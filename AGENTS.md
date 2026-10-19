@@ -29,6 +29,7 @@ go build ./...
 go vet ./...
 ./hack/unit-tests.sh          # what CI runs; `go test ./pkg/... ./cmd/...` is the quick version
 make build                    # local CLI + desktop build via hack/rebuild.sh
+./hack/build-agents.sh        # the Linux agents the CLI embeds; run before `go build` of a CLI you want to use
 ```
 
 Lint, the same way CI does (golangci-lint v1.60.1 cannot be built with the newest Go):
@@ -64,15 +65,14 @@ cd src-tauri && cargo +stable check
   deep link scheme, the Flatpak id and existing installs.
 - **Dependencies are vendored.** Builds use `-mod=vendor`. After changing imports or `go.mod`, run
   `GOFLAGS=-mod=mod go mod tidy && go mod vendor` and commit `vendor/`.
-- **The same binary runs on both sides.** The CLI injects itself as the agent into the machine/container (or the
-  agent downloads it from `curityio/devpod` releases). Structs serialized between them (`CLIOptions`,
-  `AgentWorkspaceInfo`, `ContainerWorkspaceInfo`, etc.) are a wire format between CLI and agent.
-- **Dev builds can run a stale agent.** Unless the host is Linux with the container's arch (then the CLI injects
-  itself), the CLI injects `devpod-linux-<arch>` from `devpod-cache/` under Go's `os.TempDir()` (`$TMPDIR` on
-  macOS) and never refreshes a file that is already there. `hack/build-e2e.sh` and `hack/rebuild.sh` (when building
-  linux) copy fresh binaries there; if you build some other way, copy them yourself. Also, all dev builds report
-  version `v0.0.0`, so a container that already has an agent keeps it: recreate the workspace to test agent
-  changes.
+- **The agent is embedded in the CLI.** `hack/build-agents.sh` builds the Linux agents (amd64 and arm64, with the
+  `devpod_agent` build tag) into `pkg/agent/agentbin/bin/`, and the CLI embeds them; it never downloads an agent.
+  The agent injects itself from the machine into the container. Without that script, `go build` makes a CLI with
+  no agents, which can't create workspaces (unless it's built for Linux, where it uses itself). DevPod replaces an
+  agent of another version, but state an older agent wrote on a machine or in a container (e.g. the serialized
+  `AgentWorkspaceInfo` and `ContainerWorkspaceInfo`) is still read by the new one.
+- **Dev builds keep a container's agent.** All dev builds report version `v0.0.0`, so DevPod doesn't replace the
+  agent of a container that already has one: recreate the workspace to test agent changes.
 - **Don't import `k8s.io/client-go/kubernetes`** (or its typed clients, or anything that uses them, such as
   go-containerregistry's `authn/kubernetes`). Its scheme links every Kubernetes API group and adds over 20 MB to
   the binary, which also runs as the agent. Use `pkg/kubeclient`, which only registers core/v1 and rbac/v1; add a
