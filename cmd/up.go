@@ -81,6 +81,8 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 			if devPodConfig.ContextOption(config.ContextOptionSSHStrictHostKeyChecking) == "true" {
 				cmd.StrictHostKeyChecking = true
 			}
+			cmd.GitSSHToHTTPS = devPodConfig.GitSSHToHTTPS()
+			cmd.GitSSHToHTTPSHosts = devPodConfig.GitSSHToHTTPSHosts()
 
 			ctx, cancel := WithSignals(cobraCmd.Context())
 			defer cancel()

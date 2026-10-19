@@ -1,0 +1,225 @@
+---
+title: Run Workspaces Unattended
+sidebar_label: Run Workspaces Unattended
+---
+
+A workspace can keep working while nobody is connected to it, for example with an AI agent that runs for hours
+after you close your laptop. For that to work, everything the workspace needs must be inside the workspace. By
+default, DevPod gets git and docker credentials from your computer while you are connected, so they disappear
+when your computer goes to sleep or loses the connection.
+
+This page explains what depends on your computer, and how to set up a workspace that doesn't.
+
+:::info
+This only makes sense with a provider whose workspaces run somewhere other than your computer, such as
+Kubernetes, SSH or a cloud machine. With the local `docker` provider, the workspace sleeps with your computer.
+:::
+
+## What depends on your computer
+
+| Feature | How it works | What happens when your computer is gone |
+| --- | --- | --- |
+| ssh remotes (`git@github.com:...`) | Your local ssh-agent is forwarded into the workspace over the `devpod ssh` connection. | `git fetch` and `git push` fail with `Permission denied (publickey)`. |
+| https remotes | A git credential helper in the workspace asks DevPod on your computer, which runs `git credential fill` there. | git can't get a username or password. |
+| Commit signing with ssh keys | Signing requests are sent to your computer. | `git commit` fails if signing is enabled. |
+| gpg-agent forwarding | Your local gpg-agent is forwarded into the workspace. | gpg signing and decryption fail. |
+| Docker credentials | A docker credential helper in the workspace asks DevPod on your computer. | Pulling from and pushing to private registries fails. |
+
+ssh keys can't be made to work without your computer: a forwarded ssh-agent is only a connection back to the
+agent on your computer, and the private keys never leave it. The alternative to ssh keys is https with a token.
+Tokens can be limited to the repositories the workspace needs, can expire and can be revoked, which is what you
+want for credentials that stay in a workspace nobody is watching.
+
+## How DevPod helps
+
+When ssh-agent forwarding is turned off, DevPod configures git in the workspace to use https instead of ssh for
+the hosts the workspace's repositories use. It doesn't provide the token itself: the dev container provides it,
+as shown [below](#3-provide-git-credentials-in-the-dev-container). DevPod doesn't need to know which git hosting
+service you use, and the credentials don't depend on your computer.
+
+### What DevPod changes
+
+On every `devpod up`, before any of the dev container's lifecycle commands (such as `postCreateCommand`) run,
+DevPod:
+
+1. Collects the remote urls it can find: the workspace's git source, and the `remote.*.url` and
+   `submodule.*.url` entries of the repository in the workspace folder.
+2. For each host that uses ssh, adds [`url.<base>.insteadOf`](https://git-scm.com/docs/git-config#Documentation/git-config.txt-urlltbasegtinsteadOf)
+   rules that rewrite these prefixes to `https://<host>/`:
+   - the prefix of the url itself, e.g. `ssh://git@git.example.com:7999/`
+   - `git@<host>:`
+   - `ssh://git@<host>/`
+3. Writes the rules to `/var/devpod/ssh-to-https.gitconfig` and includes that file from the system git config
+   (`/etc/gitconfig`), so they apply to every user in the container.
+
+The repository's own `.git/config` is not changed. If the workspace folder is your local checkout, its remotes
+still point to ssh on your computer. git in the workspace rewrites the urls whenever it uses them, so the rules
+also cover submodules, other remotes and repositories cloned later. You can see the result with:
+
+```bash
+git remote get-url --push origin
+```
+
+If the option is turned off again, the next `devpod up` removes the file and the include.
+
+### Options
+
+| Context option | Default | Meaning |
+| --- | --- | --- |
+| `GIT_SSH_TO_HTTPS` | `auto` | `true` always rewrites, `false` never does, and `auto` rewrites when `SSH_AGENT_FORWARDING` is `false`. |
+| `GIT_SSH_TO_HTTPS_HOSTS` | | Comma-separated list of extra hosts to rewrite, e.g. `github.com,bitbucket.org`, for repositories the workspace clones later. An entry `from=to` adds an explicit rewrite instead. |
+
+The default rewrite assumes that a repository has the same path over ssh and https, which is true for GitHub,
+Bitbucket Cloud and GitLab. Servers that use different paths, such as Bitbucket Data Center
+(`ssh://git@host:7999/proj/repo.git` but `https://host/scm/proj/repo.git`), need an explicit rewrite:
+
+```bash
+devpod context set-options -o GIT_SSH_TO_HTTPS_HOSTS='ssh://git@git.example.com:7999/=https://git.example.com/scm/'
+```
+
+An explicit rewrite replaces the default rule for the same prefix.
+
+## Set up an unattended workspace
+
+### 1. Turn off everything that depends on your computer
+
+```bash
+devpod context set-options \
+  -o SSH_AGENT_FORWARDING=false \
+  -o SSH_INJECT_GIT_CREDENTIALS=false \
+  -o GIT_SSH_SIGNATURE_FORWARDING=false
+```
+
+- `SSH_AGENT_FORWARDING=false` stops forwarding your ssh-agent into `devpod ssh` sessions and, because
+  `GIT_SSH_TO_HTTPS` is `auto` by default, makes git use https.
+- `SSH_INJECT_GIT_CREDENTIALS=false` stops DevPod from installing its credential helper. When it is on, git tries
+  DevPod's helper as well, which fails once your computer is gone.
+- `GIT_SSH_SIGNATURE_FORWARDING=false` stops DevPod from configuring commit signing through your computer. If you
+  need signed commits, configure a signing key inside the dev container.
+
+If agents in the workspace use private docker registries, also set `SSH_INJECT_DOCKER_CREDENTIALS=false` and log in
+to the registries from the dev container. Leave `GPG_AGENT_FORWARDING` off (the default).
+
+These options apply to all workspaces of the context. To keep your other workspaces as they are, create a separate
+context for unattended workspaces with `devpod context create unattended`, set the options there with
+`devpod context set-options unattended -o ...`, and pass `--context unattended` to `devpod` commands for those
+workspaces.
+
+The options take effect on the next `devpod up` of the workspace.
+
+:::note
+The repository is first cloned during `devpod up`, while you are connected, so it is cloned with your own
+credentials as before. The built-in `docker` and `kubernetes` providers clone it on your computer. With a provider
+that clones on a remote machine, `SSH_INJECT_GIT_CREDENTIALS=false` also stops DevPod from passing your https
+credentials to that clone. Use an ssh url for such workspaces, which still works during `devpod up`.
+:::
+
+### 2. Create tokens
+
+Create tokens with only the access the workspace needs, and with an expiry date.
+
+- **GitHub:** a [fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token)
+  for the repositories the workspace uses, with *Contents: Read and write* (plus *Pull requests: Read and write* if
+  agents open pull requests with `gh`). git accepts any username with it.
+- **Bitbucket Cloud:** a repository, project or workspace [access token](https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/),
+  used with the username `x-token-auth`, or an [API token](https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/)
+  with repository read and write scopes, used with the username `x-bitbucket-api-token-auth`.
+- **Other hosts:** use the host's access tokens, and check which username it expects with them.
+
+:::note
+An MCP server for your git host (for example for pull requests) doesn't give git access to the repositories. git
+needs its own token.
+:::
+
+### 3. Provide git credentials in the dev container
+
+Pass the tokens to the workspace as environment variables when you start it:
+
+```bash
+devpod up my-workspace --workspace-env-file ~/.config/devpod/unattended.env
+```
+
+where `~/.config/devpod/unattended.env` contains, for example:
+
+```
+GH_TOKEN=github_pat_...
+BITBUCKET_API_TOKEN=...
+```
+
+DevPod adds these variables to the environment of every process in the workspace. They are kept until you change
+them, so you don't need to pass the file on every `devpod up`. You can also use `--workspace-env NAME=VALUE`, or
+`"remoteEnv": { "GH_TOKEN": "${localEnv:GH_TOKEN}" }` in `devcontainer.json`, but `${localEnv:...}` only
+reads your computer's environment with providers that run DevPod on your computer, such as `docker` and
+`kubernetes`.
+
+:::warning
+The tokens are stored in the workspace and are visible to everything that runs in it, including the agents.
+Give them only the access the agents should have.
+:::
+
+Then make git use them with a [credential helper](https://git-scm.com/docs/gitcredentials). Add a script like this
+to the repository, e.g. as `.devcontainer/git-credentials.sh`:
+
+```sh
+#!/bin/sh
+# git credential helper that answers with tokens from environment variables
+[ "$1" = get ] || exit 0
+
+host=
+while IFS='=' read -r key value; do
+  [ "$key" = host ] && host=$value
+done
+
+case "$host" in
+  github.com)
+    echo username=x-access-token
+    echo "password=$GH_TOKEN"
+    ;;
+  bitbucket.org)
+    echo username=x-bitbucket-api-token-auth
+    echo "password=$BITBUCKET_API_TOKEN"
+    ;;
+esac
+```
+
+and configure it in `devcontainer.json`:
+
+```json
+{
+  "postCreateCommand": "git config --global credential.helper '!sh ${containerWorkspaceFolder}/.devcontainer/git-credentials.sh'"
+}
+```
+
+For GitHub, you can use the GitHub CLI instead, which also lets agents use `gh` for pull requests. The
+[`github-cli` feature](https://github.com/devcontainers/features/tree/main/src/github-cli) installs it, it reads
+`GH_TOKEN` from the environment, and `gh auth setup-git` makes it git's credential helper for GitHub:
+
+```json
+{
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "gh auth setup-git"
+}
+```
+
+### 4. Keep the workspace running
+
+If the provider has an inactivity timeout, it stops the workspace when nobody has been connected for that long,
+including while an agent is working. Leave the provider's `INACTIVITY_TIMEOUT` option empty (the default for the
+built-in providers) or set it longer than the agents run. See [Auto-Inactivity Timeout](./inactivity-timeout.mdx).
+
+Start long-running agents so that they don't depend on your connection, for example in `tmux` or with `nohup`,
+not as a plain `devpod ssh --command`, which ends when the connection does.
+
+### 5. Check it
+
+After `devpod up`, check that git uses https and finds the token without your computer's help:
+
+```bash
+devpod ssh my-workspace --command 'git remote get-url --push origin && GIT_TERMINAL_PROMPT=0 git ls-remote origin HEAD'
+```
+
+The first command prints an `https://` url. The second one prints a commit hash. If it fails with
+`could not read Username`, no credential helper answered for that host. If it fails with an authentication error,
+the token is wrong or doesn't have access to the repository.

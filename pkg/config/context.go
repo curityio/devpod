@@ -1,5 +1,7 @@
 package config
 
+import "strings"
+
 const (
 	ContextOptionSSHAddPrivateKeys          = "SSH_ADD_PRIVATE_KEYS"
 	ContextOptionGPGAgentForwarding         = "GPG_AGENT_FORWARDING"
@@ -15,6 +17,8 @@ const (
 	ContextOptionAgentInjectTimeout         = "AGENT_INJECT_TIMEOUT"
 	ContextOptionRegistryCache              = "REGISTRY_CACHE"
 	ContextOptionSSHStrictHostKeyChecking   = "SSH_STRICT_HOST_KEY_CHECKING"
+	ContextOptionGitSSHToHTTPS              = "GIT_SSH_TO_HTTPS"
+	ContextOptionGitSSHToHTTPSHosts         = "GIT_SSH_TO_HTTPS_HOSTS"
 )
 
 var ContextOptions = []ContextOption{
@@ -92,4 +96,38 @@ var ContextOptions = []ContextOption{
 		Default:     "false",
 		Enum:        []string{"true", "false"},
 	},
+	{
+		Name:        ContextOptionGitSSHToHTTPS,
+		Description: "Specifies if git inside the workspace should use https instead of ssh for remotes. auto does this when SSH_AGENT_FORWARDING is false",
+		Default:     "auto",
+		Enum:        []string{"auto", "true", "false"},
+	},
+	{
+		Name:        ContextOptionGitSSHToHTTPSHosts,
+		Description: "Comma separated list of extra hosts (e.g. git.example.com) or explicit rewrites (e.g. ssh://git@git.example.com:7999/=https://git.example.com/scm/) used by GIT_SSH_TO_HTTPS",
+		Default:     "",
+	},
+}
+
+// GitSSHToHTTPS reports if git inside workspaces should use https instead of ssh for remotes.
+func (c *Config) GitSSHToHTTPS() bool {
+	switch c.ContextOption(ContextOptionGitSSHToHTTPS) {
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		return c.ContextOption(ContextOptionSSHAgentForwarding) == "false"
+	}
+}
+
+// GitSSHToHTTPSHosts returns the extra hosts and explicit rewrites configured for GitSSHToHTTPS.
+func (c *Config) GitSSHToHTTPSHosts() []string {
+	hosts := []string{}
+	for _, host := range strings.Split(c.ContextOption(ContextOptionGitSSHToHTTPSHosts), ",") {
+		if host = strings.TrimSpace(host); host != "" {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
 }

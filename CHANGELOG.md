@@ -7,6 +7,19 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Added
+
+- Workspaces can keep using git while nobody is connected, e.g. for AI agents. With the new `GIT_SSH_TO_HTTPS`
+  context option (on by default when `SSH_AGENT_FORWARDING` is `false`), git in the workspace uses https instead
+  of ssh for the workspace's hosts, with credentials that the dev container provides. `GIT_SSH_TO_HTTPS_HOSTS`
+  adds hosts and explicit rewrites. See
+  [Run Workspaces Unattended](https://devpod.curityio.net/developing-in-workspaces/unattended-workspaces).
+
+### Fixed
+
+- Ending a session no longer removes credential helpers that the user or the dev container added to the
+  `[credential]` section of the global git config; only DevPod's own helper is removed.
+
 ### Changed
 
 - The Windows e2e tests, which needed Loft's self-hosted Windows runner, are replaced by
