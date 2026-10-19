@@ -1,0 +1,4 @@
+{
+	"name": "Git SSH to HTTPS",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm"
+}
