@@ -51,6 +51,13 @@ var _ = DevPodDescribe("devpod up postStartCommand test suite", func() {
 
 			// a session in the running container doesn't run it again
 			gomega.Expect(postStartRuns()).To(gomega.Equal(2))
+
+			// devpod up starts a stopped container the same way
+			err = f.DevPodStop(ctx, tempDir)
+			framework.ExpectNoError(err)
+			err = f.DevPodUp(ctx, tempDir)
+			framework.ExpectNoError(err)
+			gomega.Expect(postStartRuns()).To(gomega.Equal(3))
 		}, ginkgo.SpecTimeout(framework.GetTimeout()))
 	})
 })
