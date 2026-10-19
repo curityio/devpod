@@ -2,6 +2,7 @@
 
 # Builds the Linux agent binaries (amd64 and arm64) that get embedded into the devpod CLI, see pkg/agent/agentbin.
 # Run it before building the CLI, with the same LDFLAGS (the version especially), so that the agent matches the CLI.
+# Without LDFLAGS, the agents have version v0.0.0, like a plain `go build` of the CLI.
 
 set -e
 

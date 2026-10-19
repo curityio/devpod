@@ -10,8 +10,14 @@ if [[ -z "${BUILD_ARCHS}" ]]; then
     BUILD_ARCHS="amd64 arm64"
 fi
 
+# Each build gets its own version, so that DevPod replaces the agent that an earlier build put into a container.
+# The CLI and the agents it embeds must have the same version.
+VERSION="${VERSION:-v0.0.0-dev.$(date -u +%Y%m%d%H%M%S)}"
+LDFLAGS="-s -w -X github.com/loft-sh/devpod/pkg/version.version=$VERSION"
+echo "[INFO] Building version $VERSION"
+
 # the CLI embeds the Linux agents, so they're always needed
-./hack/build-agents.sh
+LDFLAGS="$LDFLAGS" ./hack/build-agents.sh
 
 for os in $BUILD_PLATFORMS; do
     for arch in $BUILD_ARCHS; do
@@ -22,9 +28,9 @@ for os in $BUILD_PLATFORMS; do
         echo "[INFO] Building for $os/$arch"
         if [[ $RACE == "yes" ]]; then
             echo "Building devpod with race detector"
-            CGO_ENABLED=1 GOOS=$os GOARCH=$arch go build -race -ldflags "-s -w" -o test/devpod-cli-$os-$arch
+            CGO_ENABLED=1 GOOS=$os GOARCH=$arch go build -race -ldflags "$LDFLAGS" -o test/devpod-cli-$os-$arch
         else
-            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "-s -w" -o test/devpod-cli-$os-$arch
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "$LDFLAGS" -o test/devpod-cli-$os-$arch
         fi
     done
 done
@@ -33,9 +39,9 @@ echo "[INFO] Built binaries for all platforms in test/ directory"
 # if not true, install the binary
 if [[ "${SKIP_INSTALL}" != "true" ]]; then
     if command -v sudo &> /dev/null; then
-        go build -o test/devpod && sudo mv test/devpod /usr/local/bin/
+        go build -ldflags "$LDFLAGS" -o test/devpod && sudo mv test/devpod /usr/local/bin/
     else 
-        go install .
+        go install -ldflags "$LDFLAGS" .
     fi
     echo "[INFO] Installed devpod binary to /usr/local/bin"
 else 

@@ -71,8 +71,10 @@ cd src-tauri && cargo +stable check
   no agents, which can't create workspaces (unless it's built for Linux, where it uses itself). DevPod replaces an
   agent of another version, but state an older agent wrote on a machine or in a container (e.g. the serialized
   `AgentWorkspaceInfo` and `ContainerWorkspaceInfo`) is still read by the new one.
-- **Dev builds keep a container's agent.** All dev builds report version `v0.0.0`, so DevPod doesn't replace the
-  agent of a container that already has one: recreate the workspace to test agent changes.
+- **Builds without a version keep a container's agent.** DevPod only replaces an agent whose version differs.
+  `hack/rebuild.sh` and `hack/build-e2e.sh` give each build its own version (`v0.0.0-dev.<UTC time>`, or `VERSION`),
+  shared by the CLI and its agents. A plain `hack/build-agents.sh` and `go build` both use `v0.0.0`, so a container
+  that already has a `v0.0.0` agent keeps it.
 - **Don't import `k8s.io/client-go/kubernetes`** (or its typed clients, or anything that uses them, such as
   go-containerregistry's `authn/kubernetes`). Its scheme links every Kubernetes API group and adds over 20 MB to
   the binary, which also runs as the agent. Use `pkg/kubeclient`, which only registers core/v1 and rbac/v1; add a
