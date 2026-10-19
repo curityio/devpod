@@ -35,10 +35,23 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- The `devpod` binary is about 40% smaller: the stripped linux/amd64 build went from 68 MB to 41 MB (20 MB to
+  14 MB gzipped). The Kubernetes driver and the in-cluster registry keychain now use a small client for the
+  core/v1 and rbac/v1 APIs instead of client-go's clientset, which linked every Kubernetes API group, and the
+  built-in Amazon ECR keychain is gone (see Removed).
 - The Windows e2e tests, which needed Loft's self-hosted Windows runner, are replaced by
   `windows-tests.yaml` ([#16](https://github.com/curityio/devpod/pull/16)). It builds the CLI and runs
   the unit tests on GitHub's `windows-latest` runners, which can't run the Linux containers the e2e
   tests use.
+
+### Removed
+
+- The built-in Amazon ECR registry keychain, which DevPod used when it ran inside a Kubernetes pod, together
+  with the AWS SDK it needed. To use ECR, configure
+  [`docker-credential-ecr-login`](https://github.com/awslabs/amazon-ecr-credential-helper) as a credential
+  helper in the Docker config; see
+  [Private registries](https://devpod.curityio.net/how-it-works/deploy-k8s#private-registries). The Azure
+  Container Registry and Google keychains are kept.
 
 ## v0.8.0-alpha.1 (2026-10-16)
 

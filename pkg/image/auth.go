@@ -4,21 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
-	"github.com/awslabs/amazon-ecr-credential-helper/ecr-login"
 	"github.com/chrismellard/docker-credential-acr-env/pkg/credhelper"
 	"github.com/google/go-containerregistry/pkg/authn"
-	kubernetesauth "github.com/google/go-containerregistry/pkg/authn/kubernetes"
 	"github.com/google/go-containerregistry/pkg/v1/google"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-var (
-	amazonKeychain authn.Keychain = authn.NewKeychainFromHelper(ecr.NewECRHelper(ecr.WithLogger(io.Discard)))
-	azureKeychain  authn.Keychain = authn.NewKeychainFromHelper(credhelper.NewACRCredentialsHelper())
-)
+var azureKeychain authn.Keychain = authn.NewKeychainFromHelper(credhelper.NewACRCredentialsHelper())
 
 const tokenFileLocation = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -57,10 +51,7 @@ func GetKeychain(ctx context.Context) (authn.Keychain, error) {
 	if err != nil {
 		return nil, err
 	}
-	k8sKeychain, err := kubernetesauth.NewInCluster(ctx, kubernetesauth.Options{
-		ServiceAccountName: m.serviceAccountName,
-		Namespace:          m.namespace,
-	})
+	k8sKeychain, err := newInClusterKeychain(ctx, m.namespace, m.serviceAccountName)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +60,6 @@ func GetKeychain(ctx context.Context) (authn.Keychain, error) {
 	keyChains := []authn.Keychain{
 		k8sKeychain,
 		google.Keychain,
-		amazonKeychain,
 	}
 
 	// check if we should add azure keychain
@@ -78,7 +68,8 @@ func GetKeychain(ctx context.Context) (authn.Keychain, error) {
 	}
 	keyChains = append(keyChains, authn.DefaultKeychain)
 
-	// Order matters here: We want to go through all of the cloud provider keychains before we hit the default keychain (docker config.json)
+	// Order matters here: We want to go through all of the cloud provider keychains before we hit the default keychain (docker config.json).
+	// Amazon ECR is not built in; it works through the docker-credential-ecr-login credential helper in the docker config.
 	return authn.NewMultiKeychain(
 		keyChains...,
 	), nil

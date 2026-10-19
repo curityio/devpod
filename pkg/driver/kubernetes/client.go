@@ -6,16 +6,15 @@ import (
 	"io"
 	"os"
 
+	"github.com/loft-sh/devpod/pkg/kubeclient"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
 type Client struct {
-	client *kubernetes.Clientset
+	client *kubeclient.Clientset
 
 	config *rest.Config
 }
@@ -50,7 +49,7 @@ func NewClient(kubeConfig, kubeContext string) (*Client, string, error) {
 		return nil, "", fmt.Errorf("failed to load kubernetes namespace from config: %w", err)
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := kubeclient.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, "", err
 	}
@@ -61,7 +60,7 @@ func NewClient(kubeConfig, kubeContext string) (*Client, string, error) {
 	}, namespace, nil
 }
 
-func (c *Client) Client() *kubernetes.Clientset {
+func (c *Client) Client() *kubeclient.Clientset {
 	return c.client
 }
 
@@ -97,12 +96,7 @@ type ExecStreamOptions struct {
 
 // Exec executes a kubectl exec with given transport round tripper and upgrader
 func (c *Client) Exec(ctx context.Context, options *ExecStreamOptions) error {
-	client, err := kubernetes.NewForConfig(c.config)
-	if err != nil {
-		return err
-	}
-
-	execRequest := client.CoreV1().RESTClient().Post().
+	execRequest := c.client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.Pod).
 		Namespace(options.Namespace).
@@ -113,7 +107,7 @@ func (c *Client) Exec(ctx context.Context, options *ExecStreamOptions) error {
 			Stdin:     options.Stdin != nil,
 			Stdout:    options.Stdout != nil,
 			Stderr:    options.Stderr != nil,
-		}, scheme.ParameterCodec)
+		}, kubeclient.ParameterCodec)
 
 	exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", execRequest.URL())
 	if err != nil {
