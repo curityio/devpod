@@ -35,7 +35,7 @@ func TestExecuteCommand_ReturnsWhenContainerDies(t *testing.T) {
 	}
 	done := make(chan executeResult, 1)
 	go func() {
-		result, err := ExecuteCommand(context.Background(), nil, false, agentInject, "ssh-server", "setup", log.Discard, tunnelServer)
+		result, err := ExecuteCommand(context.Background(), nil, false, true, agentInject, "ssh-server", "setup", log.Discard, tunnelServer)
 		done <- executeResult{result: result, err: err}
 	}()
 

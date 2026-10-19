@@ -1,0 +1,5 @@
+{
+	"name": "Git SSH to HTTPS",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+	"postCreateCommand": "sh -c 'echo ${SSH_AUTH_SOCK:-none} > /tmp/post-create-ssh-auth-sock'"
+}

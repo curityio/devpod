@@ -93,6 +93,10 @@ module.exports = {
         },
         {
           type: "doc",
+          id: "developing-in-workspaces/unattended-workspaces",
+        },
+        {
+          type: "doc",
           id: "developing-in-workspaces/inactivity-timeout",
         },
         {

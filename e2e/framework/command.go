@@ -355,3 +355,15 @@ func (f *Framework) DevPodContextDelete(ctx context.Context, name string, extraA
 	}
 	return nil
 }
+
+func (f *Framework) DevPodContextSetOptions(ctx context.Context, name string, options ...string) error {
+	baseArgs := []string{"context", "set-options", name}
+	for _, option := range options {
+		baseArgs = append(baseArgs, "-o", option)
+	}
+	err := f.ExecCommand(ctx, false, true, "", baseArgs)
+	if err != nil {
+		return fmt.Errorf("devpod context set-options failed: %s", err.Error())
+	}
+	return nil
+}

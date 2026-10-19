@@ -11,18 +11,20 @@ import (
 
 func TestAddHostSection(t *testing.T) {
 	tests := []struct {
-		name       string
-		config     string
-		execPath   string
-		host       string
-		user       string
-		context    string
-		workspace  string
-		workdir    string
-		command    string
-		gpgagent   bool
-		devPodHome string
-		expected   string
+		name      string
+		config    string
+		execPath  string
+		host      string
+		user      string
+		context   string
+		workspace string
+		workdir   string
+		command   string
+		gpgagent  bool
+		// noAgentForwarding is the inverse of addHostSection's forwardAgent, so that the cases default to forwarding
+		noAgentForwarding bool
+		devPodHome        string
+		expected          string
 	}{
 		{
 			name:       "Basic host addition",
@@ -39,6 +41,26 @@ func TestAddHostSection(t *testing.T) {
 			expected: `# DevPod Start testhost
 Host testhost
   ForwardAgent yes
+  LogLevel error
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
+  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  User testuser
+# DevPod End testhost`,
+		},
+		{
+			name:              "Host addition without agent forwarding",
+			config:            "",
+			execPath:          "/path/to/exec",
+			host:              "testhost",
+			user:              "testuser",
+			context:           "testcontext",
+			workspace:         "testworkspace",
+			noAgentForwarding: true,
+			expected: `# DevPod Start testhost
+Host testhost
+  ForwardAgent no
   LogLevel error
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
@@ -253,7 +275,7 @@ Host testhost
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := addHostSection(tt.config, tt.execPath, tt.host, tt.user, tt.context, tt.workspace, tt.workdir, tt.command, tt.gpgagent, tt.devPodHome)
+			result, err := addHostSection(tt.config, tt.execPath, tt.host, tt.user, tt.context, tt.workspace, tt.workdir, tt.command, tt.gpgagent, !tt.noAgentForwarding, tt.devPodHome)
 			if err != nil {
 				t.Errorf("Failed with err: %v", err)
 			}

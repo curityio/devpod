@@ -38,6 +38,8 @@ type ContainerTunnel struct {
 	client               client.WorkspaceClient
 	updateConfigInterval time.Duration
 	log                  log.Logger
+	// cliOptions are sent to the agent, which uses them if it has to start the container
+	cliOptions provider.CLIOptions
 }
 
 // Handler defines what to do once the tunnel has a client established
@@ -67,6 +69,13 @@ func (c *ContainerTunnel) Run(ctx context.Context, handler Handler, cfg *config.
 
 	// Get the timeout from the context options
 	timeout := config.ParseTimeOption(cfg, config.ContextOptionAgentInjectTimeout)
+
+	// set the container up as devpod up would if the agent has to start it
+	err = provider.ApplyContextOptions(ctx, &c.cliOptions, cfg, c.client.WorkspaceConfig().Source)
+	if err != nil {
+		c.log.Warnf("Ignoring context options: %v", err)
+		c.cliOptions = provider.CLIOptions{}
+	}
 
 	// tunnel to host
 	tunnelChan := make(chan error, 1)
@@ -157,7 +166,7 @@ func (c *ContainerTunnel) updateConfig(ctx context.Context, sshClient *ssh.Clien
 			}
 
 			// compress info
-			workspaceInfo, agentInfo, err := c.client.AgentInfo(provider.CLIOptions{})
+			workspaceInfo, agentInfo, err := c.client.AgentInfo(c.cliOptions)
 			if err != nil {
 				c.log.Errorf("Error compressing workspace info: %v", err)
 				break
@@ -184,7 +193,7 @@ func (c *ContainerTunnel) updateConfig(ctx context.Context, sshClient *ssh.Clien
 // runInContainer uses the connected SSH client to execute handler on the remote
 func (c *ContainerTunnel) runInContainer(ctx context.Context, sshClient *ssh.Client, handler Handler, envVars map[string]string) error {
 	// compress info
-	workspaceInfo, _, err := c.client.AgentInfo(provider.CLIOptions{})
+	workspaceInfo, _, err := c.client.AgentInfo(c.cliOptions)
 	if err != nil {
 		return err
 	}

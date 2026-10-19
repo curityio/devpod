@@ -160,6 +160,20 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 		}
 	}
 
+	// make git use https instead of ssh before any lifecycle hook runs
+	err = configureGitSSHToHTTPS(ctx, setupInfo, workspaceInfo, logger)
+	if err != nil {
+		logger.Errorf("Error configuring git to use https instead of ssh: %v", err)
+	}
+
+	// the workspace folder isn't chowned for docker on macOS and Windows, so git would refuse to use the repository
+	if command.Exists("git") {
+		err = git.AddSafeDirectory(ctx, setupInfo.SubstitutionContext.ContainerWorkspaceFolder)
+		if err != nil {
+			logger.Errorf("Error adding the workspace folder to git's safe.directory: %v", err)
+		}
+	}
+
 	// setup container
 	err = setup.SetupContainer(ctx, setupInfo, workspaceInfo.CLIOptions.WorkspaceEnv, cmd.ChownWorkspace, logger)
 	if err != nil {
@@ -520,6 +534,40 @@ func (cmd *SetupContainerCmd) setupOpenVSCode(setupInfo *config.Result, ideOptio
 
 	// start the server in the background
 	return openVSCode.Start()
+}
+
+// configureGitSSHToHTTPS makes git use https instead of ssh for the hosts of the workspace's remotes when
+// GIT_SSH_TO_HTTPS is enabled, and removes the rewrites again when it is disabled. When the CLI didn't say, e.g.
+// because an older CLI started the container, it leaves the rewrites as they are.
+func configureGitSSHToHTTPS(ctx context.Context, setupInfo *config.Result, workspaceInfo *provider2.ContainerWorkspaceInfo, log log.Logger) error {
+	enabled := workspaceInfo.CLIOptions.GitSSHToHTTPS
+	if enabled == "" {
+		return nil
+	}
+
+	if !command.Exists("git") {
+		if enabled == "true" {
+			log.Warn("GIT_SSH_TO_HTTPS is enabled but git is not installed in the container, skipping")
+		}
+		return nil
+	}
+
+	if enabled != "true" {
+		return git.RemoveSSHToHTTPS(ctx)
+	}
+
+	remoteURLs := []string{}
+	if workspaceInfo.Source.GitRepository != "" {
+		remoteURLs = append(remoteURLs, workspaceInfo.Source.GitRepository)
+	}
+	remoteURLs = append(remoteURLs, workspaceInfo.CLIOptions.GitSSHToHTTPSRemotes...)
+	remoteURLs = append(remoteURLs, git.RemoteURLs(ctx, setupInfo.SubstitutionContext.ContainerWorkspaceFolder)...)
+	rewrites := git.SSHToHTTPSRewrites(remoteURLs, workspaceInfo.CLIOptions.GitSSHToHTTPSHosts)
+	if len(rewrites) == 0 {
+		log.Debug("GIT_SSH_TO_HTTPS is enabled but no ssh hosts were found")
+	}
+	log.Debugf("Configuring git to use https instead of ssh: %v", rewrites)
+	return git.ConfigureSSHToHTTPS(ctx, rewrites)
 }
 
 func configureSystemGitCredentials(ctx context.Context, cancel context.CancelFunc, client tunnel.TunnelClient, log log.Logger) (func(), error) {

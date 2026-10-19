@@ -274,29 +274,49 @@ func SetupGpgGitKey(gitSignKey string) error {
 	return nil
 }
 
+// removeCredentialHelper removes DevPod's credential helper from the git config content, keeping any other
+// credential settings, and drops [credential] sections left empty by it.
 func removeCredentialHelper(content string) string {
 	scan := scanner.NewScanner(strings.NewReader(content))
 
-	isCredential := false
 	out := []string{}
+	// index in out of the current [credential] section header, or -1 outside of one
+	credentialSection := -1
+	sectionHasOtherLines := false
+	dropEmptySection := func() {
+		if credentialSection >= 0 && !sectionHasOtherLines {
+			out = out[:credentialSection]
+		}
+		credentialSection = -1
+	}
 	for scan.Scan() {
 		line := scan.Text()
-		if strings.TrimSpace(line) == "[credential]" {
-			isCredential = true
-			continue
-		} else if isCredential {
-			trimmed := strings.TrimSpace(line)
-			if len(trimmed) > 0 && trimmed[0] == '[' {
-				isCredential = false
-			} else {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 && trimmed[0] == '[' {
+			dropEmptySection()
+			if trimmed == "[credential]" {
+				credentialSection = len(out)
+				sectionHasOtherLines = false
+			}
+		} else if credentialSection >= 0 {
+			if isDevPodCredentialHelper(trimmed) {
 				continue
+			}
+			if trimmed != "" {
+				sectionHasOtherLines = true
 			}
 		}
 
 		out = append(out, line)
 	}
+	dropEmptySection()
 
 	return strings.Join(out, "\n")
+}
+
+func isDevPodCredentialHelper(line string) bool {
+	key, value, found := strings.Cut(line, "=")
+	return found && strings.TrimSpace(key) == "helper" && strings.Contains(value, " agent git-credentials")
 }
 
 // getGlobalGitConfigPath resolves the global git config for the specified user according to

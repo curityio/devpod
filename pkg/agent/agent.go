@@ -238,7 +238,7 @@ func writeWorkspaceInfo(file string, workspaceInfo *provider2.AgentWorkspaceInfo
 	cloned.CLIOptions = provider2.CLIOptions{}
 
 	// encode workspace info
-	encoded, err := json.Marshal(workspaceInfo)
+	encoded, err := json.Marshal(cloned)
 	if err != nil {
 		return err
 	}
