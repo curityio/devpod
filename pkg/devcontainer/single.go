@@ -59,6 +59,15 @@ func (r *runner) runSingleContainer(
 			if err != nil {
 				return nil, err
 			}
+
+			// refresh the details so State.StartedAt is the new start time, which tells the
+			// postStartCommand marker that the container was restarted
+			containerDetails, err = r.Driver.FindDevContainer(ctx, r.ID)
+			if err != nil {
+				return nil, fmt.Errorf("find dev container: %w", err)
+			} else if containerDetails == nil {
+				return nil, fmt.Errorf("couldn't find dev container %s after starting it", r.ID)
+			}
 		}
 
 		// if we are working with a non-managed container, and it has set workingDir, set it as the workspaceFolder

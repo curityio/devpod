@@ -1,0 +1,5 @@
+{
+	"name": "Post Start",
+	"image": "mcr.microsoft.com/devcontainers/base:alpine",
+	"postStartCommand": "echo started >> /tmp/post-start.log"
+}

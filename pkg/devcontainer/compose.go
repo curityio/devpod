@@ -177,6 +177,8 @@ func (r *runner) runDockerCompose(
 				details, err := composeHelper.FindDevContainer(ctx, project.Name, parsedConfig.Config.Service)
 				if err != nil {
 					r.Log.Errorf("Error finding dev container: %s", err)
+				} else if details == nil {
+					r.Log.Errorf("Couldn't find dev container after starting project %s", project.Name)
 				} else {
 					containerDetails = details
 					didStartProject = true

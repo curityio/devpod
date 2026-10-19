@@ -17,6 +17,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- `postStartCommand` now runs again when DevPod starts a stopped dev container, e.g. on `devpod ssh` or
+  `devpod up`. It was skipped because DevPod compared the container's start time from before it was started.
 - Ending a session no longer removes credential helpers that the user or the dev container added to the
   `[credential]` section of the global git config; only DevPod's own helper is removed. While a session is
   active, git asks those helpers before DevPod's.

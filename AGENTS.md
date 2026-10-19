@@ -67,6 +67,12 @@ cd src-tauri && cargo +stable check
 - **The same binary runs on both sides.** The CLI injects itself as the agent into the machine/container (or the
   agent downloads it from `curityio/devpod` releases). Structs serialized between them (`CLIOptions`,
   `AgentWorkspaceInfo`, `ContainerWorkspaceInfo`, etc.) are a wire format between CLI and agent.
+- **Dev builds can run a stale agent.** Unless the host is Linux with the container's arch (then the CLI injects
+  itself), the CLI injects `devpod-linux-<arch>` from `devpod-cache/` under Go's `os.TempDir()` (`$TMPDIR` on
+  macOS) and never refreshes a file that is already there. `hack/build-e2e.sh` and `hack/rebuild.sh` (when building
+  linux) copy fresh binaries there; if you build some other way, copy them yourself. Also, all dev builds report
+  version `v0.0.0`, so a container that already has an agent keeps it: recreate the workspace to test agent
+  changes.
 - **gRPC tunnel code is generated.** After editing `pkg/agent/tunnel/tunnel.proto`, regenerate with
   `hack/build-grpc.sh` (needs `protoc`; existing code uses protoc-gen-go v1.36.4 and protoc-gen-go-grpc v1.5.1).
 - **CI quirks:**
