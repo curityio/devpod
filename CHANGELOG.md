@@ -7,6 +7,13 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Changed
+
+- The Windows e2e tests, which needed Loft's self-hosted Windows runner, are replaced by
+  `windows-tests.yaml` ([#16](https://github.com/curityio/devpod/pull/16)). It builds the CLI and runs
+  the unit tests on GitHub's `windows-latest` runners, which can't run the Linux containers the e2e
+  tests use.
+
 ## v0.8.0-alpha.1 (2026-10-16)
 
 First release from `curityio/devpod`.

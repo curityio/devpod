@@ -72,7 +72,8 @@ cd src-tauri && cargo +stable check
 - **CI quirks:**
   - golangci-lint in CI only shows 3 issues of the same kind; run it locally with the flags above to see all.
   - `go-licenses-check` only runs when `go.mod` changes, so it can surface old breakage.
-  - `e2e-win-full-tests.yaml` needs a `self-hosted-windows` runner this fork doesn't have.
+  - There are no Windows e2e tests: GitHub's Windows runners can't run Linux containers. `windows-tests.yaml`
+    only builds the CLI and runs the unit tests on Windows.
 - **Desktop quirks:**
   - `yarn lint:ci` has 5 errors that already existed at the fork point.
   - The default `cargo` may be too old for the v4 `Cargo.lock`; use `cargo +stable`.
