@@ -200,10 +200,7 @@ export type TSupportedIDE = (typeof SUPPORTED_IDES)[number]
 //#region Context
 export type TContextOptions = Record<TContextOptionName, TContextOption>
 // See pkg/config/context.go
-export type TContextOptionName =
-  | "AGENT_URL"
-  | "SSH_INJECT_DOCKER_CREDENTIALS"
-  | "SSH_INJECT_GIT_CREDENTIALS"
+export type TContextOptionName = "SSH_INJECT_DOCKER_CREDENTIALS" | "SSH_INJECT_GIT_CREDENTIALS"
 export type TContextOption = Readonly<{
   name: TContextOptionName
   description: string | null | undefined

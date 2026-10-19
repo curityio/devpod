@@ -94,8 +94,6 @@ func (cmd *LogsCmd) Run(ctx context.Context, args []string) error {
 			},
 			client.AgentLocal(),
 			client.AgentPath(),
-			client.AgentURL(),
-			true,
 			sshServerCmd,
 			stdinReader,
 			stdoutWriter,

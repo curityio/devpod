@@ -87,8 +87,6 @@ func (cmd *SSHCmd) Run(ctx context.Context, args []string) error {
 			},
 				machineClient.AgentLocal(),
 				machineClient.AgentPath(),
-				machineClient.AgentURL(),
-				true,
 				command,
 				stdin,
 				stdout,

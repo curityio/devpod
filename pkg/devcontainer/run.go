@@ -45,7 +45,7 @@ type Runner interface {
 }
 
 func NewRunner(
-	agentPath, agentDownloadURL string,
+	agentPath string,
 	workspaceConfig *provider2.AgentWorkspaceInfo,
 	log log.Logger,
 ) (Runner, error) {
@@ -59,7 +59,6 @@ func NewRunner(
 		Driver: driver,
 
 		AgentPath:            agentPath,
-		AgentDownloadURL:     agentDownloadURL,
 		LocalWorkspaceFolder: workspaceConfig.ContentFolder,
 		ID:                   GetRunnerIDFromWorkspace(workspaceConfig.Workspace),
 		WorkspaceConfig:      workspaceConfig,
@@ -70,9 +69,8 @@ func NewRunner(
 type runner struct {
 	Driver driver.Driver
 
-	WorkspaceConfig  *provider2.AgentWorkspaceInfo
-	AgentPath        string
-	AgentDownloadURL string
+	WorkspaceConfig *provider2.AgentWorkspaceInfo
+	AgentPath       string
 
 	LocalWorkspaceFolder string
 

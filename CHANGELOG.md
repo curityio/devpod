@@ -35,6 +35,14 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- The DevPod CLI embeds the Linux agent for amd64 and arm64 ([#19](https://github.com/curityio/devpod/pull/19)),
+  whatever platform it runs on, and copies it into machines and dev containers itself. It no longer downloads the
+  agent from GitHub releases, so the agent always has the same version as the CLI, and workspaces can be created
+  without access to GitHub. The `AGENT_URL` context option, the `DEVPOD_AGENT_URL` environment variable, the
+  provider's `agent.downloadURL` and the desktop app's "Agent URL" setting are removed.
+- When DevPod replaces the agent of an existing dev container that a different DevPod version set up, it warns that
+  you may want to re-create the workspace with `devpod up --recreate`
+  ([#19](https://github.com/curityio/devpod/pull/19)).
 - The `devpod` binary is about 40% smaller ([#21](https://github.com/curityio/devpod/pull/21)): the stripped
   linux/amd64 build went from 68 MB to 41 MB (20 MB to 14 MB gzipped). The Kubernetes driver and the in-cluster
   registry keychain now use a small client for the core/v1 and rbac/v1 APIs instead of client-go's clientset,

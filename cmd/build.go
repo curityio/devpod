@@ -208,8 +208,6 @@ func buildAgentClient(ctx context.Context, workspaceClient client.WorkspaceClien
 			},
 			workspaceClient.AgentLocal(),
 			workspaceClient.AgentPath(),
-			workspaceClient.AgentURL(),
-			true,
 			command,
 			stdinReader,
 			stdoutWriter,

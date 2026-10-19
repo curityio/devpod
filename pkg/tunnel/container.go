@@ -100,8 +100,6 @@ func (c *ContainerTunnel) Run(ctx context.Context, handler Handler, cfg *config.
 			},
 			c.client.AgentLocal(),
 			c.client.AgentPath(),
-			c.client.AgentURL(),
-			true,
 			command,
 			stdinReader,
 			stdoutWriter,

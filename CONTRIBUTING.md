@@ -3,16 +3,12 @@
 ## Development Setup
 
 1. Clone the repository locally
-2. If you want to change something in DevPod agent code:
-   1. Exchange the URL in [DefaultAgentDownloadURL](./pkg/agent/agent.go) with a
-      custom public repository release you have created.
-   2. Build devpod via: `./hack/rebuild.sh`
-   3. Upload `test/devpod-linux-amd64` and `test/devpod-linux-arm64` to the public
-      repository release assets.
-3. Build devpod via: `./hack/rebuild.sh` (asking for sudo password)
-4. Add docker provider via `devpod provider add docker`
-5. Configure docker provider via `devpod use provider docker`
-6. Start devpod in vscode with `devpod up examples/simple`
+2. Build devpod via: `./hack/rebuild.sh` (asking for sudo password). It first builds the Linux agents with
+   `./hack/build-agents.sh`, which the CLI embeds and copies into machines and dev containers. Each build gets its
+   own version (`v0.0.0-dev.<UTC time>`), so DevPod replaces the agent in existing workspaces.
+3. Add docker provider via `devpod provider add docker`
+4. Configure docker provider via `devpod use provider docker`
+5. Start devpod in vscode with `devpod up examples/simple`
 
 ## Build from source
 
@@ -21,7 +17,12 @@ Prerequisites CLI:
 - [Go 1.20](https://go.dev/doc/install)
 
 Once installed, run
-`CGO_ENABLED=0 go build -ldflags "-s -w" -o devpod-cli`
+`./hack/build-agents.sh && CGO_ENABLED=0 go build -ldflags "-s -w" -o devpod-cli`
+
+This build has version `v0.0.0`, so DevPod won't replace a `v0.0.0` agent that an earlier build put into a
+workspace. Without `./hack/build-agents.sh`, the CLI has no agent to copy into machines and dev containers (only a CLI built for
+Linux can then use itself as the agent, for its own architecture). Pass the same `-ldflags` to both (as `LDFLAGS`
+for the script), so that the agent has the same version as the CLI.
 
 Prerequisites GUI:
 

@@ -9,7 +9,6 @@ const (
 	ContextOptionSSHInjectDockerCredentials = "SSH_INJECT_DOCKER_CREDENTIALS"
 	ContextOptionSSHInjectGitCredentials    = "SSH_INJECT_GIT_CREDENTIALS"
 	ContextOptionExitAfterTimeout           = "EXIT_AFTER_TIMEOUT"
-	ContextOptionAgentURL                   = "AGENT_URL"
 	ContextOptionDotfilesURL                = "DOTFILES_URL"
 	ContextOptionDotfilesScript             = "DOTFILES_SCRIPT"
 	ContextOptionSSHAgentForwarding         = "SSH_AGENT_FORWARDING"
@@ -63,10 +62,6 @@ var ContextOptions = []ContextOption{
 		Description: "Specifies if DevPod should do agent forwarding by default into the workspace",
 		Default:     "true",
 		Enum:        []string{"true", "false"},
-	},
-	{
-		Name:        ContextOptionAgentURL,
-		Description: "Specifies the agent url to use for DevPod",
 	},
 	{
 		Name:        ContextOptionDotfilesURL,

@@ -91,13 +91,6 @@ func (s *workspaceClient) AgentPath() string {
 	return options.ResolveAgentConfig(s.devPodConfig, s.config, s.workspace, s.machine).Path
 }
 
-func (s *workspaceClient) AgentURL() string {
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	return options.ResolveAgentConfig(s.devPodConfig, s.config, s.workspace, s.machine).DownloadURL
-}
-
 func (s *workspaceClient) Context() string {
 	return s.workspace.Context
 }

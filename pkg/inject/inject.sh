@@ -8,7 +8,6 @@ INSTALL_DIR="{{ .InstallDir }}"
 INSTALL_FILENAME="{{ .InstallFilename }}"
 
 INSTALL_PATH="$INSTALL_DIR/$INSTALL_FILENAME"
-PREFER_DOWNLOAD="{{ .PreferDownload }}"
 CHMOD_PATH="{{ .ChmodPath }}"
 
 # start marker
@@ -51,8 +50,10 @@ check_noexec() {
   return 0
 }
 
+# Asks for the agent binary, telling which architecture is needed and which agent version it replaces (if any).
+# Exits afterwards: the caller runs the command again once the agent is installed.
 inject() {
-  echo "ARM-$(is_arm && echo -n 'true' || echo -n 'false')"
+  echo "ARM-$(is_arm && printf 'true' || printf 'false') $PREVIOUS_VERSION"
   $sh_c "cat > $INSTALL_PATH.$$"
   $sh_c "mv $INSTALL_PATH.$$ $INSTALL_PATH"
 
@@ -64,43 +65,15 @@ inject() {
   exit 0
 }
 
-download() {
-  DOWNLOAD_URL="{{ .DownloadAmd }}"
-  if is_arm; then
-    DOWNLOAD_URL="{{ .DownloadArm }}"
-  fi
-  iteration=1
-  max_iteration=3
-
-  while :; do
-    if [ "$iteration" -gt "$max_iteration" ]; then
-      >&2 echo "error: failed to download devpod"
-      exit 1
-    fi
-
-    cmd_status=""
-    if command_exists curl; then
-        $sh_c "curl -fsSL $DOWNLOAD_URL -o $INSTALL_PATH.$$" && break
-        cmd_status=$?
-    elif command_exists wget; then
-        $sh_c "wget -q $DOWNLOAD_URL -O $INSTALL_PATH.$$" && break
-        cmd_status=$?
-    else
-        echo "error: no download tool found, please install curl or wget"
-        exit 127
-    fi
-    >&2 echo "error: failed to download devpod"
-    >&2 echo "       command returned: ${cmd_status}"
-    >&2 echo "Trying again in 10 seconds..."
-    iteration=$((iteration+1))
-    sleep 10
-  done
-
-  $sh_c "mv $INSTALL_PATH.$$ $INSTALL_PATH"
-}
-
-
 if {{ .ExistsCheck }}; then
+  PREVIOUS_VERSION=""
+  if [ -e "$INSTALL_PATH" ]; then
+    PREVIOUS_VERSION="$("$INSTALL_PATH" version 2>/dev/null | head -n 1)"
+    if [ -z "$PREVIOUS_VERSION" ]; then
+      PREVIOUS_VERSION="unknown"
+    fi
+  fi
+
   user="$(id -un || true)"
   sh_c='sh -c'
 
@@ -132,27 +105,11 @@ if {{ .ExistsCheck }}; then
   fi
 
   $sh_c "rm -f $INSTALL_PATH 2>/dev/null || true"
-  if [ "$PREFER_DOWNLOAD" = "true" ]; then
-    download || inject
-  else
-    inject || download
-  fi
-
-  if [ "$CHMOD_PATH" = "true" ]; then
-    $sh_c "chmod +x $INSTALL_PATH"
-  fi
-
-  if {{ .ExistsCheck }}; then
-    >&2 echo Error: failed to install devpod
-    exit 1
-  fi
+  inject
 fi
 
 # send parent done stream
 echo "done"
-
-# set download url
-export DEVPOD_AGENT_URL={{ .DownloadBase }}
 
 # Execute command
 {{ .Command }}

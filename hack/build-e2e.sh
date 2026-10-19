@@ -11,21 +11,21 @@ then
     mkdir ./$BUILD_DIR
 fi
 
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o $BUILD_DIR/devpod-linux-amd64 $SRC_DIR
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o $BUILD_DIR/devpod-linux-arm64 $SRC_DIR
-CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o $BUILD_DIR/devpod-darwin-arm64 $SRC_DIR
-CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o $BUILD_DIR/devpod-darwin-amd64 $SRC_DIR
+# Each build gets its own version, so that DevPod replaces the agent that an earlier build put into a container.
+# The CLI and the agents it embeds must have the same version.
+VERSION="${VERSION:-v0.0.0-dev.$(date -u +%Y%m%d%H%M%S)}"
+LDFLAGS="-s -w -X github.com/loft-sh/devpod/pkg/version.version=$VERSION"
+echo "Building version $VERSION"
+
+# the CLI embeds the Linux agents
+SRCDIR=$SRC_DIR LDFLAGS="$LDFLAGS" $SRC_DIR/hack/build-agents.sh
+
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o $BUILD_DIR/devpod-linux-amd64 $SRC_DIR
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o $BUILD_DIR/devpod-linux-arm64 $SRC_DIR
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o $BUILD_DIR/devpod-darwin-arm64 $SRC_DIR
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o $BUILD_DIR/devpod-darwin-amd64 $SRC_DIR
 
 chmod +x $BUILD_DIR/devpod-linux-amd64
 chmod +x $BUILD_DIR/devpod-linux-arm64
 chmod +x $BUILD_DIR/devpod-darwin-arm64
 chmod +x $BUILD_DIR/devpod-darwin-amd64
-
-# The CLI injects the agent from os.TempDir()/devpod-cache, and dev builds never refresh it,
-# so put the new binaries where Go looks: $TMPDIR when set (as on macOS), /tmp otherwise.
-CACHE_DIR="${TMPDIR:-/tmp}"
-CACHE_DIR="${CACHE_DIR%/}/devpod-cache"
-mkdir -p "$CACHE_DIR"
-cp $BUILD_DIR/devpod-linux-amd64 "$CACHE_DIR/devpod-linux-amd64"
-cp $BUILD_DIR/devpod-linux-arm64 "$CACHE_DIR/devpod-linux-arm64"
-echo "Copied the linux agent binaries to $CACHE_DIR"

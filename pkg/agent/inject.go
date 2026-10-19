@@ -3,14 +3,14 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
+	"github.com/loft-sh/devpod/pkg/agent/agentbin"
 	"github.com/loft-sh/devpod/pkg/inject"
 	"github.com/loft-sh/devpod/pkg/shell"
 	"github.com/loft-sh/devpod/pkg/version"
@@ -19,39 +19,42 @@ import (
 
 var waitForInstanceConnectionTimeout = time.Minute * 5
 
+// InjectAgent installs the agent into a dev container, replacing an agent of a different version. As the
+// container was then set up by another DevPod version, it warns the user that they may want to re-create the
+// workspace.
 func InjectAgent(
 	ctx context.Context,
 	exec inject.ExecFunc,
-	local bool,
-	remoteAgentPath,
-	downloadURL string,
-	preferDownload bool,
+	remoteAgentPath string,
 	log log.Logger,
 	timeout time.Duration,
 ) error {
-	return InjectAgentAndExecute(
-		ctx,
-		exec,
-		local,
-		remoteAgentPath,
-		downloadURL,
-		preferDownload,
-		"",
-		nil,
-		nil,
-		nil,
-		log,
-		timeout,
-	)
+	previousVersion, err := injectAgentAndExecute(ctx, exec, remoteAgentPath, "", nil, nil, nil, log, timeout)
+	if err != nil {
+		return err
+	}
+
+	if previousVersion != "" {
+		if previousVersion == "unknown" {
+			previousVersion = "an unknown version"
+		}
+		log.Warnf(
+			"The dev container was set up by DevPod %s, but this is DevPod %s. DevPod updated its agent in the container, "+
+				"but to avoid issues you may want to re-create the workspace with `devpod up --recreate`.",
+			previousVersion, version.GetVersion(),
+		)
+	}
+
+	return nil
 }
 
+// InjectAgentAndExecute installs the agent at remoteAgentPath unless it is already there in this version, and then
+// runs command. If local is true, it runs command locally instead.
 func InjectAgentAndExecute(
 	ctx context.Context,
 	exec inject.ExecFunc,
 	local bool,
 	remoteAgentPath,
-	downloadURL string,
-	preferDownload bool,
 	command string,
 	stdin io.Reader,
 	stdout io.Writer,
@@ -69,23 +72,37 @@ func InjectAgentAndExecute(
 		return shell.RunEmulatedShell(ctx, command, stdin, stdout, stderr, nil)
 	}
 
+	previousVersion, err := injectAgentAndExecute(ctx, exec, remoteAgentPath, command, stdin, stdout, stderr, log, timeout)
+	if previousVersion != "" {
+		log.Debugf("Replaced agent version %s at %s", previousVersion, remoteAgentPath)
+	}
+	return err
+}
+
+// injectAgentAndExecute returns the version of the agent it replaced, if any.
+func injectAgentAndExecute(
+	ctx context.Context,
+	exec inject.ExecFunc,
+	remoteAgentPath,
+	command string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+	log log.Logger,
+	timeout time.Duration,
+) (string, error) {
 	defer log.Debugf("Done InjectAgentAndExecute")
 	if remoteAgentPath == "" {
 		remoteAgentPath = RemoteDevPodHelperLocation
 	}
-	if downloadURL == "" {
-		downloadURL = DefaultAgentDownloadURL()
-	}
 
 	versionCheck := fmt.Sprintf(`[ "$(%s version 2>/dev/null || echo 'false')" != "%s" ]`, remoteAgentPath, version.GetVersion())
-	if version.GetVersion() == version.DevVersion {
-		preferDownload = false
-	}
 
 	// install devpod into the target
 	// do a simple hello world to check if we can get something
 	now := time.Now()
 	lastMessage := time.Now()
+	previousVersion := ""
 	for {
 		buf := &bytes.Buffer{}
 		if stderr != nil {
@@ -95,19 +112,24 @@ func InjectAgentAndExecute(
 		}
 
 		scriptParams := &inject.Params{
-			Command:             command,
-			AgentRemotePath:     remoteAgentPath,
-			DownloadURLs:        inject.NewDownloadURLs(downloadURL),
-			ExistsCheck:         versionCheck,
-			PreferAgentDownload: preferDownload,
-			ShouldChmodPath:     true,
+			Command:         command,
+			AgentRemotePath: remoteAgentPath,
+			ExistsCheck:     versionCheck,
+			ShouldChmodPath: true,
 		}
 
+		var binaryErr error
 		wasExecuted, err := inject.InjectAndExecute(
 			ctx,
 			exec,
-			func(arm bool) (io.ReadCloser, error) {
-				return injectBinary(arm, downloadURL, log)
+			func(request inject.BinaryRequest) (io.ReadCloser, error) {
+				if request.PreviousVersion != "" {
+					previousVersion = request.PreviousVersion
+				}
+
+				binary, err := agentBinary(request.Arm)
+				binaryErr = err
+				return binary, err
 			},
 			scriptParams,
 			stdin,
@@ -117,10 +139,13 @@ func InjectAgentAndExecute(
 			log,
 		)
 		if err != nil {
-			if time.Since(now) > waitForInstanceConnectionTimeout {
-				return fmt.Errorf("timeout waiting for instance connection: %w", err)
+			if binaryErr != nil {
+				// retrying won't help
+				return "", binaryErr
+			} else if time.Since(now) > waitForInstanceConnectionTimeout {
+				return "", fmt.Errorf("timeout waiting for instance connection: %w", err)
 			} else if wasExecuted {
-				return fmt.Errorf("agent error: %s: %w", buf.String(), err)
+				return "", fmt.Errorf("agent error: %s: %w", buf.String(), err)
 			}
 
 			if time.Since(lastMessage) > time.Second*5 {
@@ -136,100 +161,43 @@ func InjectAgentAndExecute(
 		break
 	}
 
-	return nil
+	return previousVersion, nil
 }
 
-func injectBinary(arm bool, tryDownloadURL string, log log.Logger) (io.ReadCloser, error) {
-	// this means we need to
+// agentBinary returns the agent binary for linux/amd64 or linux/arm64: the one embedded in this binary or, if
+// there is none, this binary itself when it is built for that platform. This is how an agent, which embeds no
+// other agents, injects itself into the dev container.
+//
+// The agent is never downloaded, so that it always matches the CLI that injects it.
+func agentBinary(arm bool) (io.ReadCloser, error) {
 	targetArch := "amd64"
 	if arm {
 		targetArch = "arm64"
 	}
 
-	// make sure a linux arm64 binary exists locally
-	var err error
-	var binaryPath string
+	binary, err := agentbin.Open(targetArch)
+	if err == nil {
+		return binary, nil
+	} else if !errors.Is(err, agentbin.ErrNotEmbedded) {
+		return nil, err
+	}
+
 	if runtime.GOOS == "linux" && runtime.GOARCH == targetArch {
-		binaryPath, err = os.Executable()
+		self, err := os.Executable()
 		if err != nil {
 			return nil, fmt.Errorf("get executable: %w", err)
 		}
 
-		// check if we still exist
-		_, err = os.Stat(binaryPath)
+		file, err := os.Open(self)
 		if err != nil {
-			binaryPath = ""
+			return nil, fmt.Errorf("open agent binary: %w", err)
 		}
+
+		return file, nil
 	}
 
-	// try to look up runner binaries
-	if binaryPath == "" {
-		binaryPath = getRunnerBinary(targetArch)
+	if agentbin.IsAgent {
+		return nil, fmt.Errorf("the DevPod agent (%s/%s) can only install itself, not an agent for linux/%s", runtime.GOOS, runtime.GOARCH, targetArch)
 	}
-
-	// download devpod locally
-	if binaryPath == "" {
-		binaryPath, err = downloadAgentLocally(tryDownloadURL, targetArch, log)
-		if err != nil {
-			return nil, fmt.Errorf("download agent locally: %w", err)
-		}
-	}
-
-	// read file
-	file, err := os.Open(binaryPath)
-	if err != nil {
-		return nil, fmt.Errorf("open agent binary: %w", err)
-	}
-
-	return file, nil
-}
-
-func downloadAgentLocally(tryDownloadURL, targetArch string, log log.Logger) (string, error) {
-	agentPath := filepath.Join(os.TempDir(), "devpod-cache", "devpod-linux-"+targetArch)
-	err := os.MkdirAll(filepath.Dir(agentPath), 0755)
-	if err != nil {
-		return "", fmt.Errorf("create agent path: %w", err)
-	}
-
-	stat, statErr := os.Stat(agentPath)
-	if version.GetVersion() == version.DevVersion && statErr == nil {
-		return agentPath, nil
-	}
-
-	fullDownloadURL := tryDownloadURL + "/devpod-linux-" + targetArch
-	log.Debugf("Attempting to download DevPod agent from: %s", fullDownloadURL)
-
-	resp, err := devpodhttp.GetHTTPClient().Get(fullDownloadURL)
-	if err != nil {
-		return "", fmt.Errorf("download devpod: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if statErr == nil && stat.Size() == resp.ContentLength {
-		return agentPath, nil
-	}
-
-	log.Infof("Download DevPod Agent...")
-	file, err := os.Create(agentPath)
-	if err != nil {
-		return "", fmt.Errorf("create agent binary: %w", err)
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		_ = os.Remove(agentPath)
-		return "", fmt.Errorf("failed to download devpod from URL %s: %w", fullDownloadURL, err)
-	}
-
-	return agentPath, nil
-}
-
-func getRunnerBinary(targetArch string) string {
-	binaryPath := filepath.Join(os.TempDir(), "devpod-cache", "devpod-linux-"+targetArch)
-	_, err := os.Stat(binaryPath)
-	if err != nil {
-		return ""
-	}
-	return binaryPath
+	return nil, fmt.Errorf("this DevPod build has no agent for linux/%s: run hack/build-agents.sh before building DevPod", targetArch)
 }
