@@ -7,13 +7,16 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+## v0.8.0-alpha.2 (2026-10-20)
+
 ### Added
 
 - Workspaces can keep using git while nobody is connected, e.g. for AI agents. With the new `GIT_SSH_TO_HTTPS`
   context option (on by default when `SSH_AGENT_FORWARDING` is `false`), git in the workspace uses https instead
   of ssh for the workspace's hosts, with credentials that the dev container provides. `GIT_SSH_TO_HTTPS_HOSTS`
   adds hosts and explicit rewrites. See
-  [Run Workspaces Unattended](https://devpod.curityio.net/developing-in-workspaces/unattended-workspaces).
+  [Run Workspaces Unattended](https://devpod.curityio.net/developing-in-workspaces/unattended-workspaces)
+  ([#17](https://github.com/curityio/devpod/pull/17)).
 
 ### Fixed
 
@@ -35,21 +38,22 @@ Add new entries to the top of the "Unreleased" section.
 - When a required provider option without a list of allowed values has no value, DevPod prompts for it in the
   terminal again ([#22](https://github.com/curityio/devpod/pull/22)). Before, the prompt failed with "please provide options to select from".
 - `devpod` log files (such as the agent daemon's) are rotated at 10 MB as intended, instead of 10 TB ([#22](https://github.com/curityio/devpod/pull/22)).
-- `devpod upgrade` and the CLI's newer-version check use this fork's releases on `curityio/devpod`. Before,
+- `devpod upgrade` and the CLI's newer-version check use this fork's releases on `curityio/devpod`
+  ([#20](https://github.com/curityio/devpod/pull/20)). Before,
   they used upstream `loft-sh/devpod`, so `devpod upgrade` replaced the CLI with an upstream binary.
 - `postStartCommand` now runs again when DevPod starts a stopped dev container, e.g. on `devpod ssh` or
-  `devpod up`. It was skipped because DevPod compared the container's start time from before it was started.
+  `devpod up` ([#18](https://github.com/curityio/devpod/pull/18)). It was skipped because DevPod compared the container's start time from before it was started.
 - Ending a session no longer removes credential helpers that the user or the dev container added to the
-  `[credential]` section of the global git config; only DevPod's own helper is removed. While a session is
+  `[credential]` section of the global git config; only DevPod's own helper is removed ([#17](https://github.com/curityio/devpod/pull/17)). While a session is
   active, git asks those helpers before DevPod's.
 - `SSH_AGENT_FORWARDING=false` now also stops forwarding the ssh-agent into the dev container's lifecycle
-  commands and into IDE connections: the workspace's entry in `~/.ssh/config` gets `ForwardAgent no`.
+  commands and into IDE connections ([#17](https://github.com/curityio/devpod/pull/17)): the workspace's entry in `~/.ssh/config` gets `ForwardAgent no`.
   Before, it only applied to `devpod ssh` sessions.
 - git in the dev container no longer refuses to use the workspace folder with "detected dubious ownership" when
-  the folder isn't owned by the container user, e.g. with Docker Desktop on macOS and Windows. DevPod adds the
+  the folder isn't owned by the container user, e.g. with Docker Desktop on macOS and Windows ([#17](https://github.com/curityio/devpod/pull/17)). DevPod adds the
   workspace folder to `safe.directory` in the system git config.
 - The workspace config that the agent saves on the machine no longer contains the CLI options of the last
-  `devpod up`, such as `--workspace-env` values, as was intended.
+  `devpod up`, such as `--workspace-env` values, as was intended ([#17](https://github.com/curityio/devpod/pull/17)).
 
 ### Changed
 
