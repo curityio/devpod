@@ -78,18 +78,25 @@ type remoteForwardChannelData struct {
 	OriginPort uint32
 }
 
+// forwardKey identifies a remote forward. A handler serves all connections of
+// a server, so a connection may only cancel its own forwards.
+type forwardKey struct {
+	conn *gossh.ServerConn
+	addr string
+}
+
 // ForwardedTCPHandler can be enabled by creating a ForwardedTCPHandler and
 // adding the HandleSSHRequest callback to the server's RequestHandlers under
 // tcpip-forward and cancel-tcpip-forward.
 type ForwardedTCPHandler struct {
-	forwards map[string]net.Listener
+	forwards map[forwardKey]net.Listener
 	sync.Mutex
 }
 
 func (h *ForwardedTCPHandler) HandleSSHRequest(ctx Context, srv *Server, req *gossh.Request) (bool, []byte) {
 	h.Lock()
 	if h.forwards == nil {
-		h.forwards = make(map[string]net.Listener)
+		h.forwards = make(map[forwardKey]net.Listener)
 	}
 	h.Unlock()
 	conn := ctx.Value(ContextKeyConn).(*gossh.ServerConn)
@@ -117,17 +124,13 @@ func (h *ForwardedTCPHandler) HandleSSHRequest(ctx Context, srv *Server, req *go
 		if reqPayload.BindPort == 0 {
 			addr = net.JoinHostPort(reqPayload.BindAddr, strconv.Itoa(destPort))
 		}
+		key := forwardKey{conn: conn, addr: addr}
 		h.Lock()
-		h.forwards[addr] = ln
+		h.forwards[key] = ln
 		h.Unlock()
 		go func() {
 			<-ctx.Done()
-			h.Lock()
-			ln, ok := h.forwards[addr]
-			h.Unlock()
-			if ok {
-				ln.Close()
-			}
+			ln.Close()
 		}()
 		go func() {
 			for {
@@ -157,7 +160,9 @@ func (h *ForwardedTCPHandler) HandleSSHRequest(ctx Context, srv *Server, req *go
 				}()
 			}
 			h.Lock()
-			delete(h.forwards, addr)
+			if h.forwards[key] == ln {
+				delete(h.forwards, key)
+			}
 			h.Unlock()
 		}()
 		return true, gossh.Marshal(&remoteForwardSuccess{uint32(destPort)})
@@ -170,7 +175,7 @@ func (h *ForwardedTCPHandler) HandleSSHRequest(ctx Context, srv *Server, req *go
 		}
 		addr := net.JoinHostPort(reqPayload.BindAddr, strconv.Itoa(int(reqPayload.BindPort)))
 		h.Lock()
-		ln, ok := h.forwards[addr]
+		ln, ok := h.forwards[forwardKey{conn: conn, addr: addr}]
 		h.Unlock()
 		if ok {
 			ln.Close()

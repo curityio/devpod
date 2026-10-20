@@ -144,3 +144,45 @@ func TestReverseUnixForwardingRespectsCallback(t *testing.T) {
 		t.Fatal("Expected error listening but it succeeded")
 	}
 }
+
+func TestReverseUnixForwardingCancelIsPerConnection(t *testing.T) {
+	t.Parallel()
+
+	forwardedUnixHandler := &ForwardedUnixHandler{}
+	addr := newMultiConnServer(t, &Server{
+		Handler: func(s Session) {},
+		ReverseUnixForwardingCallback: func(ctx Context, socketPath string) bool {
+			return true
+		},
+		RequestHandlers: map[string]RequestHandler{
+			"streamlocal-forward@openssh.com":        forwardedUnixHandler.HandleSSHRequest,
+			"cancel-streamlocal-forward@openssh.com": forwardedUnixHandler.HandleSSHRequest,
+		},
+	})
+	owner := newClient(t, addr)
+	other := newClient(t, addr)
+
+	socketPath := filepath.Join(shortTempDir(t), "s.sock")
+	l, err := owner.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// another connection can't cancel the forward
+	ok, _, err := other.SendRequest("cancel-streamlocal-forward@openssh.com", true, gossh.Marshal(&remoteUnixForwardRequest{
+		SocketPath: socketPath,
+	}))
+	if err != nil || !ok {
+		t.Fatalf("cancel request failed: %v", err)
+	}
+	expectForwarded(t, "unix", socketPath, l)
+
+	// the connection that made it can
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if conn, err := net.Dial("unix", socketPath); err == nil {
+		_ = conn.Close()
+		t.Fatal("Expected the forward to be cancelled")
+	}
+}

@@ -17,6 +17,18 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- Security hardening of the SSH server that DevPod runs in the dev container ([#22](https://github.com/curityio/devpod/pull/22)), for issues
+  inherited from upstream:
+  - A reverse forward of a unix socket (as GPG agent forwarding uses) no longer deletes whatever is at the
+    socket path. DevPod only replaces a socket that nothing listens on and that belongs to the server's user (or
+    to anyone, when the server runs as root), and refuses the forward otherwise. Before, a second session
+    forwarding the same socket took it over, and ending either session removed it for both.
+  - The directory of a browser IDE's shared ssh-agent socket (`/tmp/auth-agent-<id>`) must be a real directory
+    owned by the server's user with mode 0700, and the socket has mode 0600. Before, the server used whatever
+    was at that path, so another user in the container could create it first. Ending a session removes the
+    directory only if it is empty, so it doesn't take the socket from the next session.
+  - One SSH connection can no longer cancel another connection's TCP or unix socket reverse forward: forwards
+    are tracked per connection instead of by address only.
 - Automatic language detection ([#22](https://github.com/curityio/devpod/pull/22)), used when `devcontainer.json` has no image, Dockerfile or Compose file, now
   recognizes C++, C# and PHP projects, and no longer ignores files whose names merely contain `env`, `dist` or
   `cache`.
@@ -67,6 +79,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Removed
 
+- The hidden `devpod agent container ssh-server` command ([#22](https://github.com/curityio/devpod/pull/22)). Only DevPod Pro started it, and it accepted any
+  SSH client without authentication and ran its shell as whichever user the client named.
 - The built-in Amazon ECR registry keychain ([#21](https://github.com/curityio/devpod/pull/21)), which DevPod used when it ran inside a Kubernetes pod, together
   with the AWS SDK it needed. To use ECR, configure
   [`docker-credential-ecr-login`](https://github.com/awslabs/amazon-ecr-credential-helper) as a credential

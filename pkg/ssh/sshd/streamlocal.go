@@ -83,13 +83,13 @@ type remoteUnixForwardChannelData struct {
 // not work on all Windows installations and is not tested on Windows.
 type ForwardedUnixHandler struct {
 	sync.Mutex
-	forwards map[string]net.Listener
+	forwards map[forwardKey]net.Listener
 }
 
 func (h *ForwardedUnixHandler) HandleSSHRequest(ctx Context, srv *Server, req *gossh.Request) (bool, []byte) {
 	h.Lock()
 	if h.forwards == nil {
-		h.forwards = make(map[string]net.Listener)
+		h.forwards = make(map[forwardKey]net.Listener)
 	}
 	h.Unlock()
 	conn, ok := ctx.Value(ContextKeyConn).(*gossh.ServerConn)
@@ -112,8 +112,9 @@ func (h *ForwardedUnixHandler) HandleSSHRequest(ctx Context, srv *Server, req *g
 		}
 
 		addr := reqPayload.SocketPath
+		key := forwardKey{conn: conn, addr: addr}
 		h.Lock()
-		_, ok := h.forwards[addr]
+		_, ok := h.forwards[key]
 		h.Unlock()
 		if ok {
 			// TODO: log failure
@@ -140,7 +141,7 @@ func (h *ForwardedUnixHandler) HandleSSHRequest(ctx Context, srv *Server, req *g
 		//
 		// This is also what the TCP version of this code does.
 		h.Lock()
-		h.forwards[addr] = ln
+		h.forwards[key] = ln
 		h.Unlock()
 
 		ctx, cancel := context.WithCancel(ctx)
@@ -173,9 +174,9 @@ func (h *ForwardedUnixHandler) HandleSSHRequest(ctx Context, srv *Server, req *g
 			}
 
 			h.Lock()
-			ln2, ok := h.forwards[addr]
+			ln2, ok := h.forwards[key]
 			if ok && ln2 == ln {
-				delete(h.forwards, addr)
+				delete(h.forwards, key)
 			}
 			h.Unlock()
 			_ = ln.Close()
@@ -191,7 +192,7 @@ func (h *ForwardedUnixHandler) HandleSSHRequest(ctx Context, srv *Server, req *g
 			return false, nil
 		}
 		h.Lock()
-		ln, ok := h.forwards[reqPayload.SocketPath]
+		ln, ok := h.forwards[forwardKey{conn: conn, addr: reqPayload.SocketPath}]
 		h.Unlock()
 		if ok {
 			_ = ln.Close()

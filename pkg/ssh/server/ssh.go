@@ -12,10 +12,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 )
 
-const (
-	DefaultPort     int = 8022
-	DefaultUserPort int = 12023
-)
+const DefaultPort int = 8022
 
 type Server interface {
 	Serve(listener net.Listener) error
@@ -63,11 +60,10 @@ func NewServer(addr string, hostKey []byte, keys []sshd.PublicKey, workdir strin
 			ReverseUnixForwardingCallback: func(ctx sshd.Context, socketPath string) bool {
 				log.Debugf("attempt to bind socket %s", socketPath)
 
-				_, err := os.Stat(socketPath)
-				if err == nil {
-					log.Debugf("%s already exists, removing", socketPath)
-
-					_ = os.Remove(socketPath)
+				err := removeStaleSocket(socketPath)
+				if err != nil {
+					log.Debugf("refuse to bind socket %s: %v", socketPath, err)
+					return false
 				}
 
 				return true
@@ -121,13 +117,12 @@ func (s *server) handler(sess sshd.Session) {
 	cmd := s.getCommand(sess, isPty)
 
 	if sshd.AgentRequested(sess) {
-		l, tmpDir, err := setupAgentListener(sess, s.reuseSock)
+		l, cleanup, err := setupAgentListener(s.reuseSock)
 		if err != nil {
 			exitWithError(sess, err, s.log)
 			return
 		}
-		defer l.Close()
-		defer os.RemoveAll(tmpDir)
+		defer cleanup()
 
 		go sshd.ForwardAgentConnections(l, sess)
 
