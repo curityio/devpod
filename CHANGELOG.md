@@ -9,6 +9,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- `devpod up` of a Kubernetes workspace recreates the workspace's pod when it is dead (its phase is `Failed`,
+  `Succeeded` or `Unknown`, its dev container has terminated, or it is being deleted), keeping the workspace's
+  persistent volume claim. It used to reuse such a pod, for example after the node restarted, and then time out
+  waiting for the agent, an issue inherited from upstream.
 - `devpod provider add --use=false` and `devpod provider update --use=false` no longer silently discard `-o`
   options, an issue inherited from upstream. The options are saved and the provider is initialized, but the
   default provider is not changed. `devpod provider add --from-existing --use=false` likewise keeps the template
