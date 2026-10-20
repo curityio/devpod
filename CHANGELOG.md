@@ -7,6 +7,13 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Fixed
+
+- `devpod provider add --use=false` and `devpod provider update --use=false` no longer silently discard `-o`
+  options, an issue inherited from upstream. The options are saved and the provider is initialized, but the
+  default provider is not changed. `devpod provider add --from-existing --use=false` likewise keeps the template
+  provider's options.
+
 ## v0.8.0 (2026-10-20)
 
 ### Added

@@ -92,8 +92,10 @@ func (cmd *AddCmd) Run(ctx context.Context, devPodConfig *config.Config, args []
 	}
 
 	log.Default.Donef("Successfully installed provider %s", providerConfig.Name)
-	if cmd.Use {
-		configureErr := ConfigureProvider(ctx, providerConfig, devPodConfig.DefaultContext, options, true, false, false, &cmd.SingleMachine, log.Default)
+	// without --use, only configure the provider if there are options to save, so they aren't lost, and a provider
+	// with required options can still be added without them
+	if cmd.Use || len(options) > 0 || cmd.SingleMachine {
+		configureErr := ConfigureProvider(ctx, providerConfig, devPodConfig.DefaultContext, options, true, false, false, cmd.Use, &cmd.SingleMachine, log.Default)
 		if configureErr != nil {
 			devPodConfig, err := config.LoadConfig(cmd.Context, "")
 			if err != nil {
@@ -107,7 +109,8 @@ func (cmd *AddCmd) Run(ctx context.Context, devPodConfig *config.Config, args []
 
 			return errors.Wrap(configureErr, "configure provider")
 		}
-
+	}
+	if cmd.Use {
 		return nil
 	}
 

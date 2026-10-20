@@ -78,7 +78,7 @@ func (cmd *UseCmd) Run(ctx context.Context, providerName string) error {
 	// should reconfigure?
 	shouldReconfigure := cmd.Reconfigure || len(cmd.Options) > 0 || providerWithOptions.State == nil || cmd.SingleMachine
 	if shouldReconfigure {
-		return ConfigureProvider(ctx, providerWithOptions.Config, devPodConfig.DefaultContext, cmd.Options, cmd.Reconfigure, cmd.SkipInit, false, &cmd.SingleMachine, log.Default)
+		return ConfigureProvider(ctx, providerWithOptions.Config, devPodConfig.DefaultContext, cmd.Options, cmd.Reconfigure, cmd.SkipInit, false, true, &cmd.SingleMachine, log.Default)
 	} else {
 		log.Default.Infof("To reconfigure provider %s, run with '--reconfigure' to reconfigure the provider", providerWithOptions.Config.Name)
 	}
@@ -98,16 +98,19 @@ func (cmd *UseCmd) Run(ctx context.Context, providerName string) error {
 	return nil
 }
 
-func ConfigureProvider(ctx context.Context, provider *provider2.ProviderConfig, context string, userOptions []string, reconfigure, skipInit, skipSubOptions bool, singleMachine *bool, log log.Logger) error {
+// ConfigureProvider resolves and saves the provider's options and runs its init command. If setDefault is true, it
+// also makes the provider the default provider.
+func ConfigureProvider(ctx context.Context, provider *provider2.ProviderConfig, context string, userOptions []string, reconfigure, skipInit, skipSubOptions, setDefault bool, singleMachine *bool, log log.Logger) error {
 	// set options
 	devPodConfig, err := setOptions(ctx, provider, context, userOptions, reconfigure, false, skipInit, skipSubOptions, singleMachine, log)
 	if err != nil {
 		return err
 	}
 
-	// set options
-	defaultContext := devPodConfig.Current()
-	defaultContext.DefaultProvider = provider.Name
+	// set default provider
+	if setDefault {
+		devPodConfig.Current().DefaultProvider = provider.Name
+	}
 
 	// save provider config
 	err = config.SaveConfig(devPodConfig)

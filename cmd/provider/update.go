@@ -60,13 +60,15 @@ func (cmd *UpdateCmd) Run(ctx context.Context, devPodConfig *config.Config, args
 	}
 
 	log.Default.Donef("Successfully updated provider %s", providerConfig.Name)
-	if cmd.Use {
-		err = ConfigureProvider(ctx, providerConfig, devPodConfig.DefaultContext, cmd.Options, false, false, false, nil, log.Default)
+	// without --use, only configure the provider if options were given, so they aren't lost
+	if cmd.Use || len(cmd.Options) > 0 {
+		err = ConfigureProvider(ctx, providerConfig, devPodConfig.DefaultContext, cmd.Options, false, false, false, cmd.Use, nil, log.Default)
 		if err != nil {
 			log.Default.Errorf("Error configuring provider, please retry with 'devpod provider use %s --reconfigure'", providerConfig.Name)
 			return errors.Wrap(err, "configure provider")
 		}
-
+	}
+	if cmd.Use {
 		return nil
 	}
 
