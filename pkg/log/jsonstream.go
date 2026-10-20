@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/scanner"
+	"github.com/loft-sh/devpod/pkg/log/scanner"
 	"github.com/sirupsen/logrus"
 )
 
-func PipeJSONStream(logger log.Logger) (io.WriteCloser, chan struct{}) {
+func PipeJSONStream(logger Logger) (io.WriteCloser, chan struct{}) {
 	done := make(chan struct{})
 	reader, writer := io.Pipe()
 	go func() {
@@ -20,7 +19,7 @@ func PipeJSONStream(logger log.Logger) (io.WriteCloser, chan struct{}) {
 	return writer, done
 }
 
-func ReadJSONStream(reader io.Reader, logger log.Logger) {
+func ReadJSONStream(reader io.Reader, logger Logger) {
 	scan := scanner.NewScanner(reader)
 	for scan.Scan() {
 		lineObject, err := Unmarshal(scan.Bytes())
@@ -45,8 +44,8 @@ func ReadJSONStream(reader io.Reader, logger log.Logger) {
 	}
 }
 
-func Unmarshal(line []byte) (*log.Line, error) {
-	lineObject := &log.Line{}
+func Unmarshal(line []byte) (*Line, error) {
+	lineObject := &Line{}
 	err := json.Unmarshal(line, lineObject)
 	if err != nil {
 		return nil, err

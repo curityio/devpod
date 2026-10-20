@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 type IDE interface {

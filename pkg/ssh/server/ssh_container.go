@@ -9,28 +9,28 @@ import (
 
 	copypkg "github.com/loft-sh/devpod/pkg/copy"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
+	"github.com/loft-sh/devpod/pkg/log"
 	shellpkg "github.com/loft-sh/devpod/pkg/shell"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/ssh"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 )
 
 func NewContainerServer(addr string, workdir string, log log.Logger) (Server, error) {
-	forwardHandler := &ssh.ForwardedTCPHandler{}
-	forwardedUnixHandler := &ssh.ForwardedUnixHandler{}
+	forwardHandler := &sshd.ForwardedTCPHandler{}
+	forwardedUnixHandler := &sshd.ForwardedUnixHandler{}
 	server := &containerServer{
 		workdir: workdir,
 		log:     log,
-		sshServer: ssh.Server{
+		sshServer: sshd.Server{
 			Addr: addr,
-			LocalPortForwardingCallback: func(ctx ssh.Context, dhost string, dport uint32) bool {
+			LocalPortForwardingCallback: func(ctx sshd.Context, dhost string, dport uint32) bool {
 				log.Debugf("Accepted forward: %s:%d", dhost, dport)
 				return true
 			},
-			ReversePortForwardingCallback: func(ctx ssh.Context, host string, port uint32) bool {
+			ReversePortForwardingCallback: func(ctx sshd.Context, host string, port uint32) bool {
 				log.Debugf("attempt to bind %s:%d - %s", host, port, "granted")
 				return true
 			},
-			ReverseUnixForwardingCallback: func(ctx ssh.Context, socketPath string) bool {
+			ReverseUnixForwardingCallback: func(ctx sshd.Context, socketPath string) bool {
 				log.Debugf("attempt to bind socket %s", socketPath)
 
 				_, err := os.Stat(socketPath)
@@ -42,19 +42,19 @@ func NewContainerServer(addr string, workdir string, log log.Logger) (Server, er
 
 				return true
 			},
-			ChannelHandlers: map[string]ssh.ChannelHandler{
-				"direct-tcpip":                   ssh.DirectTCPIPHandler,
-				"direct-streamlocal@openssh.com": ssh.DirectStreamLocalHandler,
-				"session":                        ssh.DefaultSessionHandler,
+			ChannelHandlers: map[string]sshd.ChannelHandler{
+				"direct-tcpip":                   sshd.DirectTCPIPHandler,
+				"direct-streamlocal@openssh.com": sshd.DirectStreamLocalHandler,
+				"session":                        sshd.DefaultSessionHandler,
 			},
-			RequestHandlers: map[string]ssh.RequestHandler{
+			RequestHandlers: map[string]sshd.RequestHandler{
 				"tcpip-forward":                          forwardHandler.HandleSSHRequest,
 				"streamlocal-forward@openssh.com":        forwardedUnixHandler.HandleSSHRequest,
 				"cancel-streamlocal-forward@openssh.com": forwardedUnixHandler.HandleSSHRequest,
 				"cancel-tcpip-forward":                   forwardHandler.HandleSSHRequest,
 			},
-			SubsystemHandlers: map[string]ssh.SubsystemHandler{
-				"sftp": func(s ssh.Session) {
+			SubsystemHandlers: map[string]sshd.SubsystemHandler{
+				"sftp": func(s sshd.Session) {
 					sftpHandler(s, "", log)
 				},
 			},
@@ -66,7 +66,7 @@ func NewContainerServer(addr string, workdir string, log log.Logger) (Server, er
 }
 
 type containerServer struct {
-	sshServer ssh.Server
+	sshServer sshd.Server
 	log       log.Logger
 	workdir   string
 }
@@ -80,7 +80,7 @@ func (s *containerServer) ListenAndServe() error {
 	return s.sshServer.ListenAndServe()
 }
 
-func (s *containerServer) handler(sess ssh.Session) {
+func (s *containerServer) handler(sess sshd.Session) {
 	var err error
 	ptyReq, winCh, isPty := sess.Pty()
 	cmd, err := s.getCommand(sess, isPty)
@@ -89,7 +89,7 @@ func (s *containerServer) handler(sess ssh.Session) {
 		return
 	}
 
-	if ssh.AgentRequested(sess) {
+	if sshd.AgentRequested(sess) {
 		l, tmpDir, err := setupAgentListener(sess, "")
 		if err != nil {
 			exitWithError(sess, err, s.log)
@@ -104,7 +104,7 @@ func (s *containerServer) handler(sess ssh.Session) {
 			return
 		}
 
-		go ssh.ForwardAgentConnections(l, sess)
+		go sshd.ForwardAgentConnections(l, sess)
 
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", "SSH_AUTH_SOCK", l.Addr().String()))
 	}
@@ -118,7 +118,7 @@ func (s *containerServer) handler(sess ssh.Session) {
 	exitWithError(sess, err, s.log)
 }
 
-func (s *containerServer) getCommand(sess ssh.Session, isPty bool) (*exec.Cmd, error) {
+func (s *containerServer) getCommand(sess sshd.Session, isPty bool) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	user := sess.User()
 

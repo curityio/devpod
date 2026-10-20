@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/log"
 )
 
 func printUnusedUserValues(userValues map[string]string, options config.OptionDefinitions, log log.Logger) {

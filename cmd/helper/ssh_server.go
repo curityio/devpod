@@ -8,12 +8,12 @@ import (
 
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/agent"
+	"github.com/loft-sh/devpod/pkg/log"
 	helperssh "github.com/loft-sh/devpod/pkg/ssh/server"
 	"github.com/loft-sh/devpod/pkg/ssh/server/port"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 	"github.com/loft-sh/devpod/pkg/stdio"
 	"github.com/loft-sh/devpod/pkg/token"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/ssh"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +55,7 @@ func NewSSHServerCmd(flags *flags.GlobalFlags) *cobra.Command {
 // Run runs the command logic
 func (cmd *SSHServerCmd) Run(_ *cobra.Command, _ []string) error {
 	var (
-		keys    []ssh.PublicKey
+		keys    []sshd.PublicKey
 		hostKey []byte
 		err     error
 	)
@@ -73,7 +73,7 @@ func (cmd *SSHServerCmd) Run(_ *cobra.Command, _ []string) error {
 			}
 
 			for len(keyBytes) > 0 {
-				key, _, _, rest, err := ssh.ParseAuthorizedKey(keyBytes)
+				key, _, _, rest, err := sshd.ParseAuthorizedKey(keyBytes)
 				if err != nil {
 					return errors.Wrap(err, "parse authorized key")
 				}

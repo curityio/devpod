@@ -11,9 +11,9 @@ import (
 	"github.com/loft-sh/devpod/pkg/agent"
 	clientpkg "github.com/loft-sh/devpod/pkg/client"
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/ssh"
 	"github.com/loft-sh/devpod/pkg/workspace"
-	"github.com/loft-sh/log"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

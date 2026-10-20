@@ -16,8 +16,8 @@ import (
 	"github.com/loft-sh/devpod/pkg/extract"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
 	"github.com/loft-sh/devpod/pkg/ide"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/util"
-	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 	"github.com/skratchdot/open-golang/open"
 )

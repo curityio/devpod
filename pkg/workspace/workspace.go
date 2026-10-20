@@ -16,10 +16,10 @@ import (
 	"github.com/loft-sh/devpod/pkg/git"
 	"github.com/loft-sh/devpod/pkg/ide/ideparse"
 	"github.com/loft-sh/devpod/pkg/image"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/log/terminal"
 	providerpkg "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/terminal"
 )
 
 // Resolve takes the `devpod up|build` CLI input and either finds an existing workspace or creates a new one

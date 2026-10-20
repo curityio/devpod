@@ -12,9 +12,9 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/agent/agentbin"
 	"github.com/loft-sh/devpod/pkg/inject"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/shell"
 	"github.com/loft-sh/devpod/pkg/version"
-	"github.com/loft-sh/log"
 )
 
 var waitForInstanceConnectionTimeout = time.Minute * 5

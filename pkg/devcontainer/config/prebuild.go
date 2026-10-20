@@ -11,8 +11,8 @@ import (
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/pkg/errors"
 
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/hash"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/log/hash"
 )
 
 func CalculatePrebuildHash(

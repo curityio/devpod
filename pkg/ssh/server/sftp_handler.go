@@ -5,13 +5,13 @@ import (
 	"io"
 
 	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/ssh"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 )
 
-func sftpHandler(sess ssh.Session, currentUser string, log log.Logger) {
+func sftpHandler(sess sshd.Session, currentUser string, log log.Logger) {
 	writer := log.Writer(logrus.DebugLevel, false)
 	defer writer.Close()
 

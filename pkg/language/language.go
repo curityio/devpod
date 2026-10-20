@@ -5,9 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/log"
-
-	detector "github.com/loft-sh/programming-language-detection/pkg/detector"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 type ProgrammingLanguage string
@@ -122,6 +120,11 @@ func DetectLanguage(startPath string) (ProgrammingLanguage, error) {
 	if err != nil {
 		return None, err
 	}
+	// filepath.WalkDir doesn't descend into a symlinked root
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return None, err
+	}
 
 	fileInfo, err := os.Stat(root)
 	if err != nil {
@@ -132,15 +135,18 @@ func DetectLanguage(startPath string) (ProgrammingLanguage, error) {
 		return None, err
 	}
 
-	language := detector.GetLanguage(root, maxFiles)
-	if !SupportedLanguages[ProgrammingLanguage(language)] {
+	language, err := detect(root, maxFiles)
+	if err != nil {
+		return None, err
+	}
+	if !SupportedLanguages[language] {
 		return None, nil
 	}
 
 	// try to map language
-	if MapLanguages[ProgrammingLanguage(language)] != "" {
-		language = string(MapLanguages[ProgrammingLanguage(language)])
+	if MapLanguages[language] != "" {
+		language = MapLanguages[language]
 	}
 
-	return ProgrammingLanguage(language), nil
+	return language, nil
 }

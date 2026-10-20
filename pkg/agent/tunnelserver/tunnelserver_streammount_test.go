@@ -14,7 +14,7 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/agent/tunnel"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"google.golang.org/grpc"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"

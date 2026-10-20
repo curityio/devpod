@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/loft-sh/devpod/pkg/command"
+	"github.com/loft-sh/devpod/pkg/log"
 	devsshagent "github.com/loft-sh/devpod/pkg/ssh/agent"
 	"github.com/loft-sh/devpod/pkg/util"
-	"github.com/loft-sh/log"
 	"golang.org/x/crypto/ssh"
 )
 

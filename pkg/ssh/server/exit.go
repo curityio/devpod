@@ -5,12 +5,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/ssh"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 	perrors "github.com/pkg/errors"
 )
 
-func exitWithError(sess ssh.Session, err error, log log.Logger) {
+func exitWithError(sess sshd.Session, err error, log log.Logger) {
 	if err != nil {
 		var exitError *exec.ExitError
 		if !errors.As(perrors.Cause(err), &exitError) {

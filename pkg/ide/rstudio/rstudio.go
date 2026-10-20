@@ -19,8 +19,8 @@ import (
 	copypkg "github.com/loft-sh/devpod/pkg/copy"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
 	"github.com/loft-sh/devpod/pkg/ide"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/single"
-	"github.com/loft-sh/log"
 )
 
 const (

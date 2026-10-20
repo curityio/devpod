@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/loft-sh/devpod/pkg/agent/tunnel"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 // TestGitCredentials_NoWorkspace checks that a git credentials request to a

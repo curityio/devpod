@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/loft-sh/ssh"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 )
 
-func setupAgentListener(sess ssh.Session, reuseSock string) (net.Listener, string, error) {
+func setupAgentListener(sess sshd.Session, reuseSock string) (net.Listener, string, error) {
 	// on some systems (like containers) /tmp may not exists, this ensures
 	// that we have a compliant directory structure
 	err := os.MkdirAll("/tmp", 0o777)
@@ -28,7 +28,7 @@ func setupAgentListener(sess ssh.Session, reuseSock string) (net.Listener, strin
 		}
 	}
 
-	l, tmpDir, err := ssh.NewAgentListener(dir)
+	l, tmpDir, err := sshd.NewAgentListener(dir)
 	if err != nil {
 		return nil, "", fmt.Errorf("new agent listener: %w", err)
 	}

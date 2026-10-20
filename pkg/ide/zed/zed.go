@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/skratchdot/open-golang/open"
 
 	"github.com/loft-sh/devpod/pkg/config"
