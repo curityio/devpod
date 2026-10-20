@@ -7,7 +7,7 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
-## v0.8.0-alpha.2 (2026-10-20)
+## v0.8.0 (2026-10-20)
 
 ### Added
 
