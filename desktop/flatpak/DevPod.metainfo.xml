@@ -38,9 +38,9 @@
   </screenshots>
 
   <releases>
-    <release type="development" version="v0.8.0-alpha.2" date="2026-10-20">
+    <release type="stable" version="v0.8.0" date="2026-10-20">
       <description>
-        <p>Release notes can be found at https://github.com/curityio/devpod/releases/tag/v0.8.0-alpha.2</p>
+        <p>Release notes can be found at https://github.com/curityio/devpod/releases/tag/v0.8.0</p>
       </description>
     </release>
     <release type="development" version="v0.8.0-alpha.1" date="2026-10-16">
