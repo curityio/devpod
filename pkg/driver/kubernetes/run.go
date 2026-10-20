@@ -232,6 +232,17 @@ func (k *KubernetesDriver) runContainer(
 	}
 
 	if existingPod != nil {
+		// A dead pod never comes back, so replace it even if nothing changed
+		if reason := deadPodReason(existingPod); reason != "" {
+			k.Log.Infof("Pod '%s' %s, recreating it", existingPod.Name, reason)
+			err = k.waitPodDeleted(ctx, id)
+			if err != nil {
+				return errors.Wrapf(err, "delete dead pod: %s", id)
+			}
+
+			return k.runPod(ctx, id, pod)
+		}
+
 		existingOptions := &provider2.ProviderKubernetesDriverConfig{}
 		err := json.Unmarshal([]byte(existingPod.GetAnnotations()[DevPodLastAppliedAnnotation]), existingOptions)
 		if err != nil {
@@ -465,6 +476,29 @@ func getID(workspaceID string) string {
 
 func getPullSecretsName(workspaceID string) string {
 	return fmt.Sprintf("devpod-pull-secret-%s", workspaceID)
+}
+
+// deadPodReason returns why an existing workspace pod can't be reused, or "" if it can. Workspace pods have
+// restart policy Never, so once the pod's phase is terminal or its dev container has terminated (for example
+// because the node restarted), it never runs again.
+func deadPodReason(pod *corev1.Pod) string {
+	if pod.DeletionTimestamp != nil {
+		return "is terminating"
+	}
+
+	switch pod.Status.Phase {
+	case corev1.PodFailed, corev1.PodSucceeded, corev1.PodUnknown:
+		return fmt.Sprintf("is in phase %s", pod.Status.Phase)
+	case corev1.PodPending, corev1.PodRunning:
+	}
+
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name == DevContainerName && c.State.Terminated != nil {
+			return fmt.Sprintf("container '%s' has terminated (reason %s, exit code %d)", c.Name, c.State.Terminated.Reason, c.State.Terminated.ExitCode)
+		}
+	}
+
+	return ""
 }
 
 func optionsEqual(a, b *provider2.ProviderKubernetesDriverConfig) bool {
