@@ -17,12 +17,12 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
-- Automatic language detection, used when `devcontainer.json` has no image, Dockerfile or Compose file, now
+- Automatic language detection ([#22](https://github.com/curityio/devpod/pull/22)), used when `devcontainer.json` has no image, Dockerfile or Compose file, now
   recognizes C++, C# and PHP projects, and no longer ignores files whose names merely contain `env`, `dist` or
   `cache`.
 - When a required provider option without a list of allowed values has no value, DevPod prompts for it in the
-  terminal again. Before, the prompt failed with "please provide options to select from".
-- `devpod` log files (such as the agent daemon's) are rotated at 10 MB as intended, instead of 10 TB.
+  terminal again ([#22](https://github.com/curityio/devpod/pull/22)). Before, the prompt failed with "please provide options to select from".
+- `devpod` log files (such as the agent daemon's) are rotated at 10 MB as intended, instead of 10 TB ([#22](https://github.com/curityio/devpod/pull/22)).
 - `devpod upgrade` and the CLI's newer-version check use this fork's releases on `curityio/devpod`. Before,
   they used upstream `loft-sh/devpod`, so `devpod upgrade` replaced the CLI with an upstream binary.
 - `postStartCommand` now runs again when DevPod starts a stopped dev container, e.g. on `devpod ssh` or
@@ -41,7 +41,7 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
-- DevPod no longer depends on any `github.com/loft-sh` Go module, as these are no longer maintained. The logger
+- DevPod no longer depends on any `github.com/loft-sh` Go module ([#22](https://github.com/curityio/devpod/pull/22)), as these are no longer maintained. The logger
   (`loft-sh/log`) is now part of `pkg/log`, the SSH server (`loft-sh/ssh`, a fork of `gliderlabs/ssh`) is
   `pkg/ssh/sshd`, and language detection (`loft-sh/programming-language-detection`) is in `pkg/language`. The
   unmaintained libraries they used are gone too: terminal prompts use `charmbracelet/huh` instead of the archived
