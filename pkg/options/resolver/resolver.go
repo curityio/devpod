@@ -6,8 +6,8 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/config"
 	"github.com/loft-sh/devpod/pkg/devcontainer/graph"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/log"
 )
 
 const (

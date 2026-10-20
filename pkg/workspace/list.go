@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/log"
 	providerpkg "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/log"
 )
 
 func List(ctx context.Context, devPodConfig *config.Config, log log.Logger) ([]*providerpkg.Workspace, error) {

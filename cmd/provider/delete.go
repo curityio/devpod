@@ -8,9 +8,9 @@ import (
 	"github.com/loft-sh/devpod/cmd/completion"
 	"github.com/loft-sh/devpod/cmd/flags"
 	"github.com/loft-sh/devpod/pkg/config"
+	logpkg "github.com/loft-sh/devpod/pkg/log"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
 	"github.com/loft-sh/devpod/pkg/workspace"
-	logpkg "github.com/loft-sh/log"
 	"github.com/spf13/cobra"
 )
 

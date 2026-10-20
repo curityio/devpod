@@ -15,8 +15,8 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/compress"
+	"github.com/loft-sh/devpod/pkg/log"
 	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/log"
 	perrors "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

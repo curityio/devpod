@@ -11,8 +11,8 @@ import (
 	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/docker"
 	"github.com/loft-sh/devpod/pkg/file"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/random"
-	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 
 	dockerconfig "github.com/containers/image/v5/pkg/docker/config"

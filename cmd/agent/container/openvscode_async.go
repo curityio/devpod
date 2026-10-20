@@ -7,7 +7,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/compress"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/ide/openvscode"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 

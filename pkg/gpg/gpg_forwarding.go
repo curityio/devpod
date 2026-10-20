@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 
 	devssh "github.com/loft-sh/devpod/pkg/ssh"
 	"github.com/sirupsen/logrus"

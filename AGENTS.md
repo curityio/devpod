@@ -80,6 +80,11 @@ cd src-tauri && cargo +stable check
   the binary, which also runs as the agent. Use `pkg/kubeclient`, which only registers core/v1 and rbac/v1; add a
   resource or group there if you need one. `go list -deps . | grep '^k8s.io/client-go/kubernetes'` must print
   nothing.
+- **Don't depend on `github.com/loft-sh` modules** (other than this module's own path). They are no longer
+  maintained, and the ones DevPod used now live here: the logger is `pkg/log` (`log.Logger`, `log.Default`,
+  `pkg/log/table`, `pkg/log/survey`), and the SSH server that runs in the container is `pkg/ssh/sshd`, a copy of
+  `gliderlabs/ssh` with unix socket forwarding added. Check that a new dependency is maintained before adding
+  it.
 - **gRPC tunnel code is generated.** After editing `pkg/agent/tunnel/tunnel.proto`, regenerate with
   `hack/build-grpc.sh` (needs `protoc`; existing code uses protoc-gen-go v1.36.4 and protoc-gen-go-grpc v1.5.1).
 - **CI quirks:**

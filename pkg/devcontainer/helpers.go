@@ -10,7 +10,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/file"
 	"github.com/loft-sh/devpod/pkg/git"
 	"github.com/loft-sh/devpod/pkg/image"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 type GetWorkspaceConfigResult struct {

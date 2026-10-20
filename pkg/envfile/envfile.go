@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 var location = "/etc/envfile.json"

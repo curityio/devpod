@@ -14,8 +14,8 @@ import (
 	"github.com/loft-sh/devpod/pkg/ide/openvscode"
 	"github.com/loft-sh/devpod/pkg/ide/rstudio"
 	"github.com/loft-sh/devpod/pkg/ide/vscode"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 )
 

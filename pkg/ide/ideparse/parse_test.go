@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/log"
 	"gotest.tools/assert"
 )
 

@@ -14,8 +14,8 @@ import (
 	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/image"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/scanner"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/log/scanner"
 	perrors "github.com/pkg/errors"
 )
 

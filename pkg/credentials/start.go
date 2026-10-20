@@ -9,9 +9,9 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/agent/tunnel"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
+	"github.com/loft-sh/devpod/pkg/log"
 	portpkg "github.com/loft-sh/devpod/pkg/port"
 	"github.com/loft-sh/devpod/pkg/random"
-	"github.com/loft-sh/log"
 )
 
 func StartCredentialsServer(ctx context.Context, cancel context.CancelFunc, client tunnel.TunnelClient, log log.Logger) (int, error) {

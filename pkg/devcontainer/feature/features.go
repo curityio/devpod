@@ -17,8 +17,8 @@ import (
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/extract"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/hash"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/log/hash"
 	"github.com/pkg/errors"
 )
 

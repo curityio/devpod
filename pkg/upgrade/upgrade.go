@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/loft-sh/devpod/pkg/log"
 	versionpkg "github.com/loft-sh/devpod/pkg/version"
-	"github.com/loft-sh/log"
 	"github.com/pkg/errors"
 
 	"github.com/blang/semver"

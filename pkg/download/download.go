@@ -10,7 +10,7 @@ import (
 
 	"github.com/loft-sh/devpod/pkg/gitcredentials"
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

@@ -17,6 +17,24 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- Security hardening of the SSH server that DevPod runs in the dev container ([#22](https://github.com/curityio/devpod/pull/22)), for issues
+  inherited from upstream:
+  - A reverse forward of a unix socket (as GPG agent forwarding uses) no longer deletes whatever is at the
+    socket path. DevPod only replaces a socket that nothing listens on and that belongs to the server's user (or
+    to anyone, when the server runs as root), and refuses the forward otherwise. Before, a second session
+    forwarding the same socket took it over, and ending either session removed it for both.
+  - The directory of a browser IDE's shared ssh-agent socket (`/tmp/auth-agent-<id>`) must be a real directory
+    owned by the server's user with mode 0700, and the socket has mode 0600. Before, the server used whatever
+    was at that path, so another user in the container could create it first. Ending a session removes the
+    directory only if it is empty, so it doesn't take the socket from the next session.
+  - One SSH connection can no longer cancel another connection's TCP or unix socket reverse forward: forwards
+    are tracked per connection instead of by address only.
+- Automatic language detection ([#22](https://github.com/curityio/devpod/pull/22)), used when `devcontainer.json` has no image, Dockerfile or Compose file, now
+  recognizes C++, C# and PHP projects, and no longer ignores files whose names merely contain `env`, `dist` or
+  `cache`.
+- When a required provider option without a list of allowed values has no value, DevPod prompts for it in the
+  terminal again ([#22](https://github.com/curityio/devpod/pull/22)). Before, the prompt failed with "please provide options to select from".
+- `devpod` log files (such as the agent daemon's) are rotated at 10 MB as intended, instead of 10 TB ([#22](https://github.com/curityio/devpod/pull/22)).
 - `devpod upgrade` and the CLI's newer-version check use this fork's releases on `curityio/devpod`. Before,
   they used upstream `loft-sh/devpod`, so `devpod upgrade` replaced the CLI with an upstream binary.
 - `postStartCommand` now runs again when DevPod starts a stopped dev container, e.g. on `devpod ssh` or
@@ -35,6 +53,13 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- DevPod no longer depends on any `github.com/loft-sh` Go module ([#22](https://github.com/curityio/devpod/pull/22)), as these are no longer maintained. The logger
+  (`loft-sh/log`) is now part of `pkg/log`, the SSH server (`loft-sh/ssh`, a fork of `gliderlabs/ssh`) is
+  `pkg/ssh/sshd`, and language detection (`loft-sh/programming-language-detection`) is in `pkg/language`. The
+  unmaintained libraries they used are gone too: terminal prompts use `charmbracelet/huh` instead of the archived
+  `AlecAivazis/survey`, tables are rendered by DevPod instead of an old `olekukonko/tablewriter`, and
+  `mgutz/ansi`, `acarl005/stripansi`, `k0kubun/go-ansi` and `anmitsu/go-shlex` are replaced by a few lines of
+  code.
 - The DevPod CLI embeds the Linux agent for amd64 and arm64 ([#19](https://github.com/curityio/devpod/pull/19)),
   whatever platform it runs on, and copies it into machines and dev containers itself. It no longer downloads the
   agent from GitHub releases, so the agent always has the same version as the CLI, and workspaces can be created
@@ -54,6 +79,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Removed
 
+- The hidden `devpod agent container ssh-server` command ([#22](https://github.com/curityio/devpod/pull/22)). Only DevPod Pro started it, and it accepted any
+  SSH client without authentication and ran its shell as whichever user the client named.
 - The built-in Amazon ECR registry keychain ([#21](https://github.com/curityio/devpod/pull/21)), which DevPod used when it ran inside a Kubernetes pod, together
   with the AWS SDK it needed. To use ECR, configure
   [`docker-credential-ecr-login`](https://github.com/awslabs/amazon-ecr-credential-helper) as a credential

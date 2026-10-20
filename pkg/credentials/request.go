@@ -9,7 +9,7 @@ import (
 	"time"
 
 	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"

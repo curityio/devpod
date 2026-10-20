@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/ssh"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/ssh/sshd"
 	perrors "github.com/pkg/errors"
 )
 
-func execNonPTY(sess ssh.Session, cmd *exec.Cmd, log log.Logger) (err error) {
+func execNonPTY(sess sshd.Session, cmd *exec.Cmd, log log.Logger) (err error) {
 	log.Debugf("Execute SSH server command: %s", strings.Join(cmd.Args, " "))
 	// init pipes
 	stdin, err := cmd.StdinPipe()
@@ -75,9 +75,9 @@ func execNonPTY(sess ssh.Session, cmd *exec.Cmd, log log.Logger) (err error) {
 }
 
 func execPTY(
-	sess ssh.Session,
-	ptyReq ssh.Pty,
-	winCh <-chan ssh.Window,
+	sess sshd.Session,
+	ptyReq sshd.Pty,
+	winCh <-chan sshd.Window,
 	cmd *exec.Cmd,
 	log log.Logger,
 ) (err error) {

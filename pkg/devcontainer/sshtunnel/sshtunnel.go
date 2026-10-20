@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 
 	client2 "github.com/loft-sh/devpod/pkg/client"
 	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/skratchdot/open-golang/open"
 )
 

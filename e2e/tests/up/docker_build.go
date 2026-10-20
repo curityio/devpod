@@ -8,7 +8,7 @@ import (
 	"github.com/loft-sh/devpod/e2e/framework"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	docker "github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )

@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/loft-sh/log"
-	"github.com/loft-sh/log/scanner"
+	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/loft-sh/devpod/pkg/log/scanner"
 )
 
 func findMessage(reader io.Reader, message string) error {

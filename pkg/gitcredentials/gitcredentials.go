@@ -12,7 +12,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/loft-sh/devpod/pkg/file"
 	"github.com/loft-sh/devpod/pkg/git"
-	"github.com/loft-sh/log/scanner"
+	"github.com/loft-sh/devpod/pkg/log/scanner"
 	"github.com/pkg/errors"
 )
 

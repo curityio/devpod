@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 // InstallAPKRequirements installs the requirements using apk.

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/config"
-	log2 "github.com/loft-sh/log"
+	log2 "github.com/loft-sh/devpod/pkg/log"
 )
 
 const (

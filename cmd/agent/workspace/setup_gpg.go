@@ -9,7 +9,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/credentials"
 	"github.com/loft-sh/devpod/pkg/gitcredentials"
 	"github.com/loft-sh/devpod/pkg/gpg"
-	"github.com/loft-sh/log"
+	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 
