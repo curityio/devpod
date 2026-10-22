@@ -185,7 +185,10 @@ func TestSnapshot(t *testing.T) {
 	// the local commit and the one it diverged from origin/main
 	assert.Equal(t, "2", gitOutput(t, target, "rev-list", "--count", "HEAD"))
 	assert.Equal(t, origin, gitOutput(t, target, "remote", "get-url", "origin"))
-	assert.Equal(t, "repo@example.com", gitOutput(t, target, "config", "user.email"))
+	// DevPod gives the workspace the repository's identity in the global git config, which a local one would override
+	cmd := exec.Command("git", "config", "--local", "user.email")
+	cmd.Dir = target
+	assert.Assert(t, cmd.Run() != nil, "the snapshot has a user")
 	assert.Equal(t, "origin/main", gitOutput(t, target, "rev-parse", "--abbrev-ref", "@{upstream}"))
 	status := gitOutput(t, target, "status", "--porcelain=v2", "--branch")
 	assert.Assert(t, cmp.Contains(status, "# branch.ab +1 -1"))

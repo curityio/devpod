@@ -77,8 +77,9 @@ func IsTopLevel(ctx context.Context, dir string) bool {
 // Snapshot creates a shallow repository in target/.git with the commit checked out in the work tree at dir, so that
 // a copy of the work tree can be committed and pushed elsewhere. It has the commit and, if the branch has an upstream
 // branch, the commits of both since they diverged, but no other history. The branch, its upstream branch and the
-// remotes and user of the repository's config are the same as in dir. The index matches the commit, so changes staged
-// in dir show as not staged. It returns the checked out branch, empty if HEAD is detached.
+// remotes are the same as in dir. The user is left out, as DevPod gives the workspace the repository's git identity
+// in the global config, which a local one would override. The index matches the commit, so changes staged in dir
+// show as not staged. It returns the checked out branch, empty if HEAD is detached.
 func Snapshot(ctx context.Context, dir, target string) (string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
@@ -219,10 +220,10 @@ func fetch(ctx context.Context, dir, target, ref string, depth int) (string, err
 	return strings.TrimSpace(commit), err
 }
 
-// copyConfig copies the remotes, the user and the settings of the branch from the config of the repository in dir
+// copyConfig copies the remotes and the settings of the branch from the config of the repository in dir
 // to the repository in target.
 func copyConfig(ctx context.Context, dir, target, branchRef string) error {
-	entries, err := output(ctx, dir, "config", "--local", "--null", "--get-regexp", `^(remote|user|branch)\.`)
+	entries, err := output(ctx, dir, "config", "--local", "--null", "--get-regexp", `^(remote|branch)\.`)
 	if err != nil {
 		// exit code 1 means there are no such entries
 		var exitErr *exec.ExitError
