@@ -58,6 +58,10 @@ type UpCmd struct {
 
 	SSHConfigPath string
 
+	GitUserName  string
+	GitUserEmail string
+	GitUser      workspace2.GitUserOptions
+
 	DotfilesSource        string
 	DotfilesScript        string
 	DotfilesScriptEnv     []string // Key=Value to pass to install script
@@ -84,6 +88,15 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 
 			ctx, cancel := WithSignals(cobraCmd.Context())
 			defer cancel()
+
+			// an empty directory makes DevPod use the global git identity
+			cmd.GitUser.Dir, _ = os.Getwd()
+			if cobraCmd.Flags().Changed("git-user-name") {
+				cmd.GitUser.Name = &cmd.GitUserName
+			}
+			if cobraCmd.Flags().Changed("git-user-email") {
+				cmd.GitUser.Email = &cmd.GitUserEmail
+			}
 
 			client, logger, err := cmd.prepareClient(ctx, devPodConfig, args)
 			if err != nil {
@@ -123,6 +136,8 @@ func NewUpCmd(f *flags.GlobalFlags) *cobra.Command {
 	upCmd.Flags().Var(&cmd.GitCloneStrategy, "git-clone-strategy", "The git clone strategy DevPod uses to checkout git based workspaces. Can be full (default), blobless, treeless or shallow")
 	upCmd.Flags().BoolVar(&cmd.GitCloneRecursiveSubmodules, "git-clone-recursive-submodules", false, "If true will clone git submodule repositories recursively")
 	upCmd.Flags().StringVar(&cmd.GitSSHSigningKey, "git-ssh-signing-key", "", "The ssh key to use when signing git commits. Used to explicitly setup DevPod's ssh signature forwarding with given key. Should be same format as value of `git config user.signingkey`")
+	upCmd.Flags().StringVar(&cmd.GitUserName, "git-user-name", "", "The git user.name to give the workspace's container, saved with the workspace. An empty value removes the saved one. Without one, DevPod saves the one git uses in the workspace's repository: its local folder, or the directory DevPod runs in")
+	upCmd.Flags().StringVar(&cmd.GitUserEmail, "git-user-email", "", "The git user.email to give the workspace's container, saved with the workspace. An empty value removes the saved one. Without one, DevPod saves the one git uses in the workspace's repository: its local folder, or the directory DevPod runs in")
 	upCmd.Flags().StringVar(&cmd.FallbackImage, "fallback-image", "", "The fallback image to use if no devcontainer configuration has been detected")
 	upCmd.Flags().BoolVar(&cmd.DisableDaemon, "disable-daemon", false, "If enabled, will not install a daemon into the target machine to track activity")
 	upCmd.Flags().StringVar(&cmd.Source, "source", "", "Optional source for the workspace. E.g. git:https://github.com/my-org/my-repo")
@@ -1095,6 +1110,7 @@ func (cmd *UpCmd) prepareClient(ctx context.Context, devPodConfig *config.Config
 		cmd.DevContainerPath,
 		cmd.SSHConfigPath,
 		source,
+		&cmd.GitUser,
 		cmd.UID,
 		true,
 		logger,
