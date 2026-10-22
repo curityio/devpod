@@ -21,12 +21,13 @@ func setupIncludeIfConfig(t *testing.T) (workDir string) {
 	workDir = filepath.Join(home, "work")
 	assert.NilError(t, os.MkdirAll(workDir, 0755))
 
+	// gitdir/i because Windows paths are case insensitive
 	globalConfig := filepath.Join(home, ".gitconfig")
 	writeFile(t, globalConfig, `[user]
 	name = Me
 	email = me@personal.com
-[includeIf "gitdir:`+workDir+`/"]
-	path = `+filepath.Join(workDir, ".gitconfig")+"\n")
+[includeIf "gitdir/i:`+configPath(workDir)+`/"]
+	path = `+configPath(filepath.Join(workDir, ".gitconfig"))+"\n")
 	writeFile(t, filepath.Join(workDir, ".gitconfig"), "[user]\n\temail = me@company.com\n")
 
 	t.Setenv("HOME", home)
@@ -35,6 +36,12 @@ func setupIncludeIfConfig(t *testing.T) (workDir string) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 
 	return workDir
+}
+
+// configPath writes path for a git config file: git takes a backslash as an escape character, and
+// gitdir patterns use forward slashes on Windows too.
+func configPath(path string) string {
+	return filepath.ToSlash(path)
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -79,7 +86,7 @@ func TestGetHostUser_OutsideRepositoryUsesGlobalConfig(t *testing.T) {
 
 func TestGetHostUser_GlobalFollowsIncludes(t *testing.T) {
 	workDir := setupIncludeIfConfig(t)
-	writeFile(t, os.Getenv("GIT_CONFIG_GLOBAL"), "[include]\n\tpath = "+filepath.Join(workDir, ".gitconfig")+"\n")
+	writeFile(t, os.Getenv("GIT_CONFIG_GLOBAL"), "[include]\n\tpath = "+configPath(filepath.Join(workDir, ".gitconfig"))+"\n")
 
 	assert.DeepEqual(t, GetHostUser(""), &GitUser{Email: "me@company.com"})
 }
