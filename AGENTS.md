@@ -15,6 +15,7 @@ VMs). [CHANGELOG.md](CHANGELOG.md) lists what the fork changed and [TODO.md](TOD
 | `providers/` | The built-in `docker` and `kubernetes` provider definitions, embedded into the binary. Other providers live in separate repos. |
 | `desktop/` | The desktop app: Tauri 2 (Rust, `desktop/src-tauri`) with a React/TypeScript UI (`desktop/src`). It runs the `devpod` CLI as a sidecar. |
 | `docs/` | Docusaurus documentation site, deployed to [devpod.curityio.net](https://devpod.curityio.net/) (GitHub Pages with a custom domain, so `baseUrl` is `/`) by `.github/workflows/docs.yaml` on pushes to `main`. |
+| `dockerless/` | The image the kubernetes driver builds dev containers with, without a docker daemon (kaniko). A separate Go module; see its `Readme.md`. |
 | `e2e/` | Ginkgo end-to-end tests that run the real CLI against Docker, Podman and a kind cluster. |
 | `hack/` | Build and test scripts. |
 | `examples/` | Sample devcontainer projects, also used by the e2e tests. |
@@ -85,6 +86,10 @@ cd src-tauri && cargo +stable check
   `pkg/log/table`, `pkg/log/survey`), and the SSH server that runs in the container is `pkg/ssh/sshd`, a copy of
   `gliderlabs/ssh` with unix socket forwarding added. Check that a new dependency is maintained before adding
   it.
+- **`dockerless/` is a separate Go module** (`github.com/loft-sh/devpod/dockerless`), with its own `go.mod`, no
+  `vendor/`, a newer Go and golangci-lint v2 (its `.golangci.yaml`). Commands run at the root don't see it: run
+  them in `dockerless/`, with `GOOS=linux`. Its image is published from a `dockerless-v<version>` tag; DevPod pins
+  the version in `pkg/devcontainer/single.go`, so a change to `dockerless/` needs a new tag and that pin bumped.
 - **gRPC tunnel code is generated.** After editing `pkg/agent/tunnel/tunnel.proto`, regenerate with
   `hack/build-grpc.sh` (needs `protoc`; existing code uses protoc-gen-go v1.36.4 and protoc-gen-go-grpc v1.5.1).
 - **CI quirks:**

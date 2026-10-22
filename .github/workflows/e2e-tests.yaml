@@ -14,6 +14,7 @@ on:
       - "!**_test.go" # exclude test files to ignore unit test changes
       - "e2e/**_test.go" # include test files in e2e again
       - ".github/workflows/e2e-tests.yaml"
+      - "dockerless/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -68,6 +69,14 @@ jobs:
           kubectl get pods -n kube-system -v 10
           echo "kubectl config current-context:" $(kubectl config current-context)
           echo "KUBECONFIG env var:" ${KUBECONFIG}
+
+      # The kubernetes tests build with dockerless. Build its image from this checkout, under the
+      # name DevPod uses by default, so that they test this version rather than a published one.
+      - name: Build the dockerless image and load it into kind
+        run: |
+          image=$(sed -n 's/^var dockerlessImage = "\(.*\)"$/\1/p' pkg/devcontainer/single.go)
+          docker build -t "$image" dockerless
+          kind load docker-image "$image"
 
       - name: Build binary and copy to the E2E directory
         working-directory: ./e2e

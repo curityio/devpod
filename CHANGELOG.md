@@ -20,6 +20,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- Kubernetes workspaces build their dev container with `ghcr.io/curityio/dockerless:0.3.0` instead of
+  `ghcr.io/loft-sh/dockerless:0.2.0`. Its source is now in this repository (`dockerless/`), built on the maintained
+  [osscontainertools/kaniko](https://github.com/osscontainertools/kaniko) v1.28 instead of loft-sh's patched copy
+  of Google's archived kaniko 1.9.2. The `DOCKERLESS_IMAGE` option of the kubernetes provider still overrides it.
 - `devpod upgrade` only upgrades to a newer stable release: it compares versions instead of installing the latest
   release whenever it differs from the running one, which could downgrade the CLI, and it never picks a
   pre-release or a tag that isn't a plain `major.minor.patch` version. It checks that it can replace the binary

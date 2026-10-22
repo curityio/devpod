@@ -14,7 +14,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-var dockerlessImage = "ghcr.io/loft-sh/dockerless:0.2.0"
+// dockerlessImage is built from dockerless/ and published by .github/workflows/dockerless.yaml
+// when a dockerless-v<version> tag is pushed.
+var dockerlessImage = "ghcr.io/curityio/dockerless:0.3.0"
 
 const (
 	DevPodExtraEnvVar           = "DEVPOD"
