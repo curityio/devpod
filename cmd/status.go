@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -135,9 +134,25 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	if err != nil {
 		return err
 	}
-	sort.SliceStable(workspaces, func(i, j int) bool {
-		return lastUsed(workspaces[i]).After(lastUsed(workspaces[j]))
-	})
+
+	statuses := cmd.allStatuses(ctx, devPodConfig.DefaultContext, workspaces, timeout)
+	if cmd.Output == "json" {
+		out, err := json.Marshal(statuses)
+		if err != nil {
+			return err
+		}
+
+		fmt.Print(string(out))
+		return nil
+	}
+
+	return printStatuses(statuses, log.Default, logger)
+}
+
+// allStatuses retrieves the statuses of the workspaces concurrently, keeping their order
+func (cmd *StatusCmd) allStatuses(ctx context.Context, contextName string, workspaces []workspace2.ListedClient, timeout time.Duration) []client2.WorkspaceStatus {
+	options := cmd.StatusOptions
+	options.MachineStatuses = &client2.MachineStatusCache{}
 
 	statuses := make([]client2.WorkspaceStatus, len(workspaces))
 	limit := make(chan struct{}, maxConcurrentStatus)
@@ -145,7 +160,7 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	for i, workspace := range workspaces {
 		statuses[i] = client2.WorkspaceStatus{
 			ID:      workspace.ID,
-			Context: devPodConfig.DefaultContext,
+			Context: contextName,
 		}
 		if workspace.Workspace != nil {
 			statuses[i].Provider = workspace.Workspace.Provider.Name
@@ -166,7 +181,7 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 				return
 			}
 
-			state, err := cmd.status(ctx, workspace.Client, timeout)
+			state, err := status(ctx, workspace.Client, options, timeout)
 			if err != nil {
 				statuses[i].Error = err.Error()
 				return
@@ -176,16 +191,30 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	}
 	wg.Wait()
 
-	if cmd.Output == "json" {
-		out, err := json.Marshal(statuses)
-		if err != nil {
-			return err
-		}
+	return statuses
+}
 
-		fmt.Print(string(out))
-		return nil
-	} else if len(statuses) == 0 {
-		logger.Infof("There are no workspaces, you can create one via 'devpod up'")
+// status retrieves a workspace's status, giving up after the timeout (if it isn't 0)
+func status(ctx context.Context, client client2.BaseWorkspaceClient, options client2.StatusOptions, timeout time.Duration) (client2.Status, error) {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	status, err := client.Status(ctx, options)
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "", fmt.Errorf("timed out after %s, you can wait longer via --timeout", timeout)
+	}
+
+	return status, err
+}
+
+// printStatuses prints the statuses as a table to out, and why a status couldn't be retrieved to logger. It fails
+// if a status couldn't be retrieved.
+func printStatuses(statuses []client2.WorkspaceStatus, out log.Logger, logger log.Logger) error {
+	if len(statuses) == 0 {
+		out.Infof("There are no workspaces, you can create one via 'devpod up'")
 		return nil
 	}
 
@@ -201,7 +230,7 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 		tableEntries = append(tableEntries, []string{status.ID, status.Provider, state})
 	}
 
-	table.PrintTable(log.Default, []string{
+	table.PrintTable(out, []string{
 		"Name",
 		"Provider",
 		"Status",
@@ -212,30 +241,6 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	}
 
 	return nil
-}
-
-// status retrieves a workspace's status, giving up after the timeout (if it isn't 0)
-func (cmd *StatusCmd) status(ctx context.Context, client client2.BaseWorkspaceClient, timeout time.Duration) (client2.Status, error) {
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
-	status, err := client.Status(ctx, cmd.StatusOptions)
-	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return "", fmt.Errorf("timed out after %s, you can wait longer via --timeout", timeout)
-	}
-
-	return status, err
-}
-
-func lastUsed(workspace workspace2.ListedClient) time.Time {
-	if workspace.Workspace == nil {
-		return time.Time{}
-	}
-
-	return workspace.Workspace.LastUsedTimestamp.Time
 }
 
 // withTimeout applies --timeout to the context

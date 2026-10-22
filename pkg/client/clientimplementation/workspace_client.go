@@ -501,12 +501,14 @@ func (s *workspaceClient) Status(ctx context.Context, options client.StatusOptio
 			return client.StatusNotFound, nil
 		}
 
-		machineClient, err := NewMachineClient(s.devPodConfig, s.config, s.machine, s.log)
-		if err != nil {
-			return client.StatusNotFound, err
-		}
+		status, err := options.MachineStatuses.Get(s.machine.ID, func() (client.Status, error) {
+			machineClient, err := NewMachineClient(s.devPodConfig, s.config, s.machine, s.log)
+			if err != nil {
+				return client.StatusNotFound, err
+			}
 
-		status, err := machineClient.Status(ctx, options)
+			return machineClient.Status(ctx, options)
+		})
 		if err != nil {
 			return status, err
 		}

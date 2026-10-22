@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/loft-sh/devpod/pkg/client"
@@ -36,6 +37,23 @@ func ListLocalWorkspaces(contextName string, log log.Logger) ([]*providerpkg.Wor
 	return retWorkspaces, nil
 }
 
+// SortByLastUsed sorts workspaces from the most to the least recently used
+func SortByLastUsed(workspaces []*providerpkg.Workspace) {
+	sort.SliceStable(workspaces, func(i, j int) bool {
+		return usedMoreRecently(workspaces[i], workspaces[j])
+	})
+}
+
+// usedMoreRecently reports whether workspace a was used more recently than b. A nil workspace, one that couldn't
+// be loaded, comes last.
+func usedMoreRecently(a, b *providerpkg.Workspace) bool {
+	if a == nil || b == nil {
+		return a != nil && b == nil
+	}
+
+	return a.LastUsedTimestamp.Time.After(b.LastUsedTimestamp.Time)
+}
+
 // ListedClient is a workspace of the context with its client, or the reason it couldn't be loaded
 type ListedClient struct {
 	ID string
@@ -46,8 +64,9 @@ type ListedClient struct {
 	Err       error
 }
 
-// ListClients returns the clients of all workspaces of the context, loading the providers only once.
-// Unlike List, it doesn't skip workspaces that can't be loaded, but returns them with an error.
+// ListClients returns the clients of all workspaces of the context from the most to the least recently used,
+// loading the providers only once. Unlike List, it doesn't skip workspaces that can't be loaded, but returns them
+// last, with an error.
 func ListClients(devPodConfig *config.Config, log log.Logger) ([]ListedClient, error) {
 	workspaceIDs, err := listWorkspaceIDs(devPodConfig.DefaultContext)
 	if err != nil {
@@ -66,6 +85,9 @@ func ListClients(devPodConfig *config.Config, log log.Logger) ([]ListedClient, e
 		listed.Workspace, listed.Client, listed.Err = loadClient(devPodConfig, workspaceID, providers, providersErr, log)
 		retClients = append(retClients, listed)
 	}
+	sort.SliceStable(retClients, func(i, j int) bool {
+		return usedMoreRecently(retClients[i].Workspace, retClients[j].Workspace)
+	})
 
 	return retClients, nil
 }

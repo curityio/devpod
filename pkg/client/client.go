@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/loft-sh/devpod/pkg/provider"
 )
@@ -107,6 +108,46 @@ type CreateOptions struct{}
 
 type StatusOptions struct {
 	ContainerStatus bool `json:"containerStatus,omitempty"`
+
+	// MachineStatuses, if set, is shared by workspaces whose statuses are retrieved together, so that the status
+	// of a machine they share is only retrieved once
+	MachineStatuses *MachineStatusCache `json:"-"`
+}
+
+// MachineStatusCache remembers the statuses of machines by their ID. It's safe for concurrent use.
+type MachineStatusCache struct {
+	m        sync.Mutex
+	statuses map[string]*cachedMachineStatus
+}
+
+type cachedMachineStatus struct {
+	once   sync.Once
+	status Status
+	err    error
+}
+
+// Get returns the status of the machine, calling getStatus only for the first caller with the machine's ID.
+// Concurrent callers with the same ID wait for its result. A nil cache always calls getStatus.
+func (c *MachineStatusCache) Get(machineID string, getStatus func() (Status, error)) (Status, error) {
+	if c == nil {
+		return getStatus()
+	}
+
+	c.m.Lock()
+	if c.statuses == nil {
+		c.statuses = map[string]*cachedMachineStatus{}
+	}
+	cached := c.statuses[machineID]
+	if cached == nil {
+		cached = &cachedMachineStatus{}
+		c.statuses[machineID] = cached
+	}
+	c.m.Unlock()
+
+	cached.once.Do(func() {
+		cached.status, cached.err = getStatus()
+	})
+	return cached.status, cached.err
 }
 
 type CommandOptions struct {

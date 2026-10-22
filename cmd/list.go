@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/loft-sh/devpod/cmd/flags"
@@ -57,10 +56,8 @@ func (cmd *ListCmd) Run(ctx context.Context) error {
 		return err
 	}
 
+	workspace.SortByLastUsed(workspaces)
 	if cmd.Output == "json" {
-		sort.SliceStable(workspaces, func(i, j int) bool {
-			return workspaces[i].LastUsedTimestamp.Time.Unix() > workspaces[j].LastUsedTimestamp.Time.Unix()
-		})
 		out, err := json.Marshal(workspaces)
 		if err != nil {
 			return err
@@ -68,9 +65,6 @@ func (cmd *ListCmd) Run(ctx context.Context) error {
 		fmt.Print(string(out))
 	} else if cmd.Output == "plain" {
 		tableEntries := [][]string{}
-		sort.SliceStable(workspaces, func(i, j int) bool {
-			return workspaces[i].LastUsedTimestamp.Time.Unix() > workspaces[j].LastUsedTimestamp.Time.Unix()
-		})
 		for _, entry := range workspaces {
 			tableEntries = append(tableEntries, []string{
 				entry.ID,
