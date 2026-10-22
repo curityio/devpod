@@ -196,8 +196,8 @@ func (t *tunnelServer) GitUser(ctx context.Context, empty *tunnel.Empty) (*tunne
 	}, nil
 }
 
-// gitUser returns the identity `devpod up` saved with the workspace. A value it couldn't
-// find, or a workspace saved before DevPod kept the identity, gets the global one.
+// gitUser returns the identity `devpod up` saved with the workspace. A value it didn't save,
+// because it wasn't given and the workspace doesn't come from a repository, is the global one.
 func (t *tunnelServer) gitUser() *gitcredentials.GitUser {
 	gitUser := &gitcredentials.GitUser{}
 	if t.workspace != nil {
@@ -205,12 +205,12 @@ func (t *tunnelServer) gitUser() *gitcredentials.GitUser {
 		gitUser.Email = t.workspace.GitUser.Email
 	}
 	if gitUser.Name == "" || gitUser.Email == "" {
-		hostUser := gitcredentials.GetHostUser("")
+		globalUser := gitcredentials.GetGlobalUser()
 		if gitUser.Name == "" {
-			gitUser.Name = hostUser.Name
+			gitUser.Name = globalUser.Name
 		}
 		if gitUser.Email == "" {
-			gitUser.Email = hostUser.Email
+			gitUser.Email = globalUser.Email
 		}
 	}
 

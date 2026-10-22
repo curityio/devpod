@@ -63,7 +63,7 @@ func TestGitUser(t *testing.T) {
 			expected:  `{"name":"Global","email":"me@company.com"}`,
 		},
 		{
-			name:      "workspace saved before DevPod kept the identity",
+			name:      "workspace without a saved identity",
 			workspace: &provider2.Workspace{},
 			expected:  `{"name":"Global","email":"global@personal.com"}`,
 		},

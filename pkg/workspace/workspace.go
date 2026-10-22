@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -37,7 +36,7 @@ func Resolve(
 	devContainerPath string,
 	sshConfigPath string,
 	source *providerpkg.WorkspaceSource,
-	gitUser *providerpkg.WorkspaceGitUser,
+	gitUser *GitUserOptions,
 	uid string,
 	changeLastUsed bool,
 	log log.Logger,
@@ -103,11 +102,9 @@ func Resolve(
 		}
 	}
 
-	// configure the git identity of the container, unless the caller doesn't start one
+	// configure the git identity of the container, unless the caller doesn't connect to it
 	if gitUser != nil {
-		// an empty directory makes DevPod use the global git identity
-		cwd, _ := os.Getwd()
-		err = ConfigureGitUser(workspace, *gitUser, cwd, log)
+		err = ConfigureGitUser(workspace, *gitUser, log)
 		if err != nil {
 			return nil, fmt.Errorf("configure git user: %w", err)
 		}

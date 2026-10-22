@@ -10,17 +10,18 @@ Add new entries to the top of the "Unreleased" section.
 ### Added
 
 - `devpod up --git-user-name` and `--git-user-email` set the git identity that the workspace's dev container
-  gets, and save it with the workspace.
+  gets, and save it with the workspace. An empty value removes the saved one.
 
 ### Fixed
 
-- The git identity that DevPod gives a dev container is the one git uses where the workspace comes from (its local
-  folder, or the directory `devpod up` runs in), including the repository's config and matching `include` and
-  `includeIf` directives. DevPod used to read only `~/.gitconfig` without its includes, an issue inherited from
-  upstream, so a work identity kept in an `includeIf` block was ignored and workspaces committed with the
-  global (often personal) email. `devpod up` saves the identity with the workspace when it creates it, so later
-  connections from anywhere use the same one; workspaces created before get it on their next `devpod up`.
-
+- The git identity that DevPod gives a dev container is the one git uses in the repository the workspace comes
+  from (its local folder, or the directory `devpod up` runs in), including the repository's config and matching
+  `include` and `includeIf` directives. DevPod used to read only `~/.gitconfig` without its includes, an issue
+  inherited from upstream, so a work identity kept in an `includeIf` block was ignored and workspaces committed
+  with the global (often personal) email. `devpod up` saves the repository's identity with the workspace, so
+  later connections from anywhere use the same one; outside a repository it saves nothing, and the container
+  gets the global identity (now with its includes) when it connects. A dev container that already has an
+  identity keeps it, including those of existing workspaces: use `devpod up --recreate` to give it the new one.
 - `devpod up` of a Kubernetes workspace recreates the workspace's pod when it is dead (its phase is `Failed`,
   `Succeeded` or `Unknown`, its dev container has terminated, or it is being deleted), keeping the workspace's
   persistent volume claim. It used to reuse such a pod, for example after the node restarted, and then time out

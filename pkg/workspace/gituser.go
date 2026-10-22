@@ -8,17 +8,30 @@ import (
 	providerpkg "github.com/loft-sh/devpod/pkg/provider"
 )
 
+// GitUserOptions are the `devpod up` options for the git identity of the workspace's container.
+type GitUserOptions struct {
+	// Name and Email replace the saved values unless they are nil. An empty value removes the
+	// saved one, so that DevPod looks it up again.
+	Name  *string
+	Email *string
+
+	// Dir is the directory `devpod up` runs in
+	Dir string
+}
+
 // ConfigureGitUser saves the git identity that the workspace's container gets if it doesn't have
-// one yet. A name or email in gitUser replaces the saved one. One that is neither given nor saved
-// is the one git uses where the workspace comes from: its local folder, or else dir, the
+// one yet. A name or email in options replaces the saved one. One that is neither given nor saved
+// is the one git uses in the repository the workspace comes from: its local folder, or else the
 // directory `devpod up` runs in. That way the repository's config and its includeIf matches
-// count, and running `devpod up` again from somewhere else doesn't change the identity.
-func ConfigureGitUser(workspace *providerpkg.Workspace, gitUser providerpkg.WorkspaceGitUser, dir string, log log.Logger) error {
+// count, and running `devpod up` again from somewhere else doesn't change the identity. Outside a
+// repository nothing is saved, so the container gets the global identity when it connects.
+func ConfigureGitUser(workspace *providerpkg.Workspace, options GitUserOptions, log log.Logger) error {
+	dir := options.Dir
 	if workspace.Source.LocalFolder != "" {
 		dir = workspace.Source.LocalFolder
 	}
 
-	newGitUser := resolveGitUser(workspace.GitUser, gitUser, dir)
+	newGitUser := resolveGitUser(workspace.GitUser, options, dir, log)
 	if newGitUser == workspace.GitUser {
 		return nil
 	}
@@ -33,22 +46,27 @@ func ConfigureGitUser(workspace *providerpkg.Workspace, gitUser providerpkg.Work
 	return nil
 }
 
-func resolveGitUser(saved, given providerpkg.WorkspaceGitUser, dir string) providerpkg.WorkspaceGitUser {
+func resolveGitUser(saved providerpkg.WorkspaceGitUser, options GitUserOptions, dir string, log log.Logger) providerpkg.WorkspaceGitUser {
 	gitUser := saved
-	if given.Name != "" {
-		gitUser.Name = given.Name
+	if options.Name != nil {
+		gitUser.Name = *options.Name
 	}
-	if given.Email != "" {
-		gitUser.Email = given.Email
+	if options.Email != nil {
+		gitUser.Email = *options.Email
 	}
 
 	if gitUser.Name == "" || gitUser.Email == "" {
-		hostUser := gitcredentials.GetHostUser(dir)
+		repositoryUser, err := gitcredentials.GetRepositoryUser(dir)
+		if err != nil {
+			log.Debugf("Not using the git identity of %q: %v", dir, err)
+			return gitUser
+		}
+
 		if gitUser.Name == "" {
-			gitUser.Name = hostUser.Name
+			gitUser.Name = repositoryUser.Name
 		}
 		if gitUser.Email == "" {
-			gitUser.Email = hostUser.Email
+			gitUser.Email = repositoryUser.Email
 		}
 	}
 
