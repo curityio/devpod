@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/dockercredentials"
 	"github.com/loft-sh/devpod/pkg/extract"
+	"github.com/loft-sh/devpod/pkg/git"
 	"github.com/loft-sh/devpod/pkg/gitcredentials"
 	"github.com/loft-sh/devpod/pkg/gitsshsigning"
 	"github.com/loft-sh/devpod/pkg/gpg"
@@ -309,10 +311,11 @@ func (t *tunnelServer) StreamWorkspace(message *tunnel.Empty, stream tunnel.Tunn
 		return fmt.Errorf("workspace is nil")
 	}
 
-	excludes := t.readIgnoreFile(t.workspace.Source.LocalFolder)
+	opts, cleanup := t.workspaceTarOptions(stream.Context(), t.workspace.Source.LocalFolder)
+	defer cleanup()
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err := extract.WriteTarWithOptions(buf, t.workspace.Source.LocalFolder, streamTarOptions(excludes))
+	err := extract.WriteTarWithOptions(buf, t.workspace.Source.LocalFolder, opts)
 	if err != nil {
 		return err
 	}
@@ -333,17 +336,19 @@ func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tu
 		return fmt.Errorf("mount %s is not allowed to download", message.Mount)
 	}
 
-	// The ignore file only applies to the workspace folder, other bind mounts
+	// The ignore files only apply to the workspace folder, other bind mounts
 	// are streamed whole
-	var excludes []string
+	opts := extract.TarOptions{}
 	if t.workspaceMount != nil && mount.String() == t.workspaceMount.String() {
-		excludes = t.readIgnoreFile(mount.Source)
+		var cleanup func()
+		opts, cleanup = t.workspaceTarOptions(stream.Context(), mount.Source)
+		defer cleanup()
 	} else {
 		t.log.Debugf("Stream mount %s without excludes, it is not the workspace mount", mount.String())
 	}
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err := extract.WriteTarWithOptions(buf, mount.Source, streamTarOptions(excludes))
+	err := extract.WriteTarWithOptions(buf, mount.Source, opts)
 	if err != nil {
 		return err
 	}
@@ -383,12 +388,82 @@ func (t *tunnelServer) readIgnoreFile(folder string) []string {
 	return excludes
 }
 
-// streamTarOptions returns the options to stream a folder into the container
-// with excludes. The dockerless build context is always streamed whole, as the
-// build fails without it.
-func streamTarOptions(excludes []string) extract.TarOptions {
-	return extract.TarOptions{
-		Excludes:  excludes,
+// gitFolder is the folder of a git repository in its work tree.
+const gitFolder = ".git"
+
+// workspaceTarOptions returns the options to stream the workspace folder into
+// the container, and a function that removes what they need once streamed.
+//
+// If the folder is in a git work tree, only the files git doesn't ignore are
+// streamed, and the ignore file takes precedence: it can leave out files git
+// doesn't ignore, and re-include files git ignores with negation (!) patterns.
+// If the folder is the top level of the work tree, its .git is replaced by a
+// shallow copy unless the ignore file has a pattern matching .git. The
+// dockerless build context is always streamed whole, as the build fails
+// without it.
+func (t *tunnelServer) workspaceTarOptions(ctx context.Context, folder string) (extract.TarOptions, func()) {
+	opts := extract.TarOptions{
+		Excludes:  t.readIgnoreFile(folder),
 		KeepNames: []string{config.DevPodContextFeatureFolder},
 	}
+	noCleanup := func() {}
+
+	files, err := git.ListFiles(ctx, folder)
+	if err != nil {
+		if errors.Is(err, git.ErrNotInstalled) {
+			t.log.Warnf("Git is not installed, so all files of %s not excluded by %s are uploaded, including those .gitignore files ignore", folder, ignoreFileName)
+		} else {
+			t.log.Debugf("Upload all files of %s not excluded by %s, git can't list its files: %v", folder, ignoreFileName, err)
+		}
+		return opts, noCleanup
+	}
+	// e.g. the folder is in a repository of dotfiles that ignores everything
+	if len(files) == 0 {
+		t.log.Debugf("Upload all files of %s not excluded by %s, git doesn't list any", folder, ignoreFileName)
+		return opts, noCleanup
+	}
+	opts.Files = extract.NewFileList(files)
+	t.log.Debugf("Upload the %d files of %s git doesn't ignore, and those %s re-includes", opts.Files.Len(), folder, ignoreFileName)
+
+	if !git.IsTopLevel(ctx, folder) {
+		return opts, noCleanup
+	}
+	if verdict := gitFolderVerdict(opts.Excludes); verdict != extract.Unmatched {
+		t.log.Debugf("Upload %s as %s says, instead of a shallow copy", gitFolder, ignoreFileName)
+		return opts, noCleanup
+	}
+
+	snapshot, err := os.MkdirTemp("", "devpod-git-")
+	if err != nil {
+		t.log.Warnf("Upload no %s, can't create a folder for a shallow copy: %v", gitFolder, err)
+		return opts, noCleanup
+	}
+	cleanup := func() { _ = os.RemoveAll(snapshot) }
+	branch, err := git.Snapshot(ctx, folder, snapshot)
+	if err != nil {
+		cleanup()
+		t.log.Warnf("Upload no %s, can't create a shallow copy: %v. Add !%s to %s to upload the whole %s", gitFolder, err, gitFolder, ignoreFileName, gitFolder)
+		return opts, noCleanup
+	}
+	if branch != "" {
+		t.log.Infof("Upload a shallow %s with branch %s", gitFolder, branch)
+	} else {
+		t.log.Infof("Upload a shallow %s with the checked out commit", gitFolder)
+	}
+	opts.Overlays = []string{filepath.Join(snapshot, gitFolder)}
+	return opts, cleanup
+}
+
+// gitFolderVerdict returns what the exclude patterns say about the .git
+// folder at the root.
+func gitFolderVerdict(excludes []string) extract.Verdict {
+	rules, err := extract.NewExcludeRules(excludes)
+	if err != nil {
+		return extract.Unmatched
+	}
+	verdict, err := rules.Match(gitFolder)
+	if err != nil {
+		return extract.Unmatched
+	}
+	return verdict
 }
