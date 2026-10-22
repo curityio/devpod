@@ -1,7 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/go:1-1.23-bookworm
 
-# protoc, for hack/build-grpc.sh.
-RUN apt-get update \
+# protoc, for hack/build-grpc.sh. The image's yarn repository has an expired key, which fails
+# apt-get update, and nothing here needs yarn.
+RUN rm -f /etc/apt/sources.list.d/yarn.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
