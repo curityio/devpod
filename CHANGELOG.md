@@ -12,6 +12,17 @@ Add new entries to the top of the "Unreleased" section.
 - `devpod up --git-user-name` and `--git-user-email` set the git identity that the workspace's dev container
   gets, and save it with the workspace. An empty value removes the saved one.
 
+### Changed
+
+- `devpod up` of a local folder in a git repository only uploads the files git doesn't ignore, instead of the
+  whole folder, when the workspace runs on another machine or in Kubernetes. Ignored files (build output,
+  `node_modules`, ...) and nested repositories and git worktrees stay behind. Instead of the repository's
+  `.git`, the workspace gets a shallow one with the checked out commit, the branch, its upstream branch and the
+  remotes, which is enough to commit and push; so does each checked out submodule. `.devpodignore` takes
+  precedence: its patterns leave out more files, and its negation (`!`) patterns upload files git ignores
+  (`!.git` uploads the whole `.git`). See
+  [Which files are uploaded](https://devpod.curityio.net/developing-in-workspaces/create-a-workspace#which-files-are-uploaded).
+
 ### Fixed
 
 - The git identity that DevPod gives a dev container is the one git uses in the repository the workspace comes

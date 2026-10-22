@@ -87,6 +87,43 @@ devpod up ./path/to/my-folder
 
 DevPod will sync the folder into the remote machine and create a development environment from the `devcontainer.json`.
 
+##### Which files are uploaded
+
+When the workspace runs on another machine or in Kubernetes, DevPod uploads the folder. If the folder is in a git
+repository, DevPod only uploads the files git doesn't ignore: tracked files, and untracked files that no
+`.gitignore` file, `.git/info/exclude` or `core.excludesFile` ignores. So build output, `node_modules` and the like
+stay behind, as do other repositories and git worktrees inside the folder. The files of submodules are uploaded.
+
+If the folder is the top of the repository, the workspace gets a small `.git` in place of yours, with only the
+checked out commit, so that you can commit and push from the workspace. It has the same branch, remotes and
+upstream branch as yours, and the commits since your branch and its upstream branch diverged, but no other
+history. Changes you have staged show as not staged in the workspace. Each checked out submodule gets a small
+`.git` of its own in the same way.
+
+A `.devpodignore` file at the top of the folder takes precedence over git. It has the syntax of a
+[`.dockerignore` file](https://docs.docker.com/build/concepts/context/#dockerignore-files), so patterns are
+relative to the folder: `build` only matches the `build` folder at the top, `**/build` matches one anywhere. A
+pattern leaves out files git doesn't ignore, and a negation (`!`) pattern uploads files git ignores:
+
+```
+# a file git ignores, but the workspace needs
+!.env
+# files git doesn't ignore, but the workspace doesn't need
+docs/**/*.mp4
+```
+
+Tracked files that `.devpodignore` leaves out don't show as deleted in the workspace, as git marks them
+[skip-worktree](https://git-scm.com/docs/git-update-index#_skip_worktree_bit), but their content is still uploaded
+in the small `.git`. `!.git` uploads your whole `.git` instead of the small one, and `.git` uploads no `.git` at all.
+
+If the folder is not in a git repository, or git is not installed, DevPod uploads every file `.devpodignore`
+doesn't exclude.
+
+:::info
+When the workspace runs on your machine, e.g. with the `docker` provider and a local Docker, the folder is mounted
+and not uploaded, so the workspace has all of it.
+:::
+
 #### Docker Image
 
 Run the following command in a terminal to create a new workspace from a docker image:
