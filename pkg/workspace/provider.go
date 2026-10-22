@@ -344,11 +344,17 @@ func FindProvider(devPodConfig *config.Config, name string, log log.Logger) (*Pr
 	retProviders, err := LoadAllProviders(devPodConfig, log)
 	if err != nil {
 		return nil, err
-	} else if retProviders[name] == nil {
+	}
+
+	return findLoadedProvider(retProviders, name)
+}
+
+func findLoadedProvider(providers map[string]*ProviderWithOptions, name string) (*ProviderWithOptions, error) {
+	if providers[name] == nil {
 		return nil, fmt.Errorf("couldn't find provider with name %s. Please make sure to add the provider via 'devpod provider add'", name)
 	}
 
-	return retProviders[name], nil
+	return providers[name], nil
 }
 
 func LoadAllProviders(devPodConfig *config.Config, log log.Logger) (map[string]*ProviderWithOptions, error) {

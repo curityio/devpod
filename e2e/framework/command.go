@@ -181,6 +181,23 @@ func (f *Framework) DevPodStatus(ctx context.Context, extraArgs ...string) (clie
 	return *status, nil
 }
 
+func (f *Framework) DevPodStatusAll(ctx context.Context, extraArgs ...string) ([]client.WorkspaceStatus, error) {
+	baseArgs := []string{"status", "--all", "--output", "json"}
+	baseArgs = append(baseArgs, extraArgs...)
+	stdout, err := f.ExecCommandOutput(ctx, baseArgs)
+	if err != nil {
+		return nil, fmt.Errorf("devpod status --all failed: %s", err.Error())
+	}
+
+	statuses := []client.WorkspaceStatus{}
+	err = json.Unmarshal([]byte(stdout), &statuses)
+	if err != nil {
+		return nil, err
+	}
+
+	return statuses, nil
+}
+
 func (f *Framework) DevPodStop(ctx context.Context, workspace string) error {
 	baseArgs := []string{"stop"}
 	baseArgs = append(baseArgs, workspace)

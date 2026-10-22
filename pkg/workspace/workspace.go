@@ -578,15 +578,25 @@ func loadExistingWorkspace(devPodConfig *config.Config, workspaceID string, chan
 		}
 	}
 
-	// load machine config
-	var machineConfig *providerpkg.Machine
-	if workspaceConfig.Machine.ID != "" {
-		machineConfig, err = providerpkg.LoadMachineConfig(workspaceConfig.Context, workspaceConfig.Machine.ID)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("load machine config: %w", err)
-		}
+	machineConfig, err := loadWorkspaceMachine(workspaceConfig)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	// create client
 	return providerWithOptions.Config, workspaceConfig, machineConfig, nil
+}
+
+// loadWorkspaceMachine loads the config of the workspace's machine, if it has one
+func loadWorkspaceMachine(workspaceConfig *providerpkg.Workspace) (*providerpkg.Machine, error) {
+	if workspaceConfig.Machine.ID == "" {
+		return nil, nil
+	}
+
+	machineConfig, err := providerpkg.LoadMachineConfig(workspaceConfig.Context, workspaceConfig.Machine.ID)
+	if err != nil {
+		return nil, fmt.Errorf("load machine config: %w", err)
+	}
+
+	return machineConfig, nil
 }
