@@ -683,9 +683,9 @@ var _ = DevPodDescribe("devpod up test suite", func() {
 				framework.ExpectNoError(err)
 				gomega.Expect(ids).To(gomega.HaveLen(1), "1 compose container to be created")
 
-				vclusterVersionOutput, _, err := f.ExecCommandCapture(ctx, []string{"ssh", "--command", "vcluster --version", projectName})
+				ghVersionOutput, _, err := f.ExecCommandCapture(ctx, []string{"ssh", "--command", "gh --version", projectName})
 				framework.ExpectNoError(err)
-				gomega.Expect(vclusterVersionOutput).To(gomega.ContainSubstring("vcluster version 0.24.1"))
+				gomega.Expect(ghVersionOutput).To(gomega.ContainSubstring("gh version 2.62.0"))
 			}, ginkgo.SpecTimeout(framework.GetTimeout()))
 
 			ginkgo.It("should start a new workspace with env-file", func(ctx context.Context) {

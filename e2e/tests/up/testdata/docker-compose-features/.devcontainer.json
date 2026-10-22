@@ -4,8 +4,8 @@
   "service": "app",
   "workspaceFolder": "/workspaces",
   "features": {
-    "ghcr.io/loft-sh/devcontainer-features/vcluster:1.0.1": {
-      "version": "v0.24.1"
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "2.62.0"
     }
   }
 }
