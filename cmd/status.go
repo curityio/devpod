@@ -118,25 +118,25 @@ func (cmd *StatusCmd) Run(ctx context.Context, client client2.BaseWorkspaceClien
 	return nil
 }
 
-// RunAll shows the status of all workspaces of the context. The statuses are retrieved concurrently,
-// and a workspace whose status can't be retrieved doesn't stop the others from being shown.
+// RunAll shows the status of all workspaces of the context. The statuses are retrieved concurrently, each
+// within --timeout, and a workspace whose status can't be retrieved doesn't stop the others from being shown.
+// In JSON the failures are part of the output, so only the plain output makes the command fail because of them.
 func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, logger log.Logger) error {
 	if cmd.Output != "plain" && cmd.Output != "json" {
 		return fmt.Errorf("unexpected output format, choose either json or plain. Got %s", cmd.Output)
 	}
 
-	ctx, cancel, err := cmd.withTimeout(ctx)
+	timeout, err := cmd.parseTimeout()
 	if err != nil {
 		return err
 	}
-	defer cancel()
 
-	workspaces, err := workspace2.List(ctx, devPodConfig, logger)
+	workspaces, err := workspace2.ListClients(devPodConfig, logger)
 	if err != nil {
 		return err
 	}
 	sort.SliceStable(workspaces, func(i, j int) bool {
-		return workspaces[i].LastUsedTimestamp.Time.Unix() > workspaces[j].LastUsedTimestamp.Time.Unix()
+		return lastUsed(workspaces[i]).After(lastUsed(workspaces[j]))
 	})
 
 	statuses := make([]client2.WorkspaceStatus, len(workspaces))
@@ -144,18 +144,29 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	wg := sync.WaitGroup{}
 	for i, workspace := range workspaces {
 		statuses[i] = client2.WorkspaceStatus{
-			ID:       workspace.ID,
-			Context:  workspace.Context,
-			Provider: workspace.Provider.Name,
+			ID:      workspace.ID,
+			Context: devPodConfig.DefaultContext,
+		}
+		if workspace.Workspace != nil {
+			statuses[i].Provider = workspace.Workspace.Provider.Name
+		}
+		if workspace.Err != nil {
+			statuses[i].Error = workspace.Err.Error()
+			continue
 		}
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			limit <- struct{}{}
-			defer func() { <-limit }()
+			select {
+			case limit <- struct{}{}:
+				defer func() { <-limit }()
+			case <-ctx.Done():
+				statuses[i].Error = ctx.Err().Error()
+				return
+			}
 
-			state, err := cmd.workspaceStatus(ctx, devPodConfig, workspace.ID, logger)
+			state, err := cmd.status(ctx, workspace.Client, timeout)
 			if err != nil {
 				statuses[i].Error = err.Error()
 				return
@@ -165,13 +176,6 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	}
 	wg.Wait()
 
-	failed := 0
-	for _, status := range statuses {
-		if status.Error != "" {
-			failed++
-		}
-	}
-
 	if cmd.Output == "json" {
 		out, err := json.Marshal(statuses)
 		if err != nil {
@@ -179,25 +183,29 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 		}
 
 		fmt.Print(string(out))
+		return nil
 	} else if len(statuses) == 0 {
 		logger.Infof("There are no workspaces, you can create one via 'devpod up'")
-	} else {
-		tableEntries := [][]string{}
-		for _, status := range statuses {
-			state := status.State
-			if status.Error != "" {
-				state = "Error"
-				logger.Warnf("Couldn't get the status of workspace '%s': %s", status.ID, status.Error)
-			}
-			tableEntries = append(tableEntries, []string{status.ID, status.Provider, state})
-		}
-
-		table.PrintTable(log.Default, []string{
-			"Name",
-			"Provider",
-			"Status",
-		}, tableEntries)
+		return nil
 	}
+
+	failed := 0
+	tableEntries := [][]string{}
+	for _, status := range statuses {
+		state := status.State
+		if status.Error != "" {
+			failed++
+			state = "Error"
+			logger.Warnf("Couldn't get the status of workspace '%s': %s", status.ID, status.Error)
+		}
+		tableEntries = append(tableEntries, []string{status.ID, status.Provider, state})
+	}
+
+	table.PrintTable(log.Default, []string{
+		"Name",
+		"Provider",
+		"Status",
+	}, tableEntries)
 
 	if failed > 0 {
 		return fmt.Errorf("couldn't get the status of %d of %d workspaces", failed, len(statuses))
@@ -206,26 +214,53 @@ func (cmd *StatusCmd) RunAll(ctx context.Context, devPodConfig *config.Config, l
 	return nil
 }
 
-func (cmd *StatusCmd) workspaceStatus(ctx context.Context, devPodConfig *config.Config, workspaceID string, logger log.Logger) (client2.Status, error) {
-	client, err := workspace2.GetByID(devPodConfig, workspaceID, logger)
-	if err != nil {
-		return "", err
+// status retrieves a workspace's status, giving up after the timeout (if it isn't 0)
+func (cmd *StatusCmd) status(ctx context.Context, client client2.BaseWorkspaceClient, timeout time.Duration) (client2.Status, error) {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
 
-	return client.Status(ctx, cmd.StatusOptions)
+	status, err := client.Status(ctx, cmd.StatusOptions)
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return "", fmt.Errorf("timed out after %s, you can wait longer via --timeout", timeout)
+	}
+
+	return status, err
+}
+
+func lastUsed(workspace workspace2.ListedClient) time.Time {
+	if workspace.Workspace == nil {
+		return time.Time{}
+	}
+
+	return workspace.Workspace.LastUsedTimestamp.Time
 }
 
 // withTimeout applies --timeout to the context
 func (cmd *StatusCmd) withTimeout(ctx context.Context) (context.Context, context.CancelFunc, error) {
-	if cmd.Timeout == "" {
+	timeout, err := cmd.parseTimeout()
+	if err != nil {
+		return nil, nil, err
+	} else if timeout == 0 {
 		return ctx, func() {}, nil
 	}
 
-	duration, err := time.ParseDuration(cmd.Timeout)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "parse --timeout")
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	return ctx, cancel, nil
+}
+
+// parseTimeout parses --timeout, which is 0 if it isn't set
+func (cmd *StatusCmd) parseTimeout() (time.Duration, error) {
+	if cmd.Timeout == "" {
+		return 0, nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, duration)
-	return ctx, cancel, nil
+	timeout, err := time.ParseDuration(cmd.Timeout)
+	if err != nil {
+		return 0, errors.Wrap(err, "parse --timeout")
+	}
+
+	return timeout, nil
 }

@@ -168,16 +168,6 @@ func Get(ctx context.Context, devPodConfig *config.Config, args []string, change
 	return client, nil
 }
 
-// GetByID retrieves the existing workspace with the given ID
-func GetByID(devPodConfig *config.Config, workspaceID string, log log.Logger) (client.WorkspaceClient, error) {
-	provider, workspace, machine, err := loadExistingWorkspace(devPodConfig, workspaceID, false, log)
-	if err != nil {
-		return nil, err
-	}
-
-	return getWorkspaceClient(devPodConfig, provider, workspace, machine, log)
-}
-
 // Exists checks if the given workspace already exists
 func Exists(ctx context.Context, devPodConfig *config.Config, args []string, workspaceID string, log log.Logger) string {
 	workspace := findWorkspace(ctx, devPodConfig, args, workspaceID, log)
@@ -588,15 +578,25 @@ func loadExistingWorkspace(devPodConfig *config.Config, workspaceID string, chan
 		}
 	}
 
-	// load machine config
-	var machineConfig *providerpkg.Machine
-	if workspaceConfig.Machine.ID != "" {
-		machineConfig, err = providerpkg.LoadMachineConfig(workspaceConfig.Context, workspaceConfig.Machine.ID)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("load machine config: %w", err)
-		}
+	machineConfig, err := loadWorkspaceMachine(workspaceConfig)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	// create client
 	return providerWithOptions.Config, workspaceConfig, machineConfig, nil
+}
+
+// loadWorkspaceMachine loads the config of the workspace's machine, if it has one
+func loadWorkspaceMachine(workspaceConfig *providerpkg.Workspace) (*providerpkg.Machine, error) {
+	if workspaceConfig.Machine.ID == "" {
+		return nil, nil
+	}
+
+	machineConfig, err := providerpkg.LoadMachineConfig(workspaceConfig.Context, workspaceConfig.Machine.ID)
+	if err != nil {
+		return nil, fmt.Errorf("load machine config: %w", err)
+	}
+
+	return machineConfig, nil
 }
