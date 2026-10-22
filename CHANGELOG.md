@@ -7,7 +7,19 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Added
+
+- `devpod up --git-user-name` and `--git-user-email` set the git identity that the workspace's dev container
+  gets, and save it with the workspace.
+
 ### Fixed
+
+- The git identity that DevPod gives a dev container is the one git uses where the workspace comes from (its local
+  folder, or the directory `devpod up` runs in), including the repository's config and matching `include` and
+  `includeIf` directives. DevPod used to read only `~/.gitconfig` without its includes, an issue inherited from
+  upstream, so a work identity kept in an `includeIf` block was ignored and workspaces committed with the
+  global (often personal) email. `devpod up` saves the identity with the workspace when it creates it, so later
+  connections from anywhere use the same one; workspaces created before get it on their next `devpod up`.
 
 - `devpod up` of a Kubernetes workspace recreates the workspace's pod when it is dead (its phase is `Failed`,
   `Succeeded` or `Unknown`, its dev container has terminated, or it is being deleted), keeping the workspace's

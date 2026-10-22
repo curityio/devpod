@@ -49,6 +49,9 @@ type Workspace struct {
 	// DevContainerConfig holds the config for the devcontainer.json.
 	DevContainerConfig *devcontainerconfig.DevContainerConfig `json:"devContainerConfig,omitempty"`
 
+	// GitUser is the git identity to give the dev container, if it doesn't have one yet
+	GitUser WorkspaceGitUser `json:"gitUser,omitempty"`
+
 	// CreationTimestamp is the timestamp when this workspace was created
 	CreationTimestamp types.Time `json:"creationTimestamp,omitempty"`
 
@@ -71,6 +74,14 @@ type WorkspaceIDEConfig struct {
 
 	// Options are the local options that override the global ones
 	Options map[string]config.OptionValue `json:"options,omitempty"`
+}
+
+type WorkspaceGitUser struct {
+	// Name is the git user.name
+	Name string `json:"name,omitempty"`
+
+	// Email is the git user.email
+	Email string `json:"email,omitempty"`
 }
 
 type WorkspaceMachineConfig struct {

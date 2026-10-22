@@ -190,14 +190,37 @@ func GetUser(userName string) (*GitUser, error) {
 		scopeArgs = append(scopeArgs, "--global")
 	}
 
-	// we ignore the error here, because if email is empty we don't care
-	name, _ := exec.Command("git", append(scopeArgs[:], "user.name")...).Output()
+	// --file and --global name a single file, so git only follows its includes with --includes
+	scopeArgs = append(scopeArgs, "--includes")
+
+	return readUser(scopeArgs), nil
+}
+
+// GetHostUser returns the git identity that git uses in dir on this machine. That includes the
+// repository's config and the include and includeIf directives that match it; outside a
+// repository it is the system and global config. If dir is empty or git can't run there, it
+// falls back to the global config and its includes.
+func GetHostUser(dir string) *GitUser {
+	if dir != "" {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return readUser([]string{"-C", dir, "config"})
+		}
+	}
+
+	return readUser([]string{"config", "--global", "--includes"})
+}
+
+func readUser(configArgs []string) *GitUser {
+	gitUser := &GitUser{}
+
+	// we ignore the error here, because git fails if the value isn't set
+	name, _ := exec.Command("git", append(configArgs, "user.name")...).Output()
 	gitUser.Name = strings.TrimSpace(string(name))
 
-	email, _ := exec.Command("git", append(scopeArgs[:], "user.email")...).Output()
+	email, _ := exec.Command("git", append(configArgs, "user.email")...).Output()
 	gitUser.Email = strings.TrimSpace(string(email))
 
-	return gitUser, nil
+	return gitUser
 }
 
 func GetCredentials(requestObj *GitCredentials) (*GitCredentials, error) {
