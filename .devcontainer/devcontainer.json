@@ -1,8 +1,51 @@
+// A dev container for working on DevPod with an AI coding agent, started with
+// `devpod up <remote URL>@<branch>` (a clone of the pushed branch, never the local folder) on
+// the docker or the kubernetes provider. Everything it needs from the host arrives as
+// environment variables, read when the workspace is created; nothing here is a secret.
+// Set up and kept up to date by the devpod plugin's setup skill.
 {
-  "name": "DevPod Development",
-  "image": "ghcr.io/loft-sh/devpod:dev-6b64450abdb0ebc2ce7f663f9ff935c56679f8b6",
+  "name": "devpod",
+  // The image has Go, Node, yarn, protoc, kubectl, kind, gh and docker-in-docker
+  // (.github/devcontainer). The Dockerfile adds Claude and its configuration.
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
   "remoteUser": "devpod",
-  "postCreateCommand": "bash ./.devcontainer/post_create.sh",
   // Required for DinD
-  "privileged": true
+  "privileged": true,
+  // No workspaceMount or workspaceFolder: DevPod puts the checkout at /workspaces/<workspace id>,
+  // which is also where `devpod ssh` starts. The `trust` start command trusts it.
+  "containerEnv": {
+    // claude's own login. `claude setup-token` makes it.
+    "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}",
+    // base64 of "email:api-token", for the Atlassian MCP in .devcontainer/.claude.json.
+    "ATLASSIAN_MCP_AUTH": "${localEnv:ATLASSIAN_MCP_AUTH}",
+    // A fine-grained GitHub token, which gh reads from GH_TOKEN, and which Claude uses to
+    // clone the private curity-ai-plugins marketplace (see the `trust` start command).
+    "GH_TOKEN": "${localEnv:GITHUB_AUTH}"
+  },
+  // Each entry runs in parallel on every start, so each must be safe to repeat.
+  "postStartCommand": {
+    // Feature installs leave root-owned files in ~/.npm, which break every later npx.
+    // git refuses a bind-mounted checkout owned by another uid. `git -C ~`, because git fails even
+    // for --global in a checkout whose .git it cannot follow (a worktree's points outside it).
+    // (known_hosts is pinned in the image by the Dockerfile, not fetched here.)
+    "base": "sudo chown -R $(id -u):$(id -g) ~/.npm 2>/dev/null; git -C ~ config --global --replace-all safe.directory \"$PWD\"; true",
+    // Claude trusts a folder only by its own path, not its parent, so trust the checkout
+    // (/workspaces/<workspace id>, not known when the image is built). Without that, claude -p
+    // ignores the repository's .claude/settings.json permissions.
+    // Then it installs the curity-dev plugin. The marketplace is private, so a build
+    // cannot; here Claude clones it over HTTPS with GH_TOKEN, which must give read access to
+    // curityio/curity-ai-plugins. git does not read GH_TOKEN itself, so `gh auth setup-git`
+    // makes gh its credential helper for github.com first. Each step is a no-op when already done.
+    // They run from ~, not the checkout: git, which all of them use, fails in a checkout whose .git
+    // it cannot follow (a worktree's points to a path on the host), and the clone would then fall
+    // back to DevPod's credential helper. It runs after the
+    // trust step rather than as an entry of its own, because both write Claude's configuration.
+    "trust": "f=~/.claude/.claude.json; jq --arg p \"$PWD\" '.projects[$p] += {hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true}' \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; (cd ~ && { gh auth setup-git --hostname github.com; claude plugin marketplace add https://github.com/curityio/curity-ai-plugins.git && claude plugin install curity-dev@curity-ai-plugins; }) > ~/.curity-ai-plugins-install.log 2>&1; true",
+    // The e2e tests need a docker daemon in the container. It does not survive a restart, so it
+    // is started on every start, unless it already runs.
+    "docker": "getent group docker | grep -qw \"$USER\" || sudo usermod -aG docker \"$USER\"; pgrep -x dockerd >/dev/null || sudo /usr/local/share/docker-init.sh >/tmp/docker-init.log 2>&1; true"
+  }
 }
