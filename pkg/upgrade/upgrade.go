@@ -75,12 +75,13 @@ func Upgrade(ctx context.Context, opts Options, log log.Logger) error {
 		log.Warnf("Replacing %s, which already exists", in.binary)
 	}
 
+	removeStaleFiles(in.dirs())
 	log.Infof("Downloading devpod %s...", rel.TagName)
 	downloaded, err := downloadAsset(ctx, asset, in.dir())
 	if err != nil {
 		return err
 	}
-	if err := in.apply(downloaded); err != nil {
+	if err := in.apply(downloaded, log); err != nil {
 		_ = os.Remove(downloaded)
 		return err
 	}

@@ -3,15 +3,18 @@ package upgrade
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -204,42 +207,149 @@ func TestInvokedBinary(t *testing.T) {
 	}
 }
 
-func TestCheckCanRename(t *testing.T) {
+func TestCheckCanReplace(t *testing.T) {
 	dir := t.TempDir()
 	bin := writeFile(t, filepath.Join(dir, "devpod"), "binary")
-	if err := checkCanRename(bin); err != nil {
-		t.Errorf("checkCanRename in a writable directory: %v", err)
+	before, err := os.Lstat(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkCanReplace(bin); err != nil {
+		t.Errorf("checkCanReplace in a writable directory: %v", err)
 	}
 	assertContent(t, bin, "binary")
+	if !os.SameFile(before, lstat(t, bin)) {
+		t.Error("checkCanReplace replaced the file")
+	}
 	if got := readDir(t, dir); !slices.Equal(got, []string{"devpod"}) {
-		t.Errorf("checkCanRename left %v", got)
+		t.Errorf("checkCanReplace left %v", got)
 	}
 
-	skipIfPermissionsDontApply(t)
-	readOnly(t, dir)
-	if err := checkCanRename(bin); err == nil {
-		t.Error("checkCanRename in a read-only directory succeeded, want an error")
+	if err := checkCanReplace(filepath.Join(dir, "missing")); err == nil {
+		t.Error("checkCanReplace of a missing file succeeded, want an error")
 	}
-	assertContent(t, bin, "binary")
+}
+
+func TestCheckPermissionsLeavesBinaryInPlace(t *testing.T) {
+	skipIfNoSymlinks(t)
+	root := t.TempDir()
+	releases := filepath.Join(root, "releases")
+	binDir := filepath.Join(root, "bin")
+	mkdirs(t, releases, binDir)
+	previous := writeFile(t, filepath.Join(releases, "devpod-mine"), "old")
+	link := filepath.Join(binDir, "devpod")
+	if err := os.Symlink(previous, link); err != nil {
+		t.Fatal(err)
+	}
+	in, err := planInstall(link, "v0.8.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Several checks at once, as with concurrent dry runs, don't get in each other's way, and the link and the
+	// binary stay where they are all along.
+	var wg sync.WaitGroup
+	errs := make(chan error, 8)
+	for range cap(errs) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 20 {
+				if err := in.checkPermissions(); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(errs)
+		close(done)
+	}()
+	for running := true; running; {
+		select {
+		case <-done:
+			running = false
+		default:
+		}
+		for _, path := range []string{link, previous} {
+			if _, err := os.Lstat(path); err != nil {
+				t.Fatalf("%s is gone while checking permissions: %v", path, err)
+			}
+		}
+	}
+	for err := range errs {
+		t.Errorf("checkPermissions: %v", err)
+	}
+	if got := readDir(t, binDir); !slices.Equal(got, []string{"devpod"}) {
+		t.Errorf("checkPermissions left %v in %s", got, binDir)
+	}
+	if got := readDir(t, releases); !slices.Equal(got, []string{"devpod-mine"}) {
+		t.Errorf("checkPermissions left %v in %s", got, releases)
+	}
+}
+
+func TestCreateLinkNamesAreUnique(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	// A link that an interrupted upgrade left behind doesn't get in the way.
+	if err := os.Symlink("devpod-v0.7.0", filepath.Join(dir, linkPrefix+"leftover")); err != nil {
+		t.Fatal(err)
+	}
+	a, err := createLink(dir, linkPrefix, "devpod-v0.8.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := createLink(dir, linkPrefix, "devpod-v0.8.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b {
+		t.Errorf("createLink returned %s twice", a)
+	}
+	if got := readDir(t, dir); len(got) != 3 {
+		t.Errorf("files = %v, want 3 links", got)
+	}
+}
+
+func TestCause(t *testing.T) {
+	dir := t.TempDir()
+	_, statErr := os.Lstat(filepath.Join(dir, "missing"))
+	renameErr := os.Rename(filepath.Join(dir, "missing"), filepath.Join(dir, "other"))
+	for _, err := range []error{statErr, renameErr, fmt.Errorf("check: %w", statErr)} {
+		got := cause(err)
+		// The system error, without the operation and the path.
+		if !errors.Is(got, fs.ErrNotExist) || strings.Contains(got.Error(), dir) {
+			t.Errorf("cause(%v) = %v, want the system error", err, got)
+		}
+	}
+
+	err := fmt.Errorf("download: %w", context.Canceled)
+	if got := cause(err); !errors.Is(got, context.Canceled) || got.Error() != err.Error() {
+		t.Errorf("cause(%v) = %v, want it unchanged", err, got)
+	}
 }
 
 func TestUpgradeFailsBeforeDownloadForImmutableBinary(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("uses macOS's chflags")
-	}
+	dir := t.TempDir()
+	bin := writeFile(t, filepath.Join(dir, "devpod"), "old")
+	setImmutable(t, bin)
 	gh := newFakeGitHub("v0.8.0")
-	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
-	if out, err := exec.Command("chflags", "uchg", bin).CombinedOutput(); err != nil {
-		t.Fatalf("chflags: %v: %s", err, out)
-	}
-	t.Cleanup(func() { _ = exec.Command("chflags", "nouchg", bin).Run() })
 	setUp(t, gh, "v0.7.0", bin)
 
-	if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil {
-		t.Fatal("Upgrade() of an immutable binary succeeded, want an error")
+	for _, opts := range []Options{{}, {DryRun: true}} {
+		err := Upgrade(context.Background(), opts, log.Discard)
+		if err == nil || !strings.Contains(err.Error(), "immutable") {
+			t.Errorf("Upgrade(%+v) of an immutable binary = %v, want an immutable error", opts, err)
+		}
 	}
 	assertNoDownloads(t, gh)
 	assertContent(t, bin, "old")
+	if got := readDir(t, dir); !slices.Equal(got, []string{"devpod"}) {
+		t.Errorf("files = %v, want only the binary", got)
+	}
 }
 
 func TestCheckCanCreateLink(t *testing.T) {
@@ -389,22 +499,30 @@ func TestUpgradeKeepsMode(t *testing.T) {
 
 func TestUpgradeCleansUpDownloads(t *testing.T) {
 	gh := newFakeGitHub("v0.8.0")
-	gh.stall = true
+	gh.stalled = make(chan struct{})
 	dir := t.TempDir()
 	bin := writeFile(t, filepath.Join(dir, "devpod"), "old")
-	stale := writeFile(t, filepath.Join(dir, ".devpod-download-111"), "partial")
-	hourAgo := time.Now().Add(-2 * time.Hour)
-	if err := os.Chtimes(stale, hourAgo, hourAgo); err != nil {
-		t.Fatal(err)
-	}
-	recent := writeFile(t, filepath.Join(dir, ".devpod-download-222"), "partial")
+	stale := writeFile(t, filepath.Join(dir, downloadPrefix+"111"), "partial")
+	makeOld(t, stale)
+	recent := writeFile(t, filepath.Join(dir, downloadPrefix+"222"), "partial")
 	setUp(t, gh, "v0.7.0", bin)
 
 	// The download stalls halfway, until the context is cancelled, as with Ctrl-C.
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := Upgrade(ctx, Options{}, log.Discard); err == nil {
-		t.Fatal("Upgrade() of a stalled download succeeded, want an error")
+	go func() {
+		select {
+		case <-gh.stalled:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	err := Upgrade(ctx, Options{}, log.Discard)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Upgrade() of a stalled download = %v, want it cancelled", err)
+	}
+	if got := gh.downloads.Load(); got != 1 {
+		t.Errorf("downloads = %d, want 1", got)
 	}
 	assertContent(t, bin, "old")
 	got := readDir(t, dir)
@@ -464,6 +582,15 @@ func TestUpgradeThroughLink(t *testing.T) {
 			if err := os.Symlink(linkTarget, link); err != nil {
 				t.Fatal(err)
 			}
+			// What interrupted upgrades left in both directories is removed, if it is old enough.
+			makeOld(t, writeFile(t, filepath.Join(releases, downloadPrefix+"111"), "partial"))
+			makeOld(t, writeFile(t, filepath.Join(binDir, permissionCheckPrefix+"111"), ""))
+			recent := writeFile(t, filepath.Join(binDir, downloadPrefix+"222"), "partial")
+			staleLink := filepath.Join(binDir, linkPrefix+"111")
+			if err := os.Symlink("devpod-v0.7.0", staleLink); err != nil {
+				t.Fatal(err)
+			}
+			makeOld(t, staleLink)
 
 			gh := newFakeGitHub("v0.8.0")
 			setUp(t, gh, "v0.7.0", link)
@@ -478,8 +605,8 @@ func TestUpgradeThroughLink(t *testing.T) {
 				t.Errorf("link points to %q (%v), want %q", got, err, wantTarget)
 			}
 			assertContent(t, link, "devpod v0.8.0")
-			if entries := readDir(t, binDir); len(entries) != 1 {
-				t.Errorf("upgrade left files behind in %s: %v", binDir, entries)
+			if got, want := readDir(t, binDir), []string{filepath.Base(recent), "devpod"}; !slices.Equal(got, want) {
+				t.Errorf("files in %s = %v, want %v", binDir, got, want)
 			}
 			if entries := readDir(t, releases); len(entries) != 2 {
 				t.Errorf("upgrade left files behind in %s: %v", releases, entries)
@@ -592,8 +719,10 @@ type fakeGitHub struct {
 	downloads atomic.Int32
 	// emptyList makes the release list empty, as GitHub sometimes answers.
 	emptyList bool
-	// stall makes downloads send half of the asset and then wait until the client gives up.
-	stall bool
+	// stalled, if set, makes downloads send half of the asset, close stalled and then wait until the client gives
+	// up.
+	stalled     chan struct{}
+	stalledOnce sync.Once
 }
 
 func newFakeGitHub(tags ...string) *fakeGitHub {
@@ -644,10 +773,11 @@ func (gh *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(strings.TrimPrefix(path, prefix+"/assets/"))
 		if content, ok := gh.assets[id]; ok && r.Header.Get("Accept") == "application/octet-stream" {
 			gh.downloads.Add(1)
-			if gh.stall {
+			if gh.stalled != nil {
 				w.Header().Set("Content-Length", strconv.Itoa(len(content)))
 				_, _ = w.Write([]byte(content[:len(content)/2]))
 				w.(http.Flusher).Flush()
+				gh.stalledOnce.Do(func() { close(gh.stalled) })
 				<-r.Context().Done()
 				return
 			}
@@ -695,6 +825,28 @@ func writeFile(t *testing.T, path, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// makeOld makes path look as if an interrupted upgrade left it behind two hours ago.
+func makeOld(t *testing.T, path string) {
+	t.Helper()
+	old := time.Now().Add(-2 * time.Hour)
+	if info := lstat(t, path); info.Mode()&fs.ModeSymlink != 0 {
+		setLinkTime(t, path, old)
+		return
+	}
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func lstat(t *testing.T, path string) fs.FileInfo {
+	t.Helper()
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info
 }
 
 func mkdirs(t *testing.T, dirs ...string) {

@@ -134,8 +134,8 @@ release, with `--version`:
 devpod upgrade --version v0.8.0
 ```
 
-To only check whether a newer version is available, without downloading anything, run the following. It fails if
-the upgrade would fail, for example because the current user can't replace the CLI.
+To only check whether a newer version is available, without downloading anything or touching the CLI, run the
+following. It fails if the upgrade would fail, for example because the current user can't replace the CLI.
 
 ```bash
 devpod upgrade --dry-run
@@ -143,6 +143,9 @@ devpod upgrade --dry-run
 
 The upgrade needs to create files in the directory the CLI is in. If you installed it in `/usr/local/bin` as
 shown above, run it with `sudo`. If the GitHub API rate limit stops it, set `GITHUB_TOKEN` to a GitHub token.
+The new CLI gets the mode, owner and group of the one it replaces. Without root, the upgrade can't make another
+user its owner, or give it a group you aren't in; then it warns about what it couldn't keep and shows the `chown`
+command that fixes it.
 
 If you run the CLI through a symlink (for example `~/bin/devpod` pointing to `~/tools/devpod-v0.8.0`), the upgrade
 doesn't replace the file the link points to. It downloads the new release next to that file, named after the
