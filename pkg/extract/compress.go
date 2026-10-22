@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,9 +31,10 @@ type TarOptions struct {
 	// KeepNames are names of folders that are archived whole wherever the walk
 	// reaches them, whatever the excludes and files say.
 	KeepNames []string
-	// Overlays are folders archived whole at the root of the archive under
-	// their own name, in place of the archived folder's entry of that name.
-	Overlays []string
+	// Overlays maps slash-separated paths relative to the archived folder to
+	// local folders that are archived whole at those paths, in place of what
+	// the archived folder has there.
+	Overlays map[string]string
 }
 
 func WriteTarExclude(writer io.Writer, localPath string, compress bool, excludedPaths []string) error {
@@ -80,17 +82,24 @@ func WriteTarWithOptions(writer io.Writer, localPath string, opts TarOptions) er
 	}
 	archiver.files = opts.Files
 	archiver.keepNames = opts.KeepNames
-	for _, overlay := range opts.Overlays {
-		archiver.overlaid = append(archiver.overlaid, filepath.Base(overlay))
+	overlays := slices.Sorted(maps.Keys(opts.Overlays))
+	archiver.overlaid = map[string]bool{}
+	for _, overlay := range overlays {
+		archiver.overlaid[path.Clean(overlay)] = true
 	}
 	if err := archiver.AddToArchive(relativePath); err != nil {
 		return err
 	}
 
-	for _, overlay := range opts.Overlays {
-		whole := &Archiver{basePath: filepath.Dir(overlay), writer: tarWriter, writtenFiles: map[string]bool{}}
-		if err := whole.AddToArchive(filepath.Base(overlay)); err != nil {
-			return errors.Wrapf(err, "archive %s", overlay)
+	for _, overlay := range overlays {
+		whole := &Archiver{
+			basePath:     opts.Overlays[overlay],
+			writer:       tarWriter,
+			writtenFiles: map[string]bool{},
+			prefix:       path.Clean(overlay),
+		}
+		if err := whole.AddToArchive(""); err != nil {
+			return errors.Wrapf(err, "archive %s", opts.Overlays[overlay])
 		}
 	}
 	return nil
@@ -114,8 +123,10 @@ type Archiver struct {
 	files *FileList
 	// keepNames are names of folders archived whole, whatever the excludes say.
 	keepNames []string
-	// overlaid are the names at the root that overlays replace.
-	overlaid []string
+	// overlaid are the paths that overlays replace.
+	overlaid map[string]bool
+	// prefix is the path in the archive of basePath.
+	prefix string
 }
 
 // NewArchiver creates a new archiver. excludedPaths are patterns relative to
@@ -142,7 +153,7 @@ func (a *Archiver) AddToArchive(relativePath string) error {
 // addToArchive adds a path to the archive. parentInfo holds the exclude
 // results of the parent directory, or the zero value when they are unknown.
 func (a *Archiver) addToArchive(relativePath string, parentInfo patternmatcher.MatchInfo) error {
-	if a.writtenFiles[relativePath] || slices.Contains(a.overlaid, relativePath) {
+	if a.writtenFiles[relativePath] || a.overlaid[relativePath] {
 		return nil
 	}
 
@@ -206,6 +217,15 @@ func (a *Archiver) mayReincludeBelow(dir string) bool {
 	return a.excludes.mayReincludeBelow(dir)
 }
 
+// archiveName returns the name in the archive of the path relativePath: the
+// spelling of the file list for a listed path.
+func (a *Archiver) archiveName(relativePath string) string {
+	if spelling, listed := a.files.file(relativePath); listed {
+		relativePath = spelling
+	}
+	return path.Join(a.prefix, relativePath)
+}
+
 // tarFolder archives what is in a folder. archived tells whether the folder
 // itself is archived, which matters when it is empty.
 func (a *Archiver) tarFolder(target string, targetStat os.FileInfo, archived bool, matchInfo patternmatcher.MatchInfo) error {
@@ -222,7 +242,7 @@ func (a *Archiver) tarFolder(target string, targetStat os.FileInfo, archived boo
 		hdr.Uid = 0
 		hdr.Gid = 0
 		hdr.Mode = fillGo18FileTypeBits(int64(chmodTarEntry(os.FileMode(hdr.Mode))), targetStat)
-		hdr.Name = target
+		hdr.Name = a.archiveName(target)
 		if err := a.writer.WriteHeader(hdr); err != nil {
 			return errors.Wrap(err, "tar write header")
 		}
@@ -260,7 +280,7 @@ func (a *Archiver) tarFile(target string, targetStat os.FileInfo) error {
 	if err != nil {
 		return errors.Wrap(err, "create tar file info header")
 	}
-	hdr.Name = target
+	hdr.Name = a.archiveName(target)
 	hdr.Uid = 0
 	hdr.Gid = 0
 	hdr.Mode = fillGo18FileTypeBits(int64(chmodTarEntry(os.FileMode(hdr.Mode))), targetStat)

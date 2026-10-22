@@ -173,9 +173,10 @@ func TestSnapshot(t *testing.T) {
 	assert.NilError(t, os.WriteFile(filepath.Join(repo, ".git", "info", "exclude"), []byte("*.tmp\n"), 0o644))
 
 	target := t.TempDir()
-	branch, err := Snapshot(ctx, repo, target)
+	result, err := Snapshot(ctx, repo, target, nil)
 	assert.NilError(t, err)
-	assert.Equal(t, "main", branch)
+	assert.Equal(t, "main", result.Branch)
+	assert.DeepEqual(t, []string{".git"}, result.GitDirs)
 	copyWorkTree(t, repo, target)
 	writeRepoFiles(t, target, "excluded.tmp")
 
@@ -216,9 +217,9 @@ func TestSnapshotOfDetachedHead(t *testing.T) {
 	runGit(t, repo, "checkout", "-q", "--detach")
 
 	target := t.TempDir()
-	branch, err := Snapshot(context.Background(), repo, target)
+	result, err := Snapshot(context.Background(), repo, target, nil)
 	assert.NilError(t, err)
-	assert.Equal(t, "", branch)
+	assert.Equal(t, "", result.Branch)
 	assert.Equal(t, gitOutput(t, repo, "rev-parse", "HEAD"), gitOutput(t, target, "rev-parse", "HEAD"))
 	cmd := exec.Command("git", "symbolic-ref", "-q", "HEAD")
 	cmd.Dir = target
@@ -236,9 +237,9 @@ func TestSnapshotOfWorktree(t *testing.T) {
 	commitAll(t, worktree, "feature")
 
 	target := t.TempDir()
-	branch, err := Snapshot(context.Background(), worktree, target)
+	result, err := Snapshot(context.Background(), worktree, target, nil)
 	assert.NilError(t, err)
-	assert.Equal(t, "feature", branch)
+	assert.Equal(t, "feature", result.Branch)
 	assert.Equal(t, gitOutput(t, worktree, "rev-parse", "HEAD"), gitOutput(t, target, "rev-parse", "HEAD"))
 	assert.Equal(t, "1", gitOutput(t, target, "rev-list", "--count", "HEAD"))
 }
@@ -249,8 +250,134 @@ func TestSnapshotWithoutCommits(t *testing.T) {
 	runGit(t, filepath.Dir(repo), "init", "-q", "-b", "trunk", repo)
 
 	target := t.TempDir()
-	branch, err := Snapshot(context.Background(), repo, target)
+	result, err := Snapshot(context.Background(), repo, target, nil)
 	assert.NilError(t, err)
-	assert.Equal(t, "trunk", branch)
+	assert.Equal(t, "trunk", result.Branch)
 	assert.Equal(t, "refs/heads/trunk", gitOutput(t, target, "symbolic-ref", "HEAD"))
+}
+
+func TestSnapshotCountsCommitsAheadOfMergedUpstream(t *testing.T) {
+	isolateGit(t)
+	dir := t.TempDir()
+	origin := filepath.Join(dir, "origin.git")
+	runGit(t, dir, "init", "-q", "--bare", "-b", "main", origin)
+	repo := filepath.Join(dir, "repo")
+	newRepository(t, repo)
+	runGit(t, repo, "remote", "add", "origin", origin)
+	runGit(t, repo, "push", "-q", "-u", "origin", "main")
+	runGit(t, repo, "checkout", "-q", "-b", "feature", "--track", "origin/main")
+	for _, file := range []string{"f1", "f2", "f3"} {
+		writeRepoFiles(t, repo, file)
+		commitAll(t, repo, file)
+	}
+	runGit(t, repo, "checkout", "-q", "main")
+	writeRepoFiles(t, repo, "m1")
+	commitAll(t, repo, "m1")
+	runGit(t, repo, "push", "-q", "origin", "main")
+	runGit(t, repo, "checkout", "-q", "feature")
+	runGit(t, repo, "-c", "user.name=test", "-c", "user.email=test@example.com", "merge", "-q", "--no-edit", "origin/main")
+	expected := gitOutput(t, repo, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	assert.Equal(t, "4\t0", expected)
+
+	target := t.TempDir()
+	_, err := Snapshot(context.Background(), repo, target, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, expected, gitOutput(t, target, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"))
+	assert.Equal(t, "", gitOutput(t, target, "for-each-ref", "refs/devpod-snapshot"))
+}
+
+func TestSnapshotMarksMissingFilesSkipWorktree(t *testing.T) {
+	isolateGit(t)
+	repo := filepath.Join(t.TempDir(), "repo")
+	newRepository(t, repo)
+	writeRepoFiles(t, repo, "docs/big.mp4", "docs/guide.md")
+	commitAll(t, repo, "docs")
+
+	target := t.TempDir()
+	_, err := Snapshot(context.Background(), repo, target, []string{"docs/big.mp4", "untracked.txt"})
+	assert.NilError(t, err)
+	writeRepoFiles(t, target, "README.md", "docs/guide.md")
+
+	assert.Equal(t, "", gitOutput(t, target, "status", "--porcelain"))
+	assert.Equal(t, "S docs/big.mp4", gitOutput(t, target, "ls-files", "-t", "docs/big.mp4"))
+}
+
+func TestSnapshotOfSubmodules(t *testing.T) {
+	isolateGit(t)
+	ctx := context.Background()
+	dir := t.TempDir()
+	inner := filepath.Join(dir, "inner")
+	newRepository(t, inner)
+	lib := filepath.Join(dir, "lib")
+	newRepository(t, lib)
+	runGit(t, lib, "-c", "protocol.file.allow=always", "submodule", "add", "-q", inner, "inner")
+	commitAll(t, lib, "inner")
+	repo := filepath.Join(dir, "repo")
+	newRepository(t, repo)
+	runGit(t, repo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "modules/lib")
+	runGit(t, repo, "-c", "protocol.file.allow=always", "submodule", "update", "-q", "--init", "--recursive")
+	commitAll(t, repo, "lib")
+	writeRepoFiles(t, filepath.Join(repo, "modules", "lib"), "change.txt")
+
+	target := t.TempDir()
+	result, err := Snapshot(ctx, repo, target, []string{"modules/lib/README.md"})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []string{".git", "modules/lib/.git", "modules/lib/inner/.git"}, result.GitDirs)
+	copyWorkTree(t, repo, target)
+	assert.NilError(t, os.Remove(filepath.Join(target, "modules", "lib", "README.md")))
+
+	// the submodules are repositories of their own, with their changes
+	assert.Equal(t, gitOutput(t, filepath.Join(repo, "modules", "lib"), "rev-parse", "HEAD"),
+		gitOutput(t, filepath.Join(target, "modules", "lib"), "rev-parse", "HEAD"))
+	assert.Equal(t, "?? change.txt", gitOutput(t, filepath.Join(target, "modules", "lib"), "status", "--porcelain"))
+	assert.Equal(t, "", gitOutput(t, filepath.Join(target, "modules", "lib", "inner"), "status", "--porcelain"))
+	assert.Equal(t, lib, gitOutput(t, target, "config", "submodule.modules/lib.url"))
+	status := gitOutput(t, target, "submodule", "status", "--recursive")
+	assert.Assert(t, !strings.Contains(status, "-"), status)
+	assert.Assert(t, cmp.Contains(gitOutput(t, target, "status", "--porcelain"), "modules/lib"))
+}
+
+func TestSnapshotUsesRefFormatOfRepository(t *testing.T) {
+	isolateGit(t)
+	repo := filepath.Join(t.TempDir(), "repo")
+	newRepository(t, repo)
+	if _, err := output(context.Background(), repo, "rev-parse", "--show-ref-format"); err != nil {
+		t.Skip("git has no ref formats")
+	}
+	assert.NilError(t, os.WriteFile(os.Getenv("GIT_CONFIG_GLOBAL"), []byte("[init]\n\tdefaultRefFormat = reftable\n"), 0o644))
+
+	target := t.TempDir()
+	_, err := Snapshot(context.Background(), repo, target, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, "files", gitOutput(t, target, "rev-parse", "--show-ref-format"))
+}
+
+func TestCopyConfig(t *testing.T) {
+	isolateGit(t)
+	ctx := context.Background()
+	repo := filepath.Join(t.TempDir(), "repo")
+	newRepository(t, repo)
+	assert.NilError(t, os.WriteFile(filepath.Join(repo, ".git", "config"), []byte(`[branch "a"]
+	remote = origin
+	rebase
+[branch "a.b"]
+	remote = other
+[remote "origin"]
+	url = https://example.com/repo.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+	fetch = +refs/notes/*:refs/notes/*
+[user]
+	email = repo@example.com
+`), 0o644))
+	target := t.TempDir()
+	runGit(t, target, "init", "-q")
+
+	assert.NilError(t, copyConfig(ctx, repo, target, "refs/heads/a"))
+
+	config := gitOutput(t, target, "config", "--local", "--list")
+	assert.Assert(t, cmp.Contains(config, "branch.a.remote=origin"))
+	assert.Assert(t, cmp.Contains(config, "branch.a.rebase=true"))
+	assert.Assert(t, cmp.Contains(config, "remote.origin.fetch=+refs/notes/*:refs/notes/*"))
+	assert.Assert(t, !strings.Contains(config, "branch.a.b"), config)
+	assert.Assert(t, !strings.Contains(config, "user.email"), config)
 }

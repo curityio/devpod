@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/loft-sh/devpod/pkg/agent/tunnel"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
+	"github.com/loft-sh/devpod/pkg/extract"
 	"github.com/loft-sh/devpod/pkg/log"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"
@@ -124,4 +126,43 @@ func TestStreamMount_GitSubfolderHasNoGitFolder(t *testing.T) {
 	entries := streamMountEntries(t, server, config.GetWorkspaceMount(setupInfo))
 
 	assert.DeepEqual(t, []string{"main.go"}, entries)
+}
+
+func gitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	assert.NilError(t, err, string(out))
+	return strings.TrimSpace(string(out))
+}
+
+func TestStreamMount_ExtractedGitWorkspaceIsClean(t *testing.T) {
+	setupInfo := newGitSetupInfo(t, "docs/**/*.mp4\n")
+	workspaceFolder := config.GetWorkspaceMount(setupInfo).Source
+	commit := []string{"-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m"}
+
+	lib := t.TempDir()
+	runGit(t, lib, "init", "-q", "-b", "main")
+	writeFiles(t, lib, "lib.go")
+	runGit(t, lib, "add", "-A")
+	runGit(t, lib, append(commit, "lib")...)
+	runGit(t, workspaceFolder, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "lib")
+	writeFiles(t, workspaceFolder, "docs/videos/intro.mp4")
+	runGit(t, workspaceFolder, "add", "-A")
+	runGit(t, workspaceFolder, append(commit, "docs and lib")...)
+	server := newSetupServer(setupInfo, log.Discard)
+
+	stream := &mockStreamMountServer{}
+	assert.NilError(t, server.StreamMount(
+		&tunnel.StreamMountRequest{Mount: config.GetWorkspaceMount(setupInfo).String()}, stream))
+	target := t.TempDir()
+	assert.NilError(t, extract.Extract(&stream.content, target))
+
+	_, err := os.Stat(filepath.Join(target, "docs", "videos", "intro.mp4"))
+	assert.Assert(t, os.IsNotExist(err))
+	// the excluded video is not deleted and the submodule is unchanged
+	assert.Equal(t, "", gitOutput(t, target, "status", "--porcelain"))
+	assert.Equal(t, "", gitOutput(t, filepath.Join(target, "lib"), "status", "--porcelain"))
+	assert.Equal(t, gitOutput(t, workspaceFolder, "rev-parse", "HEAD"), gitOutput(t, target, "rev-parse", "HEAD"))
 }

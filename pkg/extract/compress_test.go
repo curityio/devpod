@@ -367,7 +367,7 @@ func TestWriteTarWithFiles(t *testing.T) {
 			}
 			assert.DeepEqual(t, tt.expected, tarEntriesWithOptions(t, root, TarOptions{
 				Excludes: tt.excludes,
-				Files:    NewFileList(files),
+				Files:    NewFileList(files, false),
 			}))
 		})
 	}
@@ -377,7 +377,7 @@ func TestWriteTarWithFilesKeepsFoldersWhole(t *testing.T) {
 	root := newTestTree(t)
 
 	entries := tarEntriesWithOptions(t, root, TarOptions{
-		Files:     NewFileList(gitFiles),
+		Files:     NewFileList(gitFiles, false),
 		KeepNames: []string{"worktrees"},
 	})
 
@@ -393,20 +393,41 @@ func TestWriteTarWithOverlays(t *testing.T) {
 
 	entries := tarEntriesWithOptions(t, root, TarOptions{
 		Excludes: []string{"!web/.git"},
-		Files:    NewFileList(gitFiles),
-		Overlays: []string{filepath.Join(overlayParent, "docs")},
+		Files:    NewFileList(gitFiles, false),
+		Overlays: map[string]string{
+			"docs":     filepath.Join(overlayParent, "docs"),
+			"web/app/": filepath.Join(overlayParent, "docs", "sub"),
+		},
 	})
 
-	// The overlay replaces the folder at the root only
+	// Overlays replace the folders at their paths only
 	assert.DeepEqual(t, sorted(
 		readmeFile,
 		".claude/settings.json",
-		"web/app/main.js",
+		"web/app/other.md",
 		"web/.git/HEAD",
 		"buildSrc/plugin.kt",
 		"docs/new.md",
 		"docs/sub/other.md",
 	), entries)
+}
+
+func TestWriteTarWithFilesSpelledDifferently(t *testing.T) {
+	root := t.TempDir()
+	// macOS keeps the decomposed name a file was created with, git lists it composed
+	decomposed, composed := "cafe\u0301.txt", "caf\u00e9.txt"
+	writeTestFiles(t, root, "README.md", "Docs/"+decomposed, "other.txt")
+
+	// git lists files with the case they were added with on a case-insensitive file system
+	files := []string{"Readme.md", "docs/" + composed}
+	assert.DeepEqual(t, sorted("Readme.md", "docs/"+composed), tarEntriesWithOptions(t, root, TarOptions{
+		Files: NewFileList(files, true),
+	}))
+
+	// without ignoring case, only the normalization differs
+	assert.DeepEqual(t, []string{"Docs/" + composed}, tarEntriesWithOptions(t, root, TarOptions{
+		Files: NewFileList([]string{"Docs/" + composed}, false),
+	}))
 }
 
 func writeTestFiles(t *testing.T, root string, files ...string) {
@@ -451,7 +472,7 @@ func TestExcludeRulesMatch(t *testing.T) {
 }
 
 func TestNewFileList(t *testing.T) {
-	list := NewFileList([]string{"a/b/c.txt", "a/d.txt", "e.txt", "./f/../g.txt"})
+	list := NewFileList([]string{"a/b/c.txt", "a/d.txt", "e.txt", "./f/../g.txt"}, false)
 
 	assert.Equal(t, 4, list.Len())
 	assert.Assert(t, list.hasFolder(""))
@@ -462,6 +483,13 @@ func TestNewFileList(t *testing.T) {
 	assert.Assert(t, list.hasFolder("a/b"))
 	assert.Assert(t, !list.hasFolder("f"))
 	assert.Assert(t, !list.hasFolder("a/b/c"))
+
+	ignoreCase := NewFileList([]string{"Docs/Read\u00e9.md"}, true)
+	spelling, listed := ignoreCase.file("docs/READE\u0301.md")
+	assert.Assert(t, listed)
+	assert.Equal(t, "Docs/Read\u00e9.md", spelling)
+	assert.Assert(t, ignoreCase.hasFolder("DOCS"))
+	assert.Assert(t, !list.hasFile("A/D.txt"))
 
 	var all *FileList
 	assert.Assert(t, all.hasFile("anything"))

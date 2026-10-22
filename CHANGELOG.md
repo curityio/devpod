@@ -18,8 +18,9 @@ Add new entries to the top of the "Unreleased" section.
   whole folder, when the workspace runs on another machine or in Kubernetes. Ignored files (build output,
   `node_modules`, ...) and nested repositories and git worktrees stay behind. Instead of the repository's
   `.git`, the workspace gets a shallow one with the checked out commit, the branch, its upstream branch and the
-  remotes, which is enough to commit and push. `.devpodignore` takes precedence: its patterns leave out more
-  files, and its negation (`!`) patterns upload files git ignores (`!.git` uploads the whole `.git`). See
+  remotes, which is enough to commit and push; so does each checked out submodule. `.devpodignore` takes
+  precedence: its patterns leave out more files, and its negation (`!`) patterns upload files git ignores
+  (`!.git` uploads the whole `.git`). See
   [Which files are uploaded](https://devpod.curityio.net/developing-in-workspaces/create-a-workspace#which-files-are-uploaded).
 
 ### Fixed

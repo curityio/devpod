@@ -97,7 +97,8 @@ stay behind, as do other repositories and git worktrees inside the folder. The f
 If the folder is the top of the repository, the workspace gets a small `.git` in place of yours, with only the
 checked out commit, so that you can commit and push from the workspace. It has the same branch, remotes and
 upstream branch as yours, and the commits since your branch and its upstream branch diverged, but no other
-history. Changes you have staged show as not staged in the workspace.
+history. Changes you have staged show as not staged in the workspace. Each checked out submodule gets a small
+`.git` of its own in the same way.
 
 A `.devpodignore` file at the top of the folder takes precedence over git. It has the syntax of a
 [`.dockerignore` file](https://docs.docker.com/build/concepts/context/#dockerignore-files), so patterns are
@@ -111,7 +112,9 @@ pattern leaves out files git doesn't ignore, and a negation (`!`) pattern upload
 docs/**/*.mp4
 ```
 
-`!.git` uploads your whole `.git` instead of the small one, and `.git` uploads no `.git` at all.
+Tracked files that `.devpodignore` leaves out don't show as deleted in the workspace, as git marks them
+[skip-worktree](https://git-scm.com/docs/git-update-index#_skip_worktree_bit), but their content is still uploaded
+in the small `.git`. `!.git` uploads your whole `.git` instead of the small one, and `.git` uploads no `.git` at all.
 
 If the folder is not in a git repository, or git is not installed, DevPod uploads every file `.devpodignore`
 doesn't exclude.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/moby/patternmatcher"
 	"github.com/pkg/errors"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Verdict is what exclude patterns say about a path.
@@ -158,24 +159,44 @@ func patternMayMatchBelow(pattern, dir []string) bool {
 }
 
 // FileList is a set of files to archive, relative to the archived folder.
+//
+// Its paths may be spelled differently from those on disk: git lists names
+// in Unicode normalization form C, while macOS keeps them as they were
+// created, and on a case-insensitive file system git lists a file with the
+// case it was added with. So the list matches names in form C, ignoring case
+// if it was created to, and listed files are archived with the list's
+// spelling, which is what the index of the repository has.
 type FileList struct {
-	files map[string]bool
-	// folders holds the folders that have a listed file below them.
+	ignoreCase bool
+	// files maps the key of each file to its spelling.
+	files map[string]string
+	// folders holds the keys of the folders that have a listed file below them.
 	folders map[string]bool
 }
 
 // NewFileList returns the list of files, given as slash-separated paths
-// relative to the archived folder.
-func NewFileList(files []string) *FileList {
-	l := &FileList{files: map[string]bool{}, folders: map[string]bool{}}
+// relative to the archived folder. ignoreCase makes it match paths that
+// only differ in case.
+func NewFileList(files []string, ignoreCase bool) *FileList {
+	l := &FileList{ignoreCase: ignoreCase, files: map[string]string{}, folders: map[string]bool{}}
 	for _, file := range files {
 		file = path.Clean(file)
-		l.files[file] = true
-		for dir := path.Dir(file); dir != "." && dir != "/" && !l.folders[dir]; dir = path.Dir(dir) {
+		key := l.key(file)
+		l.files[key] = file
+		for dir := path.Dir(key); dir != "." && dir != "/" && !l.folders[dir]; dir = path.Dir(dir) {
 			l.folders[dir] = true
 		}
 	}
 	return l
+}
+
+// key returns the form of relativePath that the list matches.
+func (l *FileList) key(relativePath string) string {
+	key := norm.NFC.String(relativePath)
+	if l.ignoreCase {
+		key = strings.ToLower(key)
+	}
+	return key
 }
 
 // Len returns the number of files in the list.
@@ -183,15 +204,31 @@ func (l *FileList) Len() int {
 	return len(l.files)
 }
 
+// file returns the listed spelling of the file relativePath, and whether it
+// is listed. A nil list lists every file as it is spelled.
+func (l *FileList) file(relativePath string) (string, bool) {
+	if l == nil {
+		return relativePath, true
+	}
+	spelling, listed := l.files[l.key(relativePath)]
+	return spelling, listed
+}
+
 // hasFile reports whether the file relativePath is listed. A nil list lists
 // every file.
 func (l *FileList) hasFile(relativePath string) bool {
-	return l == nil || l.files[relativePath]
+	_, listed := l.file(relativePath)
+	return listed
 }
 
 // hasFolder reports whether a file in the folder relativePath is listed, or
 // the folder itself is, as git lists a submodule that isn't checked out. A nil
 // list lists every folder, and the root is always listed.
 func (l *FileList) hasFolder(relativePath string) bool {
-	return l == nil || relativePath == "" || relativePath == "." || l.folders[relativePath] || l.files[relativePath]
+	if l == nil || relativePath == "" || relativePath == "." {
+		return true
+	}
+	key := l.key(relativePath)
+	_, listed := l.files[key]
+	return listed || l.folders[key]
 }

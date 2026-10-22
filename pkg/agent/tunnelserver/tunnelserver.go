@@ -438,13 +438,15 @@ func (t *tunnelServer) workspaceTarOptions(ctx context.Context, folder string) (
 		t.log.Debugf("Upload all files of %s not excluded by %s, git doesn't list any", folder, ignoreFileName)
 		return opts, noCleanup
 	}
-	opts.Files = extract.NewFileList(files)
+	opts.Files = extract.NewFileList(files, git.IgnoresCase(ctx, folder))
 	t.log.Debugf("Upload the %d files of %s git doesn't ignore, and those %s re-includes", opts.Files.Len(), folder, ignoreFileName)
 
 	if !git.IsTopLevel(ctx, folder) {
 		return opts, noCleanup
 	}
-	if verdict := gitFolderVerdict(opts.Excludes); verdict != extract.Unmatched {
+	// readIgnoreFile only returns valid patterns
+	rules, _ := extract.NewExcludeRules(opts.Excludes)
+	if verdict := gitFolderVerdict(rules); verdict != extract.Unmatched {
 		t.log.Debugf("Upload %s as %s says, instead of a shallow copy", gitFolder, ignoreFileName)
 		return opts, noCleanup
 	}
@@ -455,28 +457,38 @@ func (t *tunnelServer) workspaceTarOptions(ctx context.Context, folder string) (
 		return opts, noCleanup
 	}
 	cleanup := func() { _ = os.RemoveAll(snapshot) }
-	branch, err := git.Snapshot(ctx, folder, snapshot)
+	result, err := git.Snapshot(ctx, folder, snapshot, excludedFiles(rules, files))
 	if err != nil {
 		cleanup()
 		t.log.Warnf("Upload no %s, can't create a shallow copy: %v. Add !%s to %s to upload the whole %s", gitFolder, err, gitFolder, ignoreFileName, gitFolder)
 		return opts, noCleanup
 	}
-	if branch != "" {
-		t.log.Infof("Upload a shallow %s with branch %s", gitFolder, branch)
+	if result.Branch != "" {
+		t.log.Infof("Upload a shallow %s with branch %s", gitFolder, result.Branch)
 	} else {
 		t.log.Infof("Upload a shallow %s with the checked out commit", gitFolder)
 	}
-	opts.Overlays = []string{filepath.Join(snapshot, gitFolder)}
+	opts.Overlays = map[string]string{}
+	for _, gitDir := range result.GitDirs {
+		opts.Overlays[gitDir] = filepath.Join(snapshot, filepath.FromSlash(gitDir))
+	}
 	return opts, cleanup
 }
 
-// gitFolderVerdict returns what the exclude patterns say about the .git
-// folder at the root.
-func gitFolderVerdict(excludes []string) extract.Verdict {
-	rules, err := extract.NewExcludeRules(excludes)
-	if err != nil {
-		return extract.Unmatched
+// excludedFiles returns the files the exclude rules leave out.
+func excludedFiles(rules *extract.ExcludeRules, files []string) []string {
+	var excluded []string
+	for _, file := range files {
+		if verdict, err := rules.Match(file); err == nil && verdict == extract.Excluded {
+			excluded = append(excluded, file)
+		}
 	}
+	return excluded
+}
+
+// gitFolderVerdict returns what the exclude rules say about the .git folder
+// at the root.
+func gitFolderVerdict(rules *extract.ExcludeRules) extract.Verdict {
 	verdict, err := rules.Match(gitFolder)
 	if err != nil {
 		return extract.Unmatched
