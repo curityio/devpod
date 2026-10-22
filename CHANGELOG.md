@@ -20,6 +20,17 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- `devpod upgrade` only upgrades to a newer stable release: it compares versions instead of installing the latest
+  release whenever it differs from the running one, which could downgrade the CLI, and it never picks a
+  pre-release or a tag that isn't a plain `major.minor.patch` version. It checks that it can replace the binary
+  before downloading anything, without touching it (directory permissions, sticky directories, immutable and
+  append-only flags, and on Windows access control lists and other processes holding the file), accepts
+  `--version` with or without the leading `v` (and for any release, not just recent ones), and has a new
+  `--dry-run` flag that only reports whether a newer version is available, and fails if the upgrade would fail.
+  The new binary keeps the mode and owner of the one it replaces, and the upgrade warns if the current user
+  can't give it the same owner or group. When the CLI runs through a symlink, the upgrade downloads the new
+  release next to the file the link points to and points the link to it, leaving the previous release alone.
+  DevPod no longer depends on `rhysd/go-github-selfupdate` and the five modules it brought in.
 - `devpod up` of a local folder in a git repository only uploads the files git doesn't ignore, instead of the
   whole folder, when the workspace runs on another machine or in Kubernetes. Ignored files (build output,
   `node_modules`, ...) and nested repositories and git worktrees stay behind. Instead of the repository's

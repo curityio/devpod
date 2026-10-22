@@ -76,12 +76,17 @@ func File(rawURL string, log log.Logger) (io.ReadCloser, error) {
 }
 
 type GithubRelease struct {
-	Assets []GithubReleaseAsset `json:"assets,omitempty"`
+	TagName    string               `json:"tag_name,omitempty"`
+	Body       string               `json:"body,omitempty"`
+	Draft      bool                 `json:"draft,omitempty"`
+	Prerelease bool                 `json:"prerelease,omitempty"`
+	Assets     []GithubReleaseAsset `json:"assets,omitempty"`
 }
 
 type GithubReleaseAsset struct {
 	ID   int    `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
+	Size int64  `json:"size,omitempty"`
 }
 
 func downloadGithubRelease(org, repo, release, file, token string) (io.ReadCloser, error) {
