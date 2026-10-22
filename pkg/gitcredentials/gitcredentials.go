@@ -145,59 +145,78 @@ func ToString(credentials *GitCredentials) string {
 }
 
 func SetUser(userName string, user *GitUser) error {
-	if user.Name != "" {
-		shellCommand := fmt.Sprintf(`git config --global user.name "%s"`, user.Name)
-		args := []string{}
-		if userName != "" {
-			args = append(args, "su", userName, "-c", shellCommand)
-		} else {
-			args = append(args, "sh", "-c", shellCommand)
+	if user.Name == "" && user.Email == "" {
+		return nil
+	}
+
+	gitConfigPath, err := getGlobalGitConfigPath(userName)
+	if err != nil {
+		return err
+	}
+
+	err = file.MkdirAll(userName, filepath.Dir(gitConfigPath), 0755)
+	if err != nil {
+		return err
+	}
+
+	// run git without a shell, so that the values need no quoting
+	for _, setting := range [][2]string{{"user.name", user.Name}, {"user.email", user.Email}} {
+		if setting[1] == "" {
+			continue
 		}
 
-		out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+		out, err := exec.Command("git", "config", "--file", gitConfigPath, setting[0], setting[1]).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("set user.name '%s': %w", strings.Join(args, " "), command.WrapCommandError(out, err))
+			return fmt.Errorf("set %s: %w", setting[0], command.WrapCommandError(out, err))
 		}
 	}
-	if user.Email != "" {
-		shellCommand := fmt.Sprintf(`git config --global user.email "%s"`, user.Email)
-		args := []string{}
-		if userName != "" {
-			args = append(args, "su", userName, "-c", shellCommand)
-		} else {
-			args = append(args, "sh", "-c", shellCommand)
-		}
 
-		out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("set user.email '%s': %w", strings.Join(args, " "), command.WrapCommandError(out, err))
-		}
-	}
-	return nil
+	return file.Chown(userName, gitConfigPath)
 }
 
 func GetUser(userName string) (*GitUser, error) {
-	gitUser := &GitUser{}
-
-	scopeArgs := []string{"config"}
-	if userName != "" {
-		p, err := getGlobalGitConfigPath(userName)
-		if err != nil {
-			return gitUser, fmt.Errorf("get git global dir for %s: %w", userName, err)
-		}
-		scopeArgs = append(scopeArgs, "--file", p)
-	} else {
-		scopeArgs = append(scopeArgs, "--global")
+	gitConfigPath, err := getGlobalGitConfigPath(userName)
+	if err != nil {
+		return &GitUser{}, fmt.Errorf("get git global dir for %s: %w", userName, err)
 	}
 
-	// we ignore the error here, because if email is empty we don't care
-	name, _ := exec.Command("git", append(scopeArgs[:], "user.name")...).Output()
+	// --file names a single file, so git only follows its includes with --includes
+	return readUser([]string{"config", "--file", gitConfigPath, "--includes"}), nil
+}
+
+// GetRepositoryUser returns the git identity that git uses in the repository that dir is in. That
+// includes the repository's config and the include and includeIf directives that match it. It
+// fails if dir isn't in a repository that git can use, for example one that git doesn't trust
+// because another user owns it (see git's safe.directory).
+func GetRepositoryUser(dir string) (*GitUser, error) {
+	if dir == "" {
+		return nil, fmt.Errorf("no directory")
+	}
+
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--git-dir").CombinedOutput()
+	if err != nil {
+		return nil, command.WrapCommandError(out, err)
+	}
+
+	return readUser([]string{"-C", dir, "config"}), nil
+}
+
+// GetGlobalUser returns the git identity of the global git config, following its includes.
+func GetGlobalUser() *GitUser {
+	return readUser([]string{"config", "--global", "--includes"})
+}
+
+func readUser(configArgs []string) *GitUser {
+	gitUser := &GitUser{}
+
+	// we ignore the error here, because git fails if the value isn't set
+	name, _ := exec.Command("git", append(configArgs, "user.name")...).Output()
 	gitUser.Name = strings.TrimSpace(string(name))
 
-	email, _ := exec.Command("git", append(scopeArgs[:], "user.email")...).Output()
+	email, _ := exec.Command("git", append(configArgs, "user.email")...).Output()
 	gitUser.Email = strings.TrimSpace(string(email))
 
-	return gitUser, nil
+	return gitUser
 }
 
 func GetCredentials(requestObj *GitCredentials) (*GitCredentials, error) {

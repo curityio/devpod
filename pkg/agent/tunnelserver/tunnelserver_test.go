@@ -2,10 +2,14 @@ package tunnelserver
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/loft-sh/devpod/pkg/agent/tunnel"
 	"github.com/loft-sh/devpod/pkg/log"
+	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"gotest.tools/assert"
 )
 
 // TestGitCredentials_NoWorkspace checks that a git credentials request to a
@@ -29,4 +33,50 @@ func TestGitCredentials_NoWorkspace(t *testing.T) {
 	// With no helper and no prompt git cannot answer, so an error is fine;
 	// a panic is not.
 	_, _ = s.GitCredentials(context.Background(), request)
+}
+
+// TestGitUser checks that the container gets the identity saved with the
+// workspace, and the global one for what the workspace doesn't have.
+func TestGitUser(t *testing.T) {
+	home := t.TempDir()
+	globalConfig := filepath.Join(home, ".gitconfig")
+	err := os.WriteFile(globalConfig, []byte("[user]\n\tname = Global\n\temail = global@personal.com\n"), 0600)
+	assert.NilError(t, err)
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("GIT_CONFIG_GLOBAL", globalConfig)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+	testCases := []struct {
+		name      string
+		workspace *provider2.Workspace
+		expected  string
+	}{
+		{
+			name:      "saved identity",
+			workspace: &provider2.Workspace{GitUser: provider2.WorkspaceGitUser{Name: "Work", Email: "me@company.com"}},
+			expected:  `{"name":"Work","email":"me@company.com"}`,
+		},
+		{
+			name:      "partly saved identity",
+			workspace: &provider2.Workspace{GitUser: provider2.WorkspaceGitUser{Email: "me@company.com"}},
+			expected:  `{"name":"Global","email":"me@company.com"}`,
+		},
+		{
+			name:      "workspace without a saved identity",
+			workspace: &provider2.Workspace{},
+			expected:  `{"name":"Global","email":"global@personal.com"}`,
+		},
+		{
+			name:     "no workspace",
+			expected: `{"name":"Global","email":"global@personal.com"}`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		s := New(log.Discard, WithWorkspace(testCase.workspace))
+		response, err := s.GitUser(context.Background(), &tunnel.Empty{})
+		assert.NilError(t, err, testCase.name)
+		assert.Equal(t, response.Message, testCase.expected, testCase.name)
+	}
 }

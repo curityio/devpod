@@ -188,12 +188,7 @@ func (t *tunnelServer) DockerCredentials(ctx context.Context, message *tunnel.Me
 }
 
 func (t *tunnelServer) GitUser(ctx context.Context, empty *tunnel.Empty) (*tunnel.Message, error) {
-	gitUser, err := gitcredentials.GetUser("")
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := json.Marshal(gitUser)
+	out, err := json.Marshal(t.gitUser())
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +196,27 @@ func (t *tunnelServer) GitUser(ctx context.Context, empty *tunnel.Empty) (*tunne
 	return &tunnel.Message{
 		Message: string(out),
 	}, nil
+}
+
+// gitUser returns the identity `devpod up` saved with the workspace. A value it didn't save,
+// because it wasn't given and the workspace doesn't come from a repository, is the global one.
+func (t *tunnelServer) gitUser() *gitcredentials.GitUser {
+	gitUser := &gitcredentials.GitUser{}
+	if t.workspace != nil {
+		gitUser.Name = t.workspace.GitUser.Name
+		gitUser.Email = t.workspace.GitUser.Email
+	}
+	if gitUser.Name == "" || gitUser.Email == "" {
+		globalUser := gitcredentials.GetGlobalUser()
+		if gitUser.Name == "" {
+			gitUser.Name = globalUser.Name
+		}
+		if gitUser.Email == "" {
+			gitUser.Email = globalUser.Email
+		}
+	}
+
+	return gitUser
 }
 
 func (t *tunnelServer) GitCredentials(ctx context.Context, message *tunnel.Message) (*tunnel.Message, error) {
