@@ -2,6 +2,9 @@
 
 - The repository's `AGENTS.md` describes its layout, how to build, test and lint it, and its
   pitfalls. Read it before working on the code.
+- This container is for the Go code: it has Go, protoc and a docker daemon (for the e2e tests),
+  but no Node, so the desktop app and the docs cannot be built here. The e2e tests that need a
+  kind cluster need `kind` and `kubectl`, which are not installed.
 - You may run any command: the tokens in here give only the access this work needs, so
   there is no list of allowed commands. The one thing you must never do is merge: not a pull
   request (`gh pr merge`, `mergeBitbucketRepoPullRequest` in the Atlassian MCP, the merge endpoints

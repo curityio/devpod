@@ -1,19 +1,23 @@
-// A dev container for working on DevPod with an AI coding agent, started with
+// A dev container for working on DevPod's Go code (the CLI, the agent and the providers, not
+// the desktop app) with an AI coding agent, started with
 // `devpod up <remote URL>@<branch>` (a clone of the pushed branch, never the local folder) on
 // the docker or the kubernetes provider. Everything it needs from the host arrives as
 // environment variables, read when the workspace is created; nothing here is a secret.
 // Set up and kept up to date by the devpod plugin's setup skill.
 {
   "name": "devpod",
-  // The image has Go, Node, yarn, protoc, kubectl, kind, gh and docker-in-docker
-  // (.github/devcontainer). The Dockerfile adds Claude and its configuration.
+  // The image has Go; the Dockerfile adds protoc, Claude and its configuration.
   "build": {
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "remoteUser": "devpod",
-  // Required for DinD
-  "privileged": true,
+  "features": {
+    // A docker daemon in the container, for the e2e tests. The feature runs the container
+    // privileged, starts the daemon on every start and adds the user to the docker group.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    // Not logged in; it authenticates with GH_TOKEN, which comes from outside.
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
   // No workspaceMount or workspaceFolder: DevPod puts the checkout at /workspaces/<workspace id>,
   // which is also where `devpod ssh` starts. The `trust` start command trusts it.
   "containerEnv": {
@@ -27,11 +31,10 @@
   },
   // Each entry runs in parallel on every start, so each must be safe to repeat.
   "postStartCommand": {
-    // Feature installs leave root-owned files in ~/.npm, which break every later npx.
     // git refuses a bind-mounted checkout owned by another uid. `git -C ~`, because git fails even
     // for --global in a checkout whose .git it cannot follow (a worktree's points outside it).
     // (known_hosts is pinned in the image by the Dockerfile, not fetched here.)
-    "base": "sudo chown -R $(id -u):$(id -g) ~/.npm 2>/dev/null; git -C ~ config --global --replace-all safe.directory \"$PWD\"; true",
+    "base": "git -C ~ config --global --replace-all safe.directory \"$PWD\"; true",
     // Claude trusts a folder only by its own path, not its parent, so trust the checkout
     // (/workspaces/<workspace id>, not known when the image is built). Without that, claude -p
     // ignores the repository's .claude/settings.json permissions.
@@ -43,9 +46,6 @@
     // it cannot follow (a worktree's points to a path on the host), and the clone would then fall
     // back to DevPod's credential helper. It runs after the
     // trust step rather than as an entry of its own, because both write Claude's configuration.
-    "trust": "f=~/.claude/.claude.json; jq --arg p \"$PWD\" '.projects[$p] += {hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true}' \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; (cd ~ && { gh auth setup-git --hostname github.com; claude plugin marketplace add https://github.com/curityio/curity-ai-plugins.git && claude plugin install curity-dev@curity-ai-plugins; }) > ~/.curity-ai-plugins-install.log 2>&1; true",
-    // The e2e tests need a docker daemon in the container. It does not survive a restart, so it
-    // is started on every start, unless it already runs.
-    "docker": "getent group docker | grep -qw \"$USER\" || sudo usermod -aG docker \"$USER\"; pgrep -x dockerd >/dev/null || sudo /usr/local/share/docker-init.sh >/tmp/docker-init.log 2>&1; true"
+    "trust": "f=~/.claude/.claude.json; jq --arg p \"$PWD\" '.projects[$p] += {hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true}' \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"; (cd ~ && { gh auth setup-git --hostname github.com; claude plugin marketplace add https://github.com/curityio/curity-ai-plugins.git && claude plugin install curity-dev@curity-ai-plugins; }) > ~/.curity-ai-plugins-install.log 2>&1; true"
   }
 }
