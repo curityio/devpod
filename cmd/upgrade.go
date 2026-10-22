@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/loft-sh/devpod/pkg/upgrade"
 	"github.com/pkg/errors"
@@ -25,13 +29,17 @@ func NewUpgradeCmd() *cobra.Command {
 	}
 
 	upgradeCmd.Flags().StringVar(&cmd.Version, "version", "", "The release to install, such as v0.8.0. Defaults to the latest stable release, if it is newer than this CLI")
-	upgradeCmd.Flags().BoolVar(&cmd.DryRun, "dry-run", false, "Only check whether a newer version is available and whether the CLI could be replaced, without downloading anything")
+	upgradeCmd.Flags().BoolVar(&cmd.DryRun, "dry-run", false, "Only check whether a newer version is available and whether the CLI could be replaced, without downloading anything. Fails if the upgrade would fail")
 	return upgradeCmd
 }
 
 // Run executes the command logic
 func (cmd *UpgradeCmd) Run(cobraCmd *cobra.Command, _ []string) error {
-	err := upgrade.Upgrade(cobraCmd.Context(), upgrade.Options{Version: cmd.Version, DryRun: cmd.DryRun}, cmd.log)
+	// Cancelling the context on Ctrl-C lets an interrupted download clean up after itself.
+	ctx, stop := signal.NotifyContext(cobraCmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	err := upgrade.Upgrade(ctx, upgrade.Options{Version: cmd.Version, DryRun: cmd.DryRun}, cmd.log)
 	if err != nil {
 		return errors.Errorf("unable to upgrade: %v", err)
 	}

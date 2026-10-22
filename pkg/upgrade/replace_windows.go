@@ -7,31 +7,25 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
-// checkCanRename fails if the current user can't rename path. Windows decides that with access control lists, so
-// the check renames the file and back.
-func checkCanRename(path string) error {
-	probe := filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".permission-check")
-	if err := os.Rename(path, probe); err != nil {
-		return fmt.Errorf("the current user can't replace %s: %w", path, err)
-	}
-	if err := os.Rename(probe, path); err != nil {
-		return fmt.Errorf("checking whether %s can be replaced, it was renamed to %s and couldn't be renamed back: %w", path, probe, err)
-	}
-	return nil
-}
-
 // replaceFile moves src to dst, replacing dst if it exists. Windows can't replace a running binary, but it can
-// rename it, so dst is moved out of the way first. It can't be deleted while it runs either, so it is left as a
-// hidden .old file, which the next upgrade removes.
+// rename it, so dst is moved out of the way first, to a hidden .old file named after the time. A running binary
+// can't be deleted either, so .old files are removed when they no longer run, here or on a later upgrade.
 func replaceFile(src, dst string) error {
 	if _, err := os.Lstat(dst); err != nil {
 		return os.Rename(src, dst)
 	}
 
-	old := filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".old")
-	_ = os.Remove(old)
+	oldPattern := filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".old*")
+	if olds, err := filepath.Glob(oldPattern); err == nil {
+		for _, old := range olds {
+			_ = os.Remove(old)
+		}
+	}
+
+	old := filepath.Join(filepath.Dir(dst), fmt.Sprintf(".%s.old-%d", filepath.Base(dst), time.Now().UnixNano()))
 	if err := os.Rename(dst, old); err != nil {
 		return err
 	}
@@ -46,6 +40,9 @@ func replaceFile(src, dst string) error {
 	}
 	return nil
 }
+
+// copyOwner does nothing: Windows files don't have Unix owners.
+func copyOwner(string, os.FileInfo) {}
 
 func hideFile(path string) {
 	p, err := syscall.UTF16PtrFromString(path)

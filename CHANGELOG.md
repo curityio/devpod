@@ -18,8 +18,8 @@ Add new entries to the top of the "Unreleased" section.
   release whenever it differs from the running one, which could downgrade the CLI, and it never picks a
   pre-release or a tag that isn't a plain `major.minor.patch` version. It checks that it can replace the binary
   before downloading anything, accepts `--version` with or without the leading `v` (and for any release, not
-  just recent ones), and has a new `--dry-run` flag that only reports whether a newer version is available and
-  whether the upgrade would succeed. When the CLI runs through a symlink, the upgrade downloads the new release
+  just recent ones), and has a new `--dry-run` flag that only reports whether a newer version is available, and
+  fails if the upgrade would fail. The new binary keeps the mode and owner of the one it replaces. When the CLI runs through a symlink, the upgrade downloads the new release
   next to the file the link points to and points the link to it, leaving the previous release alone. DevPod no
   longer depends on `rhysd/go-github-selfupdate` and the five modules it brought in.
 - `devpod up` of a local folder in a git repository only uploads the files git doesn't ignore, instead of the

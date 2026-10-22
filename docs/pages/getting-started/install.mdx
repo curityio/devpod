@@ -134,7 +134,8 @@ release, with `--version`:
 devpod upgrade --version v0.8.0
 ```
 
-To only check whether a newer version is available, without downloading anything, run:
+To only check whether a newer version is available, without downloading anything, run the following. It fails if
+the upgrade would fail, for example because the current user can't replace the CLI.
 
 ```bash
 devpod upgrade --dry-run

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/loft-sh/devpod/pkg/download"
 	"github.com/loft-sh/devpod/pkg/log"
@@ -172,6 +174,85 @@ func TestCheckCanCreateIn(t *testing.T) {
 	}
 }
 
+func TestInvokedBinary(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	exe := writeFile(t, filepath.Join(dir, "devpod-mine"), "binary")
+	other := writeFile(t, filepath.Join(dir, "other"), "binary")
+	link := filepath.Join(dir, "devpod")
+	if err := os.Symlink("devpod-mine", link); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	tests := []struct {
+		name, arg0, want string
+	}{
+		{"link by path", link, link},
+		{"link found in PATH", "devpod", link},
+		{"the binary itself", exe, exe},
+		{"another file", other, exe},
+		{"another name in PATH", "other", exe},
+		{"not found", "missing", exe},
+		{"nonsense", "", exe},
+	}
+	for _, tt := range tests {
+		// exe is what os.Executable returns on Linux, where it resolves links.
+		if got := invokedBinary(tt.arg0, exe); got != tt.want {
+			t.Errorf("%s: invokedBinary(%q) = %s, want %s", tt.name, tt.arg0, got, tt.want)
+		}
+	}
+}
+
+func TestCheckCanRename(t *testing.T) {
+	dir := t.TempDir()
+	bin := writeFile(t, filepath.Join(dir, "devpod"), "binary")
+	if err := checkCanRename(bin); err != nil {
+		t.Errorf("checkCanRename in a writable directory: %v", err)
+	}
+	assertContent(t, bin, "binary")
+	if got := readDir(t, dir); !slices.Equal(got, []string{"devpod"}) {
+		t.Errorf("checkCanRename left %v", got)
+	}
+
+	skipIfPermissionsDontApply(t)
+	readOnly(t, dir)
+	if err := checkCanRename(bin); err == nil {
+		t.Error("checkCanRename in a read-only directory succeeded, want an error")
+	}
+	assertContent(t, bin, "binary")
+}
+
+func TestUpgradeFailsBeforeDownloadForImmutableBinary(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("uses macOS's chflags")
+	}
+	gh := newFakeGitHub("v0.8.0")
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	if out, err := exec.Command("chflags", "uchg", bin).CombinedOutput(); err != nil {
+		t.Fatalf("chflags: %v: %s", err, out)
+	}
+	t.Cleanup(func() { _ = exec.Command("chflags", "nouchg", bin).Run() })
+	setUp(t, gh, "v0.7.0", bin)
+
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil {
+		t.Fatal("Upgrade() of an immutable binary succeeded, want an error")
+	}
+	assertNoDownloads(t, gh)
+	assertContent(t, bin, "old")
+}
+
+func TestCheckCanCreateLink(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	if err := checkCanCreateLink(dir, "devpod-v0.8.0"); err != nil {
+		t.Errorf("checkCanCreateLink: %v", err)
+	}
+	if entries := readDir(t, dir); len(entries) != 0 {
+		t.Errorf("checkCanCreateLink left files behind: %v", entries)
+	}
+}
+
 func TestRunningBinary(t *testing.T) {
 	path, err := runningBinary()
 	if err != nil {
@@ -274,9 +355,62 @@ func TestUpgradeChecksPermissionsBeforeDownload(t *testing.T) {
 	assertContent(t, bin, "old")
 	assertNoDownloads(t, gh)
 
-	// A dry run reports the problem instead of failing.
-	if err := Upgrade(context.Background(), Options{DryRun: true}, log.Discard); err != nil {
-		t.Errorf("dry run: %v", err)
+	// A dry run fails too, so that scripts can tell.
+	err = Upgrade(context.Background(), Options{DryRun: true}, log.Discard)
+	if err == nil || !strings.Contains(err.Error(), "would fail") {
+		t.Errorf("dry run = %v, want an error saying the upgrade would fail", err)
+	}
+	assertNoDownloads(t, gh)
+}
+
+func TestUpgradeKeepsMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows files don't have Unix modes")
+	}
+	gh := newFakeGitHub("v0.8.0")
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	if err := os.Chmod(bin, 0750); err != nil {
+		t.Fatal(err)
+	}
+	setUp(t, gh, "v0.7.0", bin)
+
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, bin, "devpod v0.8.0")
+	info, err := os.Stat(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0750 {
+		t.Errorf("mode = %v, want 0750", info.Mode().Perm())
+	}
+}
+
+func TestUpgradeCleansUpDownloads(t *testing.T) {
+	gh := newFakeGitHub("v0.8.0")
+	gh.stall = true
+	dir := t.TempDir()
+	bin := writeFile(t, filepath.Join(dir, "devpod"), "old")
+	stale := writeFile(t, filepath.Join(dir, ".devpod-download-111"), "partial")
+	hourAgo := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, hourAgo, hourAgo); err != nil {
+		t.Fatal(err)
+	}
+	recent := writeFile(t, filepath.Join(dir, ".devpod-download-222"), "partial")
+	setUp(t, gh, "v0.7.0", bin)
+
+	// The download stalls halfway, until the context is cancelled, as with Ctrl-C.
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := Upgrade(ctx, Options{}, log.Discard); err == nil {
+		t.Fatal("Upgrade() of a stalled download succeeded, want an error")
+	}
+	assertContent(t, bin, "old")
+	got := readDir(t, dir)
+	want := []string{filepath.Base(recent), "devpod"}
+	if !slices.Equal(got, want) {
+		t.Errorf("files = %v, want %v", got, want)
 	}
 }
 
@@ -406,6 +540,32 @@ func TestUpgradeThroughLinkToLinkFails(t *testing.T) {
 	assertContent(t, bin, "old")
 }
 
+func TestUpgradeThroughLinkReplacesFileNamedAfterRelease(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	previous := writeFile(t, filepath.Join(dir, "devpod-mine"), "old")
+	existing := writeFile(t, filepath.Join(dir, "devpod-v0.8.0"), "something else")
+	link := filepath.Join(dir, "devpod")
+	if err := os.Symlink(previous, link); err != nil {
+		t.Fatal(err)
+	}
+
+	gh := newFakeGitHub("v0.8.0")
+	setUp(t, gh, "v0.7.0", link)
+	in, err := planInstall(link, "v0.8.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !in.overwrites {
+		t.Error("planInstall doesn't report that the existing file would be replaced")
+	}
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, existing, "devpod v0.8.0")
+	assertContent(t, previous, "old")
+}
+
 func TestUpgradeThroughLinkToReleaseFileName(t *testing.T) {
 	skipIfNoSymlinks(t)
 	dir := t.TempDir()
@@ -432,6 +592,8 @@ type fakeGitHub struct {
 	downloads atomic.Int32
 	// emptyList makes the release list empty, as GitHub sometimes answers.
 	emptyList bool
+	// stall makes downloads send half of the asset and then wait until the client gives up.
+	stall bool
 }
 
 func newFakeGitHub(tags ...string) *fakeGitHub {
@@ -482,6 +644,13 @@ func (gh *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(strings.TrimPrefix(path, prefix+"/assets/"))
 		if content, ok := gh.assets[id]; ok && r.Header.Get("Accept") == "application/octet-stream" {
 			gh.downloads.Add(1)
+			if gh.stall {
+				w.Header().Set("Content-Length", strconv.Itoa(len(content)))
+				_, _ = w.Write([]byte(content[:len(content)/2]))
+				w.(http.Flusher).Flush()
+				<-r.Context().Done()
+				return
+			}
 			_, _ = w.Write([]byte(content))
 			return
 		}

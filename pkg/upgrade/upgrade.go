@@ -59,13 +59,20 @@ func Upgrade(ctx context.Context, opts Options, log log.Logger) error {
 		} else {
 			log.Infof("`devpod upgrade` would download it to %s and point %s to it, leaving %s alone", in.binary, in.link, in.previous)
 		}
+		if in.overwrites {
+			log.Warnf("%s already exists and would be replaced", in.binary)
+		}
 		if permErr != nil {
-			log.Warnf("The upgrade would fail: %v", permErr)
+			return fmt.Errorf("the upgrade would fail: %w", permErr)
 		}
 		return nil
 	}
 	if permErr != nil {
 		return permErr
+	}
+
+	if in.overwrites {
+		log.Warnf("Replacing %s, which already exists", in.binary)
 	}
 
 	log.Infof("Downloading devpod %s...", rel.TagName)

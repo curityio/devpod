@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -120,8 +121,11 @@ func releaseByTag(ctx context.Context, tag string) (*download.GithubRelease, err
 	return nil, nil
 }
 
-// downloadAsset downloads a release asset into a new hidden file in dir, makes it executable, and returns its
-// path.
+// downloadPattern names the hidden files releases are downloaded to.
+const downloadPattern = ".devpod-download-*"
+
+// downloadAsset downloads a release asset into a new hidden file in dir and returns its path. It removes the file
+// if the download fails or ctx is cancelled, and files that interrupted downloads left behind.
 func downloadAsset(ctx context.Context, asset *download.GithubReleaseAsset, dir string) (string, error) {
 	res, err := githubGet(ctx, fmt.Sprintf("/repos/%s/%s/releases/assets/%d", repoOwner, repoName, asset.ID), "application/octet-stream")
 	if err != nil {
@@ -132,7 +136,8 @@ func downloadAsset(ctx context.Context, asset *download.GithubReleaseAsset, dir 
 		return "", githubError("download "+asset.Name, res)
 	}
 
-	f, err := os.CreateTemp(dir, ".devpod-download-*")
+	removeStaleDownloads(dir)
+	f, err := os.CreateTemp(dir, downloadPattern)
 	if err != nil {
 		return "", err
 	}
@@ -143,12 +148,23 @@ func downloadAsset(ctx context.Context, asset *download.GithubReleaseAsset, dir 
 	if err == nil && asset.Size > 0 && n != asset.Size {
 		err = fmt.Errorf("got %d bytes, expected %d", n, asset.Size)
 	}
-	if err == nil {
-		err = os.Chmod(f.Name(), 0755)
-	}
 	if err != nil {
 		_ = os.Remove(f.Name())
 		return "", fmt.Errorf("download %s: %w", asset.Name, err)
 	}
 	return f.Name(), nil
+}
+
+// removeStaleDownloads removes download files in dir that haven't been written to for an hour, which a killed
+// upgrade left behind. Newer ones may belong to an upgrade that is still running.
+func removeStaleDownloads(dir string) {
+	paths, err := filepath.Glob(filepath.Join(dir, downloadPattern))
+	if err != nil {
+		return
+	}
+	for _, path := range paths {
+		if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() && time.Since(info.ModTime()) > time.Hour {
+			_ = os.Remove(path)
+		}
+	}
 }

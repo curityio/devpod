@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 // install describes where Upgrade puts a new release.
@@ -20,6 +21,11 @@ type install struct {
 	link, linkTarget string
 	// previous is the binary the link pointed to, which Upgrade leaves alone.
 	previous string
+	// overwrites reports whether binary exists already although it isn't the running binary: a link's target
+	// directory can already have a file named after the release.
+	overwrites bool
+	// like is the running binary, whose mode and owner the new one gets.
+	like fs.FileInfo
 }
 
 // planInstall decides where to install release tag, given the path the running binary was started from. A regular
@@ -31,7 +37,7 @@ func planInstall(path, tag string) (*install, error) {
 		return nil, fmt.Errorf("find the devpod binary: %w", err)
 	}
 	if info.Mode()&fs.ModeSymlink == 0 {
-		return &install{binary: path}, nil
+		return &install{binary: path, like: info}, nil
 	}
 
 	rawTarget, err := os.Readlink(path)
@@ -65,11 +71,14 @@ func planInstall(path, tag string) (*install, error) {
 		return nil, fmt.Errorf("%s links to %s, which is where devpod %s would be downloaded to", path, target, tag)
 	}
 
+	_, err = os.Lstat(binary)
 	return &install{
 		binary:     binary,
 		link:       path,
 		linkTarget: filepath.Join(filepath.Dir(rawTarget), name),
 		previous:   target,
+		overwrites: err == nil,
+		like:       targetInfo,
 	}, nil
 }
 
@@ -93,6 +102,9 @@ func (in *install) checkPermissions() error {
 		if err := checkCanCreateIn(filepath.Dir(in.link)); err != nil {
 			return err
 		}
+		if err := checkCanCreateLink(filepath.Dir(in.link), in.linkTarget); err != nil {
+			return err
+		}
 		if err := checkCanRename(in.link); err != nil {
 			return err
 		}
@@ -102,6 +114,10 @@ func (in *install) checkPermissions() error {
 
 // apply moves the downloaded release into place and, if there is a link, points the link to it.
 func (in *install) apply(downloaded string) error {
+	copyOwner(downloaded, in.like)
+	if err := os.Chmod(downloaded, in.like.Mode().Perm()); err != nil {
+		return fmt.Errorf("install %s: %w", in.binary, err)
+	}
 	if err := replaceFile(downloaded, in.binary); err != nil {
 		return fmt.Errorf("install %s: %w", in.binary, err)
 	}
@@ -136,6 +152,39 @@ func checkCanCreateIn(dir string) error {
 	return nil
 }
 
+// checkCanCreateLink fails if the current user can't create a symlink to target in dir. Windows only lets users
+// with a privilege, or in Developer Mode, do that.
+func checkCanCreateLink(dir, target string) error {
+	probe := filepath.Join(dir, fmt.Sprintf(".devpod-permission-check-%d", time.Now().UnixNano()))
+	if err := os.Symlink(target, probe); err != nil {
+		var linkErr *os.LinkError
+		if errors.As(err, &linkErr) {
+			err = linkErr.Err
+		}
+		return fmt.Errorf("the current user can't create links in %s: %w", dir, err)
+	}
+	_ = os.Remove(probe)
+	return nil
+}
+
+// checkCanRename fails if the current user can't rename path, by renaming it and back. Creating files in its
+// directory isn't always enough: a sticky directory (such as /tmp), an immutable flag (chflags uchg, chattr +i)
+// or an access control list can still prevent it.
+func checkCanRename(path string) error {
+	probe := filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".permission-check")
+	if err := os.Rename(path, probe); err != nil {
+		var linkErr *os.LinkError
+		if errors.As(err, &linkErr) {
+			err = linkErr.Err
+		}
+		return fmt.Errorf("the current user can't replace %s: %w", path, err)
+	}
+	if err := os.Rename(probe, path); err != nil {
+		return fmt.Errorf("checking whether %s can be replaced, it was renamed to %s and couldn't be renamed back: %w", path, probe, err)
+	}
+	return nil
+}
+
 // runningBinary returns the path the running binary was started from. If it was started through a symlink, that
 // is the link, which os.Executable resolves on some platforms (such as Linux).
 func runningBinary() (string, error) {
@@ -144,24 +193,31 @@ func runningBinary() (string, error) {
 		return "", fmt.Errorf("find the devpod binary: %w", err)
 	}
 
-	invoked := os.Args[0]
+	return invokedBinary(os.Args[0], exe), nil
+}
+
+// invokedBinary returns the path a binary was started from, given its os.Args[0] (a path, or a name found in
+// PATH) and the path os.Executable returns. os.Args[0] can be anything, so it is only used if it leads to exe.
+func invokedBinary(arg0, exe string) string {
+	invoked := arg0
 	if filepath.Base(invoked) == invoked {
+		var err error
 		if invoked, err = exec.LookPath(invoked); err != nil {
-			return exe, nil
+			return exe
 		}
 	}
-	if invoked, err = filepath.Abs(invoked); err != nil {
-		return exe, nil
+	invoked, err := filepath.Abs(invoked)
+	if err != nil {
+		return exe
 	}
 
-	// os.Args[0] can be anything, so only trust it if it leads to the running binary.
 	invokedInfo, err := os.Stat(invoked)
 	if err != nil {
-		return exe, nil
+		return exe
 	}
 	exeInfo, err := os.Stat(exe)
 	if err != nil || !os.SameFile(invokedInfo, exeInfo) {
-		return exe, nil
+		return exe
 	}
-	return invoked, nil
+	return invoked
 }
