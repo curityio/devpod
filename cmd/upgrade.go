@@ -24,7 +24,7 @@ func NewUpgradeCmd() *cobra.Command {
 		RunE:  cmd.Run,
 	}
 
-	upgradeCmd.Flags().StringVar(&cmd.Version, "version", "", "The version to update to. Defaults to the latest stable version available")
+	upgradeCmd.Flags().StringVar(&cmd.Version, "version", "", "The release to install, such as v0.8.0. Defaults to the latest stable release, if it is newer than this CLI")
 	upgradeCmd.Flags().BoolVar(&cmd.DryRun, "dry-run", false, "Only check whether a newer version is available and whether the CLI could be replaced, without downloading anything")
 	return upgradeCmd
 }

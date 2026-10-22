@@ -2,33 +2,23 @@ package upgrade
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"io/fs"
-	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/inconshreveable/go-update"
+	"github.com/loft-sh/devpod/pkg/download"
 	"github.com/loft-sh/devpod/pkg/log"
 	versionpkg "github.com/loft-sh/devpod/pkg/version"
-	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
-const (
-	repoOwner = "curityio"
-	repoName  = "devpod"
+// These are variables so that tests can replace them.
+var (
+	currentVersion = versionpkg.GetVersion
+	findBinary     = runningBinary
 )
-
-// releasesURL lists the newest releases. Only the first page is read, which is plenty to find the latest one.
-var releasesURL = fmt.Sprintf("https://api.github.com/repos/%s/%s/releases?per_page=100", repoOwner, repoName)
 
 // Options configures Upgrade.
 type Options struct {
@@ -39,61 +29,35 @@ type Options struct {
 	DryRun bool
 }
 
-// Upgrade replaces the running binary with another release of devpod from GitHub.
+// Upgrade installs another release of devpod from GitHub in place of the running binary. If the binary was started
+// through a symlink, Upgrade downloads the release next to the file the link points to and points the link to it
+// instead, leaving the previous binary alone.
 func Upgrade(ctx context.Context, opts Options, log log.Logger) error {
-	current, err := parseVersion(versionpkg.GetVersion())
-	if err != nil {
-		return fmt.Errorf("cannot tell which version this binary is: %w", err)
-	}
-
-	releases, err := listReleases(ctx)
-	if err != nil {
+	rel, asset, err := pickRelease(ctx, opts, log)
+	if err != nil || rel == nil {
 		return err
 	}
 
-	assetName := cliAssetName(runtime.GOOS, runtime.GOARCH)
-	var rel *release
-	var asset *releaseAsset
-	if opts.Version != "" {
-		rel = findRelease(releases, opts.Version)
-		if rel == nil {
-			return fmt.Errorf("devpod version %s couldn't be found", opts.Version)
-		}
-		asset = rel.findAsset(assetName)
-		if asset == nil {
-			return fmt.Errorf("devpod version %s has no CLI for %s/%s", rel.TagName, runtime.GOOS, runtime.GOARCH)
-		}
-		if strings.TrimPrefix(rel.TagName, "v") == strings.TrimPrefix(versionpkg.GetVersion(), "v") {
-			log.Infof("Current binary is already version %s", rel.TagName)
-			return nil
-		}
-	} else {
-		var latest version
-		rel, asset, latest = latestStableRelease(releases, assetName)
-		if rel == nil {
-			return fmt.Errorf("no stable release of devpod has a CLI for %s/%s", runtime.GOOS, runtime.GOARCH)
-		}
-		switch latest.compare(current) {
-		case 0:
-			log.Infof("Current binary is the latest version: %s", versionpkg.GetVersion())
-			return nil
-		case -1:
-			log.Infof("Current binary (%s) is newer than the latest release (%s)", versionpkg.GetVersion(), rel.TagName)
-			return nil
-		}
-	}
-
-	cmdPath, err := executablePath()
+	binary, err := findBinary()
 	if err != nil {
 		return err
 	}
-	permErr := checkCanReplace(cmdPath)
+	in, err := planInstall(binary, rel.TagName)
+	if err != nil {
+		return err
+	}
+	permErr := in.checkPermissions()
 
 	if opts.DryRun {
 		if opts.Version != "" {
-			log.Infof("Would install devpod version %s (current version: %s)", rel.TagName, versionpkg.GetVersion())
+			log.Infof("Would install devpod %s (current version: %s)", rel.TagName, currentVersion())
 		} else {
-			log.Infof("A newer version of devpod is available: %s (current version: %s). Run `devpod upgrade` to install it.", rel.TagName, versionpkg.GetVersion())
+			log.Infof("A newer version of devpod is available: %s (current version: %s)", rel.TagName, currentVersion())
+		}
+		if in.link == "" {
+			log.Infof("`devpod upgrade` would replace %s", in.binary)
+		} else {
+			log.Infof("`devpod upgrade` would download it to %s and point %s to it, leaving %s alone", in.binary, in.link, in.previous)
 		}
 		if permErr != nil {
 			log.Warnf("The upgrade would fail: %v", permErr)
@@ -104,37 +68,93 @@ func Upgrade(ctx context.Context, opts Options, log log.Logger) error {
 		return permErr
 	}
 
-	updater, err := selfupdate.NewUpdater(selfupdate.Config{APIToken: os.Getenv("GITHUB_TOKEN")})
-	if err != nil {
-		return fmt.Errorf("failed to initialize updater: %w", err)
-	}
-
 	log.Infof("Downloading devpod %s...", rel.TagName)
-	err = updater.UpdateTo(&selfupdate.Release{
-		AssetURL:      asset.BrowserDownloadURL,
-		AssetByteSize: asset.Size,
-		AssetID:       asset.ID,
-		RepoOwner:     repoOwner,
-		RepoName:      repoName,
-	}, cmdPath)
+	downloaded, err := downloadAsset(ctx, asset, in.dir())
 	if err != nil {
 		return err
 	}
+	if err := in.apply(downloaded); err != nil {
+		_ = os.Remove(downloaded)
+		return err
+	}
 
-	log.Donef("Successfully updated devpod to version %s", rel.TagName)
+	if in.link == "" {
+		log.Donef("Successfully updated devpod to version %s", rel.TagName)
+	} else {
+		log.Donef("Downloaded devpod %s to %s and pointed %s to it", rel.TagName, in.binary, in.link)
+		log.Infof("The previous binary, %s, was left alone", in.previous)
+	}
 	if opts.Version == "" && rel.Body != "" {
 		log.Infof("Release notes: \n\n%s", rel.Body)
 	}
 	return nil
 }
 
-// version is a devpod version: at least three numbers, optionally followed by a suffix such as "-alpha.1".
+// pickRelease returns the release to install and its CLI asset, or no release if there is nothing to do.
+func pickRelease(ctx context.Context, opts Options, log log.Logger) (*download.GithubRelease, *download.GithubReleaseAsset, error) {
+	assetName := cliAssetName(runtime.GOOS, runtime.GOARCH)
+
+	if opts.Version != "" {
+		rel, err := releaseByTag(ctx, opts.Version)
+		if err != nil {
+			return nil, nil, err
+		}
+		if rel == nil {
+			return nil, nil, fmt.Errorf("devpod version %s couldn't be found", opts.Version)
+		}
+		asset := findAsset(rel, assetName)
+		if asset == nil {
+			return nil, nil, fmt.Errorf("devpod version %s has no CLI for %s/%s", rel.TagName, runtime.GOOS, runtime.GOARCH)
+		}
+		if sameTag(rel.TagName, currentVersion()) {
+			log.Infof("Current binary is already version %s", rel.TagName)
+			return nil, nil, nil
+		}
+		return rel, asset, nil
+	}
+
+	current, err := parseVersion(currentVersion())
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot tell which version this binary is, use --version to pick one: %w", err)
+	}
+	releases, err := listReleases(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	rel, asset, latest := latestStableRelease(releases, assetName)
+	if rel == nil {
+		// GitHub sometimes answers the list with no releases at all, so also ask for the latest one directly.
+		latestRel, err := latestRelease(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		if latestRel != nil {
+			rel, asset, latest = latestStableRelease([]download.GithubRelease{*latestRel}, assetName)
+		}
+	}
+	if rel == nil {
+		return nil, nil, fmt.Errorf("no stable release of devpod has a CLI for %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	switch latest.compare(current) {
+	case 0:
+		log.Infof("Current binary is the latest version: %s", currentVersion())
+		return nil, nil, nil
+	case -1:
+		log.Infof("Current binary (%s) is newer than the latest release (%s)", currentVersion(), rel.TagName)
+		return nil, nil, nil
+	}
+	return rel, asset, nil
+}
+
+// version is a devpod version: at least three numbers, optionally followed by a suffix such as "-alpha.1" and by
+// build metadata such as "+abc123".
 type version struct {
 	numbers []int
 	suffix  string
+	build   string
 }
 
-var versionRegex = regexp.MustCompile(`^v?(\d+(?:\.\d+){2,})(.*)$`)
+var versionRegex = regexp.MustCompile(`^v?(\d+(?:\.\d+){2,})([^+]*)(?:\+(.*))?$`)
 
 func parseVersion(s string) (version, error) {
 	m := versionRegex.FindStringSubmatch(s)
@@ -152,17 +172,17 @@ func parseVersion(s string) (version, error) {
 		numbers[i] = n
 	}
 
-	return version{numbers: numbers, suffix: m[2]}, nil
+	return version{numbers: numbers, suffix: m[2], build: m[3]}, nil
 }
 
 // isStable reports whether v is a plain major.minor.patch version, the only kind Upgrade installs on its own.
 func (v version) isStable() bool {
-	return len(v.numbers) == 3 && v.suffix == ""
+	return len(v.numbers) == 3 && v.suffix == "" && v.build == ""
 }
 
 // compare returns -1, 0 or 1 when v is older than, as old as, or newer than o. Numbers are compared in order,
 // with missing ones counting as 0. When they are equal, a version with a suffix (a pre-release or development
-// build) is older than one without, and two suffixes are not ordered.
+// build) is older than one without, and two suffixes are not ordered. Build metadata is ignored.
 func (v version) compare(o version) int {
 	for i := 0; i < len(v.numbers) || i < len(o.numbers); i++ {
 		a, b := v.number(i), o.number(i)
@@ -190,28 +210,9 @@ func (v version) number(i int) int {
 	return 0
 }
 
-type release struct {
-	TagName    string         `json:"tag_name"`
-	Body       string         `json:"body"`
-	Draft      bool           `json:"draft"`
-	Prerelease bool           `json:"prerelease"`
-	Assets     []releaseAsset `json:"assets"`
-}
-
-type releaseAsset struct {
-	ID                 int64  `json:"id"`
-	Name               string `json:"name"`
-	Size               int    `json:"size"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-func (r *release) findAsset(name string) *releaseAsset {
-	for i := range r.Assets {
-		if r.Assets[i].Name == name {
-			return &r.Assets[i]
-		}
-	}
-	return nil
+// sameTag reports whether two release tags are the same, with or without their leading "v".
+func sameTag(a, b string) bool {
+	return strings.TrimPrefix(a, "v") == strings.TrimPrefix(b, "v")
 }
 
 // cliAssetName is the name the release workflow gives the CLI binary for a platform.
@@ -223,11 +224,20 @@ func cliAssetName(goos, goarch string) string {
 	return name
 }
 
+func findAsset(rel *download.GithubRelease, name string) *download.GithubReleaseAsset {
+	for i := range rel.Assets {
+		if rel.Assets[i].Name == name {
+			return &rel.Assets[i]
+		}
+	}
+	return nil
+}
+
 // latestStableRelease returns the release with the highest stable version that has the given asset, ignoring
 // drafts, pre-releases and tags that aren't plain major.minor.patch versions.
-func latestStableRelease(releases []release, assetName string) (*release, *releaseAsset, version) {
-	var latest *release
-	var latestAsset *releaseAsset
+func latestStableRelease(releases []download.GithubRelease, assetName string) (*download.GithubRelease, *download.GithubReleaseAsset, version) {
+	var latest *download.GithubRelease
+	var latestAsset *download.GithubReleaseAsset
 	var latestVersion version
 	for i := range releases {
 		rel := &releases[i]
@@ -238,7 +248,7 @@ func latestStableRelease(releases []release, assetName string) (*release, *relea
 		if err != nil || !v.isStable() {
 			continue
 		}
-		asset := rel.findAsset(assetName)
+		asset := findAsset(rel, assetName)
 		if asset == nil {
 			continue
 		}
@@ -247,84 +257,4 @@ func latestStableRelease(releases []release, assetName string) (*release, *relea
 		}
 	}
 	return latest, latestAsset, latestVersion
-}
-
-// findRelease returns the release tagged tag, accepting the tag with or without its leading "v".
-func findRelease(releases []release, tag string) *release {
-	for i := range releases {
-		if t := releases[i].TagName; t == tag || strings.TrimPrefix(t, "v") == strings.TrimPrefix(tag, "v") {
-			return &releases[i]
-		}
-	}
-	return nil
-}
-
-func listReleases(ctx context.Context) ([]release, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("list devpod releases: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("list devpod releases: %w", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		var apiErr struct {
-			Message string `json:"message"`
-		}
-		_ = json.Unmarshal(body, &apiErr)
-		err := fmt.Errorf("list devpod releases: GitHub returned %s: %s", res.Status, apiErr.Message)
-		if res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusTooManyRequests {
-			err = fmt.Errorf("%w (set GITHUB_TOKEN to raise GitHub's rate limit)", err)
-		}
-		return nil, err
-	}
-
-	var releases []release
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, fmt.Errorf("parse devpod releases: %w", err)
-	}
-	return releases, nil
-}
-
-// executablePath returns the path of the running binary, following symlinks so that an upgrade replaces the
-// binary itself rather than a link to it.
-func executablePath() (string, error) {
-	path, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("find the devpod binary: %w", err)
-	}
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", fmt.Errorf("resolve the devpod binary %s: %w", path, err)
-	}
-	return resolved, nil
-}
-
-// checkCanReplace fails if the current user can't replace the binary at path. The update writes the new binary
-// next to the old one and renames it into place, so it needs to create files in the binary's directory.
-func checkCanReplace(path string) error {
-	opts := update.Options{TargetPath: path, TargetMode: 0755}
-	if err := opts.CheckPermissions(); err != nil {
-		var pathErr *fs.PathError
-		if errors.As(err, &pathErr) {
-			err = pathErr.Err
-		}
-		return fmt.Errorf("the current user can't replace %s, as it can't create files in %s: %w", path, filepath.Dir(path), err)
-	}
-	return nil
 }

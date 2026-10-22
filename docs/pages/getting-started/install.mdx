@@ -142,3 +142,8 @@ devpod upgrade --dry-run
 
 The upgrade needs to create files in the directory the CLI is in. If you installed it in `/usr/local/bin` as
 shown above, run it with `sudo`. If the GitHub API rate limit stops it, set `GITHUB_TOKEN` to a GitHub token.
+
+If you run the CLI through a symlink (for example `~/bin/devpod` pointing to `~/tools/devpod-v0.8.0`), the upgrade
+doesn't replace the file the link points to. It downloads the new release next to that file, named after the
+release (`~/tools/devpod-v0.9.0`), and points the link to it, so the previous release stays where it was. This
+needs permission to create files in both directories. A symlink to another symlink isn't supported.

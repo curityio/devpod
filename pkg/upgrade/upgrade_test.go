@@ -1,10 +1,21 @@
 package upgrade
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
+
+	"github.com/loft-sh/devpod/pkg/download"
+	"github.com/loft-sh/devpod/pkg/log"
 )
 
 func TestParseVersion(t *testing.T) {
@@ -12,17 +23,20 @@ func TestParseVersion(t *testing.T) {
 		in      string
 		numbers []int
 		suffix  string
+		build   string
 		stable  bool
 	}{
-		{"v0.8.0", []int{0, 8, 0}, "", true},
-		{"1.2.3", []int{1, 2, 3}, "", true},
-		{"v10.20.30", []int{10, 20, 30}, "", true},
-		{"v0.8.0-alpha.1", []int{0, 8, 0}, "-alpha.1", false},
-		{"1.2.3alpha", []int{1, 2, 3}, "alpha", false},
-		{"1.2.3-beta-1", []int{1, 2, 3}, "-beta-1", false},
-		{"1.2.3.4", []int{1, 2, 3, 4}, "", false},
-		{"1.2.3.4-rc1", []int{1, 2, 3, 4}, "-rc1", false},
-		{"v0.0.0-dev.20261022101500", []int{0, 0, 0}, "-dev.20261022101500", false},
+		{"v0.8.0", []int{0, 8, 0}, "", "", true},
+		{"1.2.3", []int{1, 2, 3}, "", "", true},
+		{"v10.20.30", []int{10, 20, 30}, "", "", true},
+		{"v0.8.0-alpha.1", []int{0, 8, 0}, "-alpha.1", "", false},
+		{"1.2.3alpha", []int{1, 2, 3}, "alpha", "", false},
+		{"1.2.3-beta-1", []int{1, 2, 3}, "-beta-1", "", false},
+		{"1.2.3.4", []int{1, 2, 3, 4}, "", "", false},
+		{"1.2.3.4-rc1", []int{1, 2, 3, 4}, "-rc1", "", false},
+		{"v0.0.0-dev.20261022101500", []int{0, 0, 0}, "-dev.20261022101500", "", false},
+		{"v0.8.0+curity.1", []int{0, 8, 0}, "", "curity.1", false},
+		{"v0.8.0-rc.1+abc", []int{0, 8, 0}, "-rc.1", "abc", false},
 	}
 	for _, tt := range tests {
 		v, err := parseVersion(tt.in)
@@ -30,8 +44,8 @@ func TestParseVersion(t *testing.T) {
 			t.Errorf("parseVersion(%q): %v", tt.in, err)
 			continue
 		}
-		if !equalInts(v.numbers, tt.numbers) || v.suffix != tt.suffix {
-			t.Errorf("parseVersion(%q) = %v %q, want %v %q", tt.in, v.numbers, v.suffix, tt.numbers, tt.suffix)
+		if !slices.Equal(v.numbers, tt.numbers) || v.suffix != tt.suffix || v.build != tt.build {
+			t.Errorf("parseVersion(%q) = %v %q %q, want %v %q %q", tt.in, v.numbers, v.suffix, v.build, tt.numbers, tt.suffix, tt.build)
 		}
 		if v.isStable() != tt.stable {
 			t.Errorf("parseVersion(%q).isStable() = %v, want %v", tt.in, v.isStable(), tt.stable)
@@ -40,7 +54,7 @@ func TestParseVersion(t *testing.T) {
 }
 
 func TestParseVersionInvalid(t *testing.T) {
-	for _, in := range []string{"", "latest", "v1", "1.2", "1.2.x", "x1.2.3", "99999999999999999999.0.0"} {
+	for _, in := range []string{"", "dev", "latest", "v1", "1.2", "1.2.x", "x1.2.3", "99999999999999999999.0.0"} {
 		if _, err := parseVersion(in); err == nil {
 			t.Errorf("parseVersion(%q) succeeded, want an error", in)
 		}
@@ -65,6 +79,8 @@ func TestCompareVersions(t *testing.T) {
 		{"1.2.3-alpha", "1.2.3-beta", 0},
 		{"1.2.4-alpha", "1.2.3", 1},
 		{"0.0.0-dev.20261022101500", "0.8.0", -1},
+		{"1.2.3+abc", "1.2.3", 0},
+		{"1.2.3-rc.1+abc", "1.2.3", -1},
 	}
 	for _, tt := range tests {
 		a, err := parseVersion(tt.a)
@@ -83,20 +99,21 @@ func TestCompareVersions(t *testing.T) {
 
 func TestLatestStableRelease(t *testing.T) {
 	asset := cliAssetName("linux", "amd64")
-	withAsset := func(tag string) release {
-		return release{TagName: tag, Assets: []releaseAsset{{ID: 1, Name: "DevPod_linux_amd64.AppImage"}, {ID: 2, Name: asset}}}
+	withAsset := func(tag string) download.GithubRelease {
+		return download.GithubRelease{TagName: tag, Assets: []download.GithubReleaseAsset{{ID: 1, Name: "DevPod_linux_amd64.AppImage"}, {ID: 2, Name: asset}}}
 	}
 
 	draft := withAsset("v0.13.0")
 	draft.Draft = true
 	prerelease := withAsset("v0.12.0")
 	prerelease.Prerelease = true
-	releases := []release{
+	releases := []download.GithubRelease{
 		withAsset("v0.9.0-alpha.1"),
 		withAsset("v0.9.0.1"),
+		withAsset("v0.9.0+build.1"),
 		draft,
 		prerelease,
-		{TagName: "v0.11.0", Assets: []releaseAsset{{Name: cliAssetName("darwin", "arm64")}}},
+		{TagName: "v0.11.0", Assets: []download.GithubReleaseAsset{{Name: cliAssetName("darwin", "arm64")}}},
 		withAsset("nightly"),
 		withAsset("v0.10.0"),
 		withAsset("v0.8.0"),
@@ -112,27 +129,21 @@ func TestLatestStableRelease(t *testing.T) {
 	if a.Name != asset {
 		t.Errorf("asset = %s, want %s", a.Name, asset)
 	}
-	if !equalInts(v.numbers, []int{0, 10, 0}) {
+	if !slices.Equal(v.numbers, []int{0, 10, 0}) {
 		t.Errorf("version = %v, want [0 10 0]", v.numbers)
 	}
 
-	if rel, _, _ := latestStableRelease(releases[:4], asset); rel != nil {
+	if rel, _, _ := latestStableRelease(releases[:5], asset); rel != nil {
 		t.Errorf("latest release = %s, want none", rel.TagName)
 	}
 }
 
-func TestFindRelease(t *testing.T) {
-	releases := []release{{TagName: "v0.8.0"}, {TagName: "v0.8.0-alpha.1"}}
-	for _, tag := range []string{"v0.8.0", "0.8.0"} {
-		if rel := findRelease(releases, tag); rel == nil || rel.TagName != "v0.8.0" {
-			t.Errorf("findRelease(%q) = %v, want v0.8.0", tag, rel)
-		}
+func TestSameTag(t *testing.T) {
+	if !sameTag("v0.8.0", "0.8.0") || !sameTag("0.8.0", "0.8.0") || !sameTag("v0.8.0", "v0.8.0") {
+		t.Error("sameTag doesn't ignore the leading v")
 	}
-	if rel := findRelease(releases, "0.8.0-alpha.1"); rel == nil || rel.TagName != "v0.8.0-alpha.1" {
-		t.Errorf("findRelease(0.8.0-alpha.1) = %v, want v0.8.0-alpha.1", rel)
-	}
-	if rel := findRelease(releases, "0.9.0"); rel != nil {
-		t.Errorf("findRelease(0.9.0) = %s, want none", rel.TagName)
+	if sameTag("v0.8.0", "v0.8.0-alpha.1") {
+		t.Error("sameTag(v0.8.0, v0.8.0-alpha.1) = true")
 	}
 }
 
@@ -145,44 +156,431 @@ func TestCliAssetName(t *testing.T) {
 	}
 }
 
-func TestCheckCanReplace(t *testing.T) {
+func TestCheckCanCreateIn(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "devpod")
-	if err := os.WriteFile(bin, []byte("old"), 0755); err != nil {
+	if err := checkCanCreateIn(dir); err != nil {
+		t.Errorf("checkCanCreateIn in a writable directory: %v", err)
+	}
+	if entries := readDir(t, dir); len(entries) != 0 {
+		t.Errorf("checkCanCreateIn left files behind: %v", entries)
+	}
+
+	skipIfPermissionsDontApply(t)
+	readOnly(t, dir)
+	if err := checkCanCreateIn(dir); err == nil {
+		t.Error("checkCanCreateIn in a read-only directory succeeded, want an error")
+	}
+}
+
+func TestRunningBinary(t *testing.T) {
+	path, err := runningBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameFile(t, path, exe) {
+		t.Errorf("runningBinary() = %s, which isn't the running binary %s", path, exe)
+	}
+}
+
+func TestUpgradeReplacesBinary(t *testing.T) {
+	gh := newFakeGitHub("v0.8.0", "v0.9.0-alpha.1")
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	setUp(t, gh, "v0.7.0", bin)
+
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, bin, "devpod v0.8.0")
+	if entries := readDir(t, filepath.Dir(bin)); len(entries) != 1 {
+		t.Errorf("upgrade left files behind: %v", entries)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(bin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&0111 == 0 {
+			t.Errorf("mode = %v, want an executable", info.Mode())
+		}
+	}
+}
+
+func TestUpgradeWhenReleaseListIsEmpty(t *testing.T) {
+	gh := newFakeGitHub("v0.7.0", "v0.8.0")
+	gh.add("v0.9.0-alpha.1", true)
+	gh.emptyList = true
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	setUp(t, gh, "v0.7.0", bin)
+
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, bin, "devpod v0.8.0")
+
+	gh = newFakeGitHub()
+	gh.add("v0.9.0-alpha.1", true)
+	setUp(t, gh, "v0.8.0", bin)
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil || !strings.Contains(err.Error(), "no stable release") {
+		t.Errorf("Upgrade() without stable releases = %v, want a no stable release error", err)
+	}
+}
+
+func TestUpgradeWithoutNewerRelease(t *testing.T) {
+	for _, current := range []string{"v0.8.0", "0.8.0", "v0.8.0+build.1", "v0.9.0", "v0.8.0.1"} {
+		t.Run(current, func(t *testing.T) {
+			gh := newFakeGitHub("v0.8.0", "v0.9.0-alpha.1", "v0.9.0.1")
+			gh.add("v0.10.0", true)
+			bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+			setUp(t, gh, current, bin)
+
+			if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+				t.Fatal(err)
+			}
+			assertContent(t, bin, "old")
+			assertNoDownloads(t, gh)
+		})
+	}
+}
+
+func TestUpgradeDryRun(t *testing.T) {
+	gh := newFakeGitHub("v0.8.0")
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	setUp(t, gh, "v0.8.0-alpha.1", bin)
+
+	for _, opts := range []Options{{DryRun: true}, {DryRun: true, Version: "v0.8.0"}} {
+		if err := Upgrade(context.Background(), opts, log.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertContent(t, bin, "old")
+	assertNoDownloads(t, gh)
+}
+
+func TestUpgradeChecksPermissionsBeforeDownload(t *testing.T) {
+	skipIfPermissionsDontApply(t)
+	gh := newFakeGitHub("v0.8.0")
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	readOnly(t, filepath.Dir(bin))
+	setUp(t, gh, "v0.7.0", bin)
+
+	err := Upgrade(context.Background(), Options{}, log.Discard)
+	if err == nil || !strings.Contains(err.Error(), "can't create files in") {
+		t.Fatalf("Upgrade() = %v, want a permission error", err)
+	}
+	assertContent(t, bin, "old")
+	assertNoDownloads(t, gh)
+
+	// A dry run reports the problem instead of failing.
+	if err := Upgrade(context.Background(), Options{DryRun: true}, log.Discard); err != nil {
+		t.Errorf("dry run: %v", err)
+	}
+}
+
+func TestUpgradeVersionFlag(t *testing.T) {
+	gh := newFakeGitHub("v0.8.0")
+	gh.add("v0.8.0-alpha.1", true)
+	bin := writeFile(t, filepath.Join(t.TempDir(), "devpod"), "old")
+	// The current version doesn't matter when the version to install is given.
+	setUp(t, gh, "dev", bin)
+
+	if err := Upgrade(context.Background(), Options{Version: "0.8.0-alpha.1"}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, bin, "devpod v0.8.0-alpha.1")
+
+	err := Upgrade(context.Background(), Options{Version: "v0.9.9"}, log.Discard)
+	if err == nil || !strings.Contains(err.Error(), "couldn't be found") {
+		t.Errorf("Upgrade(v0.9.9) = %v, want a not found error", err)
+	}
+
+	currentVersion = func() string { return "v0.8.0" }
+	if err := Upgrade(context.Background(), Options{Version: "0.8.0"}, log.Discard); err != nil {
+		t.Fatal(err)
+	}
+	assertContent(t, bin, "devpod v0.8.0-alpha.1")
+	if got := gh.downloads.Load(); got != 1 {
+		t.Errorf("downloads = %d, want 1", got)
+	}
+
+	// Without --version, the current version must be known.
+	currentVersion = func() string { return "dev" }
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil {
+		t.Error("Upgrade() of an unknown version succeeded, want an error")
+	}
+}
+
+func TestUpgradeThroughLink(t *testing.T) {
+	skipIfNoSymlinks(t)
+	for _, relative := range []bool{false, true} {
+		t.Run("relative="+strconv.FormatBool(relative), func(t *testing.T) {
+			root := t.TempDir()
+			releases := filepath.Join(root, "releases")
+			binDir := filepath.Join(root, "bin")
+			mkdirs(t, releases, binDir)
+			previous := writeFile(t, filepath.Join(releases, "devpod-mine"), "old")
+			linkTarget := previous
+			if relative {
+				linkTarget = filepath.Join("..", "releases", "devpod-mine")
+			}
+			link := filepath.Join(binDir, "devpod")
+			if err := os.Symlink(linkTarget, link); err != nil {
+				t.Fatal(err)
+			}
+
+			gh := newFakeGitHub("v0.8.0")
+			setUp(t, gh, "v0.7.0", link)
+			if err := Upgrade(context.Background(), Options{}, log.Discard); err != nil {
+				t.Fatal(err)
+			}
+
+			assertContent(t, previous, "old")
+			assertContent(t, filepath.Join(releases, "devpod-v0.8.0"), "devpod v0.8.0")
+			wantTarget := filepath.Join(filepath.Dir(linkTarget), "devpod-v0.8.0")
+			if got, err := os.Readlink(link); err != nil || got != wantTarget {
+				t.Errorf("link points to %q (%v), want %q", got, err, wantTarget)
+			}
+			assertContent(t, link, "devpod v0.8.0")
+			if entries := readDir(t, binDir); len(entries) != 1 {
+				t.Errorf("upgrade left files behind in %s: %v", binDir, entries)
+			}
+			if entries := readDir(t, releases); len(entries) != 2 {
+				t.Errorf("upgrade left files behind in %s: %v", releases, entries)
+			}
+		})
+	}
+}
+
+func TestUpgradeThroughLinkChecksPermissions(t *testing.T) {
+	skipIfNoSymlinks(t)
+	skipIfPermissionsDontApply(t)
+	for _, readOnlyDir := range []string{"releases", "bin"} {
+		t.Run(readOnlyDir, func(t *testing.T) {
+			root := t.TempDir()
+			mkdirs(t, filepath.Join(root, "releases"), filepath.Join(root, "bin"))
+			previous := writeFile(t, filepath.Join(root, "releases", "devpod-mine"), "old")
+			link := filepath.Join(root, "bin", "devpod")
+			if err := os.Symlink(previous, link); err != nil {
+				t.Fatal(err)
+			}
+			readOnly(t, filepath.Join(root, readOnlyDir))
+
+			gh := newFakeGitHub("v0.8.0")
+			setUp(t, gh, "v0.7.0", link)
+			if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil {
+				t.Fatal("Upgrade() succeeded, want a permission error")
+			}
+			assertNoDownloads(t, gh)
+			if got, _ := os.Readlink(link); got != previous {
+				t.Errorf("link points to %q, want %q", got, previous)
+			}
+		})
+	}
+}
+
+func TestUpgradeThroughLinkToLinkFails(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	bin := writeFile(t, filepath.Join(dir, "devpod-mine"), "old")
+	middle := filepath.Join(dir, "devpod-current")
+	link := filepath.Join(dir, "devpod")
+	if err := os.Symlink(bin, middle); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(middle, link); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := checkCanReplace(bin); err != nil {
-		t.Errorf("checkCanReplace in a writable directory: %v", err)
+	gh := newFakeGitHub("v0.8.0")
+	setUp(t, gh, "v0.7.0", link)
+	for _, opts := range []Options{{}, {DryRun: true}} {
+		err := Upgrade(context.Background(), opts, log.Discard)
+		if err == nil || !strings.Contains(err.Error(), "another link") {
+			t.Errorf("Upgrade(%+v) = %v, want a link to link error", opts, err)
+		}
 	}
+	assertNoDownloads(t, gh)
+	assertContent(t, bin, "old")
+}
+
+func TestUpgradeThroughLinkToReleaseFileName(t *testing.T) {
+	skipIfNoSymlinks(t)
+	dir := t.TempDir()
+	bin := writeFile(t, filepath.Join(dir, "devpod-v0.8.0"), "old")
+	link := filepath.Join(dir, "devpod")
+	if err := os.Symlink(bin, link); err != nil {
+		t.Fatal(err)
+	}
+
+	gh := newFakeGitHub("v0.8.0")
+	setUp(t, gh, "v0.7.0", link)
+	if err := Upgrade(context.Background(), Options{}, log.Discard); err == nil {
+		t.Error("Upgrade() succeeded, want an error")
+	}
+	assertNoDownloads(t, gh)
+	assertContent(t, bin, "old")
+}
+
+// fakeGitHub serves the GitHub API endpoints Upgrade uses. Each release has a CLI for the current platform whose
+// content is "devpod <tag>".
+type fakeGitHub struct {
+	releases  []download.GithubRelease
+	assets    map[int]string
+	downloads atomic.Int32
+	// emptyList makes the release list empty, as GitHub sometimes answers.
+	emptyList bool
+}
+
+func newFakeGitHub(tags ...string) *fakeGitHub {
+	gh := &fakeGitHub{assets: map[int]string{}}
+	for _, tag := range tags {
+		gh.add(tag, false)
+	}
+	return gh
+}
+
+func (gh *fakeGitHub) add(tag string, prerelease bool) {
+	id := len(gh.assets) + 1
+	content := "devpod " + tag
+	gh.assets[id] = content
+	gh.releases = append(gh.releases, download.GithubRelease{
+		TagName:    tag,
+		Prerelease: prerelease,
+		Assets:     []download.GithubReleaseAsset{{ID: id, Name: cliAssetName(runtime.GOOS, runtime.GOARCH), Size: int64(len(content))}},
+	})
+}
+
+func (gh *fakeGitHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	prefix := "/repos/curityio/devpod/releases"
+	switch path := r.URL.Path; {
+	case path == prefix:
+		if gh.emptyList {
+			_, _ = w.Write([]byte("[]"))
+		} else {
+			_ = json.NewEncoder(w).Encode(gh.releases)
+		}
+		return
+	case path == prefix+"/latest":
+		for i := len(gh.releases) - 1; i >= 0; i-- {
+			if !gh.releases[i].Prerelease {
+				_ = json.NewEncoder(w).Encode(gh.releases[i])
+				return
+			}
+		}
+	case strings.HasPrefix(path, prefix+"/tags/"):
+		tag := strings.TrimPrefix(path, prefix+"/tags/")
+		for _, rel := range gh.releases {
+			if rel.TagName == tag {
+				_ = json.NewEncoder(w).Encode(rel)
+				return
+			}
+		}
+	case strings.HasPrefix(path, prefix+"/assets/"):
+		id, _ := strconv.Atoi(strings.TrimPrefix(path, prefix+"/assets/"))
+		if content, ok := gh.assets[id]; ok && r.Header.Get("Accept") == "application/octet-stream" {
+			gh.downloads.Add(1)
+			_, _ = w.Write([]byte(content))
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+}
+
+func setUp(t *testing.T, gh *fakeGitHub, current, binary string) {
+	t.Helper()
+	server := httptest.NewServer(gh)
+	t.Cleanup(server.Close)
+
+	oldAPIURL, oldCurrentVersion, oldFindBinary := apiURL, currentVersion, findBinary
+	t.Cleanup(func() { apiURL, currentVersion, findBinary = oldAPIURL, oldCurrentVersion, oldFindBinary })
+	apiURL = server.URL
+	currentVersion = func() string { return current }
+	findBinary = func() (string, error) { return binary, nil }
+}
+
+func assertNoDownloads(t *testing.T, gh *fakeGitHub) {
+	t.Helper()
+	if got := gh.downloads.Load(); got != 0 {
+		t.Errorf("downloads = %d, want 0", got)
+	}
+}
+
+func assertContent(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Errorf("%s contains %q, want %q", path, got, want)
+	}
+}
+
+func writeFile(t *testing.T, path, content string) string {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func mkdirs(t *testing.T, dirs ...string) {
+	t.Helper()
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func readDir(t *testing.T, dir string) []string {
+	t.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("checkCanReplace left files behind: %v", entries)
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name()
 	}
+	return names
+}
 
-	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
-		t.Skip("directory permissions don't stop this user from creating files")
-	}
+func readOnly(t *testing.T, dir string) {
+	t.Helper()
 	if err := os.Chmod(dir, 0555); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
-	if err := checkCanReplace(bin); err == nil {
-		t.Error("checkCanReplace in a read-only directory succeeded, want an error")
+}
+
+func sameFile(t *testing.T, a, b string) bool {
+	t.Helper()
+	ai, err := os.Stat(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bi, err := os.Stat(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return os.SameFile(ai, bi)
+}
+
+func skipIfPermissionsDontApply(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions don't stop this user from creating files")
 	}
 }
 
-func equalInts(a, b []int) bool {
-	if len(a) != len(b) {
-		return false
+func skipIfNoSymlinks(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks on Windows needs a privilege the tests may not have")
 	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

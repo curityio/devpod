@@ -357,12 +357,6 @@ github.com/google/go-containerregistry/pkg/v1/remote/transport
 github.com/google/go-containerregistry/pkg/v1/stream
 github.com/google/go-containerregistry/pkg/v1/tarball
 github.com/google/go-containerregistry/pkg/v1/types
-# github.com/google/go-github/v30 v30.1.0
-## explicit; go 1.13
-github.com/google/go-github/v30/github
-# github.com/google/go-querystring v1.0.0
-## explicit
-github.com/google/go-querystring/query
 # github.com/google/gofuzz v1.2.0
 ## explicit; go 1.12
 github.com/google/gofuzz
@@ -400,11 +394,6 @@ github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common
 github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.1
 github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2
 github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v1
-# github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
-## explicit
-github.com/inconshreveable/go-update
-github.com/inconshreveable/go-update/internal/binarydist
-github.com/inconshreveable/go-update/internal/osext
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
@@ -619,9 +608,6 @@ github.com/planetscale/vtprotobuf/vtproto
 # github.com/ramr/go-reaper v0.2.3
 ## explicit; go 1.14
 github.com/ramr/go-reaper
-# github.com/rhysd/go-github-selfupdate v1.2.3
-## explicit; go 1.13
-github.com/rhysd/go-github-selfupdate/selfupdate
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
@@ -648,9 +634,6 @@ github.com/spf13/pflag
 # github.com/takama/daemon v1.0.0
 ## explicit; go 1.14
 github.com/takama/daemon
-# github.com/tcnksm/go-gitconfig v0.1.2
-## explicit
-github.com/tcnksm/go-gitconfig
 # github.com/tidwall/jsonc v0.3.2
 ## explicit; go 1.16
 github.com/tidwall/jsonc
@@ -667,12 +650,6 @@ github.com/tonistiigi/units
 # github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab
 ## explicit; go 1.12
 github.com/tonistiigi/vt100
-# github.com/ulikunitz/xz v0.5.12
-## explicit; go 1.12
-github.com/ulikunitz/xz
-github.com/ulikunitz/xz/internal/hash
-github.com/ulikunitz/xz/internal/xlog
-github.com/ulikunitz/xz/lzma
 # github.com/vbatts/tar-split v0.11.6
 ## explicit; go 1.17
 github.com/vbatts/tar-split/archive/tar
@@ -752,19 +729,12 @@ go.opentelemetry.io/proto/otlp/trace/v1
 # golang.org/x/crypto v0.36.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/blowfish
-golang.org/x/crypto/cast5
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/nacl/sign
-golang.org/x/crypto/openpgp
-golang.org/x/crypto/openpgp/armor
-golang.org/x/crypto/openpgp/elgamal
-golang.org/x/crypto/openpgp/errors
-golang.org/x/crypto/openpgp/packet
-golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/pkcs12
 golang.org/x/crypto/pkcs12/internal/rc2
