@@ -14,6 +14,12 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- `devpod upgrade` only upgrades to a newer stable release: it compares versions instead of installing the latest
+  release whenever it differs from the running one, which could downgrade the CLI, and it never picks a
+  pre-release or a tag that isn't a plain `major.minor.patch` version. It checks that it can replace the binary
+  before downloading anything, follows symlinks to the binary, accepts `--version` with or without the leading
+  `v`, and has a new `--dry-run` flag that only reports whether a newer version is available and whether the
+  upgrade would succeed.
 - `devpod up` of a local folder in a git repository only uploads the files git doesn't ignore, instead of the
   whole folder, when the workspace runs on another machine or in Kubernetes. Ignored files (build output,
   `node_modules`, ...) and nested repositories and git worktrees stay behind. Instead of the repository's

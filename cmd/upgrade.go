@@ -11,6 +11,7 @@ import (
 type UpgradeCmd struct {
 	log     log.Logger
 	Version string
+	DryRun  bool
 }
 
 // NewUpgradeCmd creates a new upgrade command
@@ -24,12 +25,13 @@ func NewUpgradeCmd() *cobra.Command {
 	}
 
 	upgradeCmd.Flags().StringVar(&cmd.Version, "version", "", "The version to update to. Defaults to the latest stable version available")
+	upgradeCmd.Flags().BoolVar(&cmd.DryRun, "dry-run", false, "Only check whether a newer version is available and whether the CLI could be replaced, without downloading anything")
 	return upgradeCmd
 }
 
 // Run executes the command logic
-func (cmd *UpgradeCmd) Run(*cobra.Command, []string) error {
-	err := upgrade.Upgrade(cmd.Version, cmd.log)
+func (cmd *UpgradeCmd) Run(cobraCmd *cobra.Command, _ []string) error {
+	err := upgrade.Upgrade(cobraCmd.Context(), upgrade.Options{Version: cmd.Version, DryRun: cmd.DryRun}, cmd.log)
 	if err != nil {
 		return errors.Errorf("unable to upgrade: %v", err)
 	}
