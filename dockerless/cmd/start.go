@@ -66,14 +66,14 @@ func (cmd *StartCmd) Run() error {
 
 	// get the built image config
 	var (
-		out []byte
-		err error
+		configFile *v1.ConfigFile
+		err        error
 	)
 	for {
-		out, err = os.ReadFile(ImageConfigOutput)
+		configFile, err = readImageConfig()
 		if err != nil {
 			if !cmd.Wait {
-				return fmt.Errorf("read image config: %w", err)
+				return err
 			}
 
 			time.Sleep(time.Second)
@@ -81,13 +81,6 @@ func (cmd *StartCmd) Run() error {
 		}
 
 		break
-	}
-
-	// unmarshal the config file
-	configFile := &v1.ConfigFile{}
-	err = json.Unmarshal(out, configFile)
-	if err != nil {
-		return fmt.Errorf("unmarshal config file: %w", err)
 	}
 
 	// entrypoint
@@ -148,13 +141,10 @@ func (cmd *StartCmd) Run() error {
 	}
 
 	// build the container env
-	containerEnv, err := getContainerEnv(homeDir, configFile.Config.Env)
-	if err != nil {
-		return fmt.Errorf("get container env: %w", err)
-	}
+	containerEnv := getContainerEnv(homeDir, configFile.Config.Env, os.Environ())
 
 	// write container config
-	out, err = json.MarshalIndent(configFile, "", "  ")
+	out, err := json.MarshalIndent(configFile, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config file: %w", err)
 	}
@@ -197,6 +187,21 @@ func (cmd *StartCmd) Run() error {
 	return nil
 }
 
+func readImageConfig() (*v1.ConfigFile, error) {
+	out, err := os.ReadFile(ImageConfigOutput)
+	if err != nil {
+		return nil, fmt.Errorf("read image config: %w", err)
+	}
+
+	configFile := &v1.ConfigFile{}
+	err = json.Unmarshal(out, configFile)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal image config: %w", err)
+	}
+
+	return configFile, nil
+}
+
 func isContainerRunning() bool {
 	pid, err := os.ReadFile(ContainerPID)
 	if err == nil {
@@ -237,59 +242,91 @@ func setPath(containerEnvs []string) {
 	}
 }
 
-func getContainerEnv(homeDir string, containerEnv []string) ([]string, error) {
-	env := []string{}
-	env = append(env, "HOME="+homeDir)
-	env = append(env, containerEnv...)
-	setPath(env)
-	return env, nil
+// dockerlessEnv is the environment of the dockerless image (see its Dockerfile), which the
+// container gets from the image it was built from instead.
+var dockerlessEnv = map[string]string{
+	"HOME":         "/root",
+	"USER":         "root",
+	"PATH":         "/usr/local/bin:/.dockerless/bin",
+	"KANIKO_DIR":   "/.dockerless",
+	"SSL_CERT_DIR": "/.dockerless/ssl/certs",
 }
 
-func getUserInfo(name string) (string, *syscall.Credential, error) {
-	userObj, err := getUser(name)
-	if err != nil {
-		return "", nil, err
-	}
-
-	uid, err := strconv.Atoi(userObj.Uid)
-	if err != nil {
-		return "", nil, fmt.Errorf("parse uid: %w", err)
-	}
-
-	gid, err := strconv.Atoi(userObj.Gid)
-	if err != nil {
-		return "", nil, fmt.Errorf("parse gid: %w", err)
-	}
-
-	intGroupIDs := []uint32{}
-	groupIDs, err := userObj.GroupIds()
-	if err == nil {
-		for _, groupID := range groupIDs {
-			parsed, err := strconv.Atoi(groupID)
-			if err == nil {
-				intGroupIDs = append(intGroupIDs, uint32(parsed))
-			}
+// getContainerEnv returns the container's environment, as docker would build it: HOME, the built
+// image's environment, then the one the container was started with (processEnv, minus what the
+// dockerless image and DevPod set for dockerless itself), each overriding the one before.
+func getContainerEnv(homeDir string, imageEnv []string, processEnv []string) []string {
+	env := []string{"HOME=" + homeDir}
+	env = append(env, imageEnv...)
+	for _, e := range processEnv {
+		name, value, _ := strings.Cut(e, "=")
+		if name == "DOCKERLESS" || strings.HasPrefix(name, "DOCKERLESS_") || dockerlessEnv[name] == value {
+			continue
 		}
+		env = append(env, e)
 	}
-
-	homeDir := userObj.HomeDir
-	if homeDir == "" {
-		homeDir = "/root"
-	}
-
-	return homeDir, &syscall.Credential{
-		Uid:    uint32(uid),
-		Gid:    uint32(gid),
-		Groups: intGroupIDs,
-	}, nil
+	setPath(env)
+	return env
 }
 
-func getUser(name string) (*user.User, error) {
+// getUserInfo returns the home directory and credentials of a USER value, which docker accepts
+// as user, uid, user:group, uid:gid, user:gid or uid:group. A uid or gid needs no entry in
+// /etc/passwd or /etc/group; a uid without one runs with gid 0 and HOME=/.
+func getUserInfo(spec string) (string, *syscall.Credential, error) {
+	name, group, hasGroup := strings.Cut(spec, ":")
 	if name == "" {
 		name = "root"
 	}
 
-	// get user
+	homeDir := "/"
+	credential := &syscall.Credential{Groups: []uint32{}}
+	userObj, err := getUser(name)
+	if err == nil {
+		uid, err := strconv.ParseUint(userObj.Uid, 10, 32)
+		if err != nil {
+			return "", nil, fmt.Errorf("parse uid: %w", err)
+		}
+		gid, err := strconv.ParseUint(userObj.Gid, 10, 32)
+		if err != nil {
+			return "", nil, fmt.Errorf("parse gid: %w", err)
+		}
+		credential.Uid = uint32(uid)
+		credential.Gid = uint32(gid)
+
+		groupIDs, err := userObj.GroupIds()
+		if err == nil {
+			for _, groupID := range groupIDs {
+				parsed, err := strconv.ParseUint(groupID, 10, 32)
+				if err == nil {
+					credential.Groups = append(credential.Groups, uint32(parsed))
+				}
+			}
+		}
+
+		homeDir = userObj.HomeDir
+		if homeDir == "" {
+			homeDir = "/root"
+		}
+	} else {
+		uid, parseErr := strconv.ParseUint(name, 10, 32)
+		if parseErr != nil {
+			return "", nil, err
+		}
+		credential.Uid = uint32(uid)
+	}
+
+	if hasGroup {
+		gid, err := getGroupID(group)
+		if err != nil {
+			return "", nil, err
+		}
+		credential.Gid = gid
+	}
+
+	return homeDir, credential, nil
+}
+
+func getUser(name string) (*user.User, error) {
 	_, err := strconv.Atoi(name)
 	if err == nil {
 		user, err := user.LookupId(name)
@@ -306,4 +343,23 @@ func getUser(name string) (*user.User, error) {
 	}
 
 	return user, nil
+}
+
+func getGroupID(name string) (uint32, error) {
+	gid, err := strconv.ParseUint(name, 10, 32)
+	if err == nil {
+		return uint32(gid), nil
+	}
+
+	group, err := user.LookupGroup(name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to lookup group: %w", err)
+	}
+
+	gid, err = strconv.ParseUint(group.Gid, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse gid: %w", err)
+	}
+
+	return uint32(gid), nil
 }

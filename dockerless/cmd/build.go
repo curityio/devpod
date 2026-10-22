@@ -47,7 +47,7 @@ func NewBuildCmd() *cobra.Command {
 	cobraCmd.Flags().StringVar(&cmd.Context, "context", "", "Context to build from.")
 	cobraCmd.Flags().StringArrayVar(&cmd.BuildArgs, "build-arg", []string{}, "Docker build args.")
 	cobraCmd.Flags().StringArrayVar(&cmd.IgnorePaths, "ignore-path", []string{}, "Extra paths to exclude from deletion.")
-	cobraCmd.Flags().BoolVar(&cmd.Insecure, "insecure", true, "If true will not check for certificates")
+	cobraCmd.Flags().BoolVar(&cmd.Insecure, "insecure", false, "If true, registries may use plain HTTP or certificates that aren't trusted.")
 	cobraCmd.Flags().StringVar(&cmd.RegistryCache, "registry-cache", "", "Registry to use as remote cache.")
 	cobraCmd.Flags().BoolVar(&cmd.ExportCache, "export-cache", false, "If true kanoiko build push cache to registry.")
 	return cobraCmd
@@ -103,7 +103,20 @@ func (cmd *BuildCmd) Run() error {
 		return fmt.Errorf("marshal image config: %w", err)
 	}
 
-	err = os.WriteFile(ImageConfigOutput, out, 0666)
+	// kaniko keeps a copy of every file the build changed, which would double the container's
+	// disk use. The image config was read from it above, so it can go now.
+	err = config.CleanupBuild()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: remove build files: %v\n", err)
+	}
+
+	// `start --wait` reads this file as soon as it exists, so it must appear complete.
+	tmp := ImageConfigOutput + ".tmp"
+	err = os.WriteFile(tmp, out, 0666)
+	if err != nil {
+		return fmt.Errorf("write image config: %w", err)
+	}
+	err = os.Rename(tmp, ImageConfigOutput)
 	if err != nil {
 		return fmt.Errorf("write image config: %w", err)
 	}
@@ -157,7 +170,6 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 		RunV2:               true,
 		NoPush:              true,
 		KanikoDir:           "/.dockerless",
-		Cache:               true,
 		CacheRunLayers:      true,
 		CacheCopyLayers:     true,
 		CompressedCaching:   true,
@@ -165,11 +177,15 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 		NoPushCache:         !cmd.ExportCache,
 		Compression:         config.ZStd,
 		CompressionLevel:    3,
+		CompressionLevelSet: true,
 		CacheOptions: config.CacheOptions{
 			CacheTTL: time.Hour * 24 * 7,
 		},
 	}
+	// Layers are only cached in a registry. Without one, kaniko would look them up in a
+	// repository named after the "local" destination, on Docker Hub.
 	if cmd.RegistryCache != "" {
+		opts.Cache = true
 		opts.CacheRepo = cmd.RegistryCache
 	} else {
 		opts.CacheDir = defaultCacheDir

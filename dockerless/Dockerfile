@@ -17,16 +17,20 @@ FROM busybox:1.37.0-musl AS busybox
 # now build from scratch
 FROM scratch
 
-# Create kaniko directory with world write permission to allow non root run
-RUN --mount=from=busybox,dst=/usr/ ["busybox", "sh", "-c", "mkdir -p /.dockerless && chmod 777 /.dockerless"]
+# Only root may write to the kaniko directory: dockerless and DevPod's agent run as root, and the
+# container's other users must not be able to put files where root runs them.
+RUN --mount=from=busybox,dst=/usr/ ["busybox", "sh", "-c", "mkdir -p /.dockerless && chmod 755 /.dockerless"]
 
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /.dockerless/ssl/certs/
 COPY files/nsswitch.conf /etc/nsswitch.conf
 
+# Keep these in step with dockerlessEnv in cmd/start.go.
 ENV HOME=/root
 ENV USER=root
 ENV KANIKO_DIR=/.dockerless
-ENV PATH=/usr/local/bin:/.dockerless:/.dockerless/bin
+# DevPod runs commands in the container through `sh` and `su`, as root, so PATH holds no directory
+# a user could write to. dockerless itself is always called by its full path.
+ENV PATH=/usr/local/bin:/.dockerless/bin
 ENV SSL_CERT_DIR=/.dockerless/ssl/certs
 
 COPY --from=build /dockerless /.dockerless/dockerless
