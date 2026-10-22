@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"github.com/loft-sh/dockerless/cmd"
+	"github.com/loft-sh/devpod/dockerless/cmd"
 )
 
 func main() {

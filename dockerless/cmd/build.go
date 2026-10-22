@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoogleContainerTools/kaniko/pkg/config"
-	"github.com/GoogleContainerTools/kaniko/pkg/executor"
-	"github.com/GoogleContainerTools/kaniko/pkg/util"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/osscontainertools/kaniko/pkg/config"
+	"github.com/osscontainertools/kaniko/pkg/executor"
+	"github.com/osscontainertools/kaniko/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -116,7 +116,7 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 	buildIgnorePaths(cmd.IgnorePaths)
 
 	// make sure we detect the correct ignore list
-	err := util.InitIgnoreList(true)
+	err := util.InitIgnoreList()
 	if err != nil {
 		return nil, fmt.Errorf("init ignore list: %w", err)
 	}
@@ -133,9 +133,16 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 		return nil, fmt.Errorf("change dir: %w", err)
 	}
 
+	var targets []string
+	if cmd.Target != "" {
+		targets = []string{cmd.Target}
+	}
+
 	opts := &config.KanikoOptions{
-		Destinations:   []string{"local"},
-		Unpack:         true,
+		Destinations: []string{"local"},
+		// The workspace runs in this container, so the final stage's file system must be
+		// unpacked here even when every layer comes from the cache.
+		Materialize:    true,
 		BuildArgs:      cmd.BuildArgs,
 		DockerfilePath: cmd.Dockerfile,
 		RegistryOptions: config.RegistryOptions{
@@ -144,7 +151,7 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 			SkipTLSVerify: cmd.Insecure,
 		},
 		SrcContext:          cmd.Context,
-		Target:              cmd.Target,
+		Target:              targets,
 		CustomPlatform:      platforms.Format(platforms.Normalize(platforms.DefaultSpec())),
 		SnapshotMode:        "redo",
 		RunV2:               true,
@@ -154,7 +161,6 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 		CacheRunLayers:      true,
 		CacheCopyLayers:     true,
 		CompressedCaching:   true,
-		SkipUnusedStages:    true,
 		ImageFSExtractRetry: 3,
 		NoPushCache:         !cmd.ExportCache,
 		Compression:         config.ZStd,
@@ -166,7 +172,7 @@ func (cmd *BuildCmd) build() (v1.Image, error) {
 	if cmd.RegistryCache != "" {
 		opts.CacheRepo = cmd.RegistryCache
 	} else {
-		opts.CacheOptions.CacheDir = defaultCacheDir
+		opts.CacheDir = defaultCacheDir
 	}
 	if !cmd.ExportCache {
 		opts.SingleSnapshot = true
