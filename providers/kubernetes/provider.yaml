@@ -28,6 +28,7 @@ optionGroups:
       - LABELS
       - DOCKERLESS_DISABLED
       - DOCKERLESS_IMAGE
+      - DOCKERLESS_INSECURE
     name: "Advanced Options"
 options:
   DISK_SIZE:
@@ -87,6 +88,11 @@ options:
   DOCKERLESS_IMAGE:
     description: The dockerless image to use.
     global: true
+  DOCKERLESS_INSECURE:
+    description: If true, dockerless reaches registries (base images and the registry cache) over plain HTTP or with certificates that aren't trusted. Only for registries you trust on a network you trust, such as a registry cache in the cluster.
+    global: true
+    type: boolean
+    default: "false"
   DOCKERLESS_DISABLED:
     description: If dockerless should be disabled. Dockerless is the way DevPod uses to build images directly within Kubernetes. If dockerless is disabled and no image is specified, DevPod will fail instead.
     global: true
@@ -107,6 +113,7 @@ agent:
   dockerless:
     disabled: ${DOCKERLESS_DISABLED}
     image: ${DOCKERLESS_IMAGE}
+    insecure: ${DOCKERLESS_INSECURE}
   driver: kubernetes
   kubernetes:
     kubernetesContext: ${KUBERNETES_CONTEXT}

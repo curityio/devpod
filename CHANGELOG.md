@@ -24,6 +24,16 @@ Add new entries to the top of the "Unreleased" section.
   `ghcr.io/loft-sh/dockerless:0.2.0`. Its source is now in this repository (`dockerless/`), built on the maintained
   [osscontainertools/kaniko](https://github.com/osscontainertools/kaniko) v1.28 instead of loft-sh's patched copy
   of Google's archived kaniko 1.9.2. The `DOCKERLESS_IMAGE` option of the kubernetes provider still overrides it.
+  It also fixes these dockerless problems:
+  - It checks registries' TLS certificates. It used to accept any certificate, and plain HTTP, for base images
+    and the registry cache; the kubernetes provider's new `DOCKERLESS_INSECURE` option allows that again.
+  - Workspace users can no longer run commands as root: `/.dockerless` was writable by everyone and on `PATH`,
+    where DevPod's commands, which run as root, looked for `sh` and `su`.
+  - A Dockerfile's `USER` can be a uid without a passwd entry, or have a group (`1000:1000`); the pod used to stop.
+  - The container's processes get the variables the pod was started with, such as `containerEnv`, as with docker.
+  - The build no longer leaves a copy of the files it changed on the pod's disk, no longer looks for cached
+    layers on Docker Hub when no registry cache is set, and writes the image config so that the pod can't
+    read it half-written.
 - `devpod upgrade` only upgrades to a newer stable release: it compares versions instead of installing the latest
   release whenever it differs from the running one, which could downgrade the CLI, and it never picks a
   pre-release or a tag that isn't a plain `major.minor.patch` version. It checks that it can replace the binary
