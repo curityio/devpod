@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/loft-sh/devpod/e2e/framework"
+	"github.com/loft-sh/devpod/pkg/client"
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	docker "github.com/loft-sh/devpod/pkg/docker"
 	"github.com/loft-sh/devpod/pkg/log"
@@ -53,6 +54,18 @@ var _ = DevPodDescribe("devpod up test suite", func() {
 				// Wait for devpod workspace to come online (deadline: 30s)
 				err = f.DevPodUp(ctx, tempDir)
 				framework.ExpectNoError(err)
+
+				workspace, err := f.FindWorkspace(ctx, tempDir)
+				framework.ExpectNoError(err)
+
+				statuses, err := f.DevPodStatusAll(ctx)
+				framework.ExpectNoError(err)
+				gomega.Expect(statuses).To(gomega.ContainElement(client.WorkspaceStatus{
+					ID:       workspace.ID,
+					Context:  workspace.Context,
+					Provider: "docker",
+					State:    string(client.StatusRunning),
+				}))
 			}, ginkgo.SpecTimeout(framework.GetTimeout()))
 			ginkgo.It("should start a new workspace with existing running container", func(ctx context.Context) {
 				tempDir, err := framework.CopyToTempDir("tests/up/testdata/no-devcontainer")

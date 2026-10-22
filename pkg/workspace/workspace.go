@@ -168,6 +168,16 @@ func Get(ctx context.Context, devPodConfig *config.Config, args []string, change
 	return client, nil
 }
 
+// GetByID retrieves the existing workspace with the given ID
+func GetByID(devPodConfig *config.Config, workspaceID string, log log.Logger) (client.WorkspaceClient, error) {
+	provider, workspace, machine, err := loadExistingWorkspace(devPodConfig, workspaceID, false, log)
+	if err != nil {
+		return nil, err
+	}
+
+	return getWorkspaceClient(devPodConfig, provider, workspace, machine, log)
+}
+
 // Exists checks if the given workspace already exists
 func Exists(ctx context.Context, devPodConfig *config.Config, args []string, workspaceID string, log log.Logger) string {
 	workspace := findWorkspace(ctx, devPodConfig, args, workspaceID, log)

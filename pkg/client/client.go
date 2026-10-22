@@ -164,6 +164,8 @@ type WorkspaceStatus struct {
 	Context  string `json:"context,omitempty"`
 	Provider string `json:"provider,omitempty"`
 	State    string `json:"state,omitempty"`
+	// Error is why the state couldn't be retrieved, set only by `devpod status --all`
+	Error string `json:"error,omitempty"`
 }
 
 type User struct {

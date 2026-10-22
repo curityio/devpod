@@ -11,6 +11,10 @@ Add new entries to the top of the "Unreleased" section.
 
 - `devpod up --git-user-name` and `--git-user-email` set the git identity that the workspace's dev container
   gets, and save it with the workspace. An empty value removes the saved one.
+- `devpod status --all` shows the status of all workspaces of the context in a table (or, with `--output json`,
+  a list). The statuses are retrieved concurrently, within `--timeout`. A workspace whose status can't be
+  retrieved is shown as `Error` (with an `error` field in JSON) and makes the command exit with an error, after
+  the others are shown.
 
 ### Fixed
 
