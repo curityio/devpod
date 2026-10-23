@@ -17,6 +17,10 @@ FROM busybox:1.37.0-musl AS busybox
 # now build from scratch
 FROM scratch
 
+# Links the package to this repository when it is first published to ghcr.io, so that it gets the
+# repository's access permissions (not its visibility, which is set in the package's settings).
+LABEL org.opencontainers.image.source=https://github.com/curityio/devpod
+
 # Only root may write to the kaniko directory: dockerless and DevPod's agent run as root, and the
 # container's other users must not be able to put files where root runs them.
 RUN --mount=from=busybox,dst=/usr/ ["busybox", "sh", "-c", "mkdir -p /.dockerless && chmod 755 /.dockerless"]
