@@ -308,6 +308,9 @@ func dockerlessBuild(
 		log.Debug("Appending registry cache to dockerless build arguments ", dockerlessOptions.RegistryCache)
 		args = append(args, "--registry-cache", dockerlessOptions.RegistryCache)
 	}
+	if dockerlessOptions.Insecure == "true" {
+		args = append(args, "--insecure")
+	}
 
 	// ignore mounts
 	args = append(args, "--ignore-path", setupInfo.SubstitutionContext.ContainerWorkspaceFolder)

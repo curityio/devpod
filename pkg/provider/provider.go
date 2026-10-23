@@ -136,6 +136,9 @@ type ProviderDockerlessOptions struct {
 	// Registry to use as remote cache
 	RegistryCache string `json:"registryCache,omitempty"`
 
+	// Insecure lets the build reach registries over plain HTTP or with certificates that aren't trusted
+	Insecure types.StrBool `json:"insecure,omitempty"`
+
 	// DisableDockerCredentials prevents docker credentials from getting injected
 	DisableDockerCredentials types.StrBool `json:"disableDockerCredentials,omitempty"`
 }

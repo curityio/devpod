@@ -1,0 +1,236 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/containerd/platforms"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/osscontainertools/kaniko/pkg/config"
+	"github.com/osscontainertools/kaniko/pkg/executor"
+	"github.com/osscontainertools/kaniko/pkg/util"
+	"github.com/spf13/cobra"
+)
+
+const defaultCacheDir = "/.dockerless/cache"
+
+var ImageConfigOutput = "/.dockerless/image.json"
+
+type BuildCmd struct {
+	Dockerfile    string
+	Context       string
+	Target        string
+	RegistryCache string
+	BuildArgs     []string
+	IgnorePaths   []string
+	Insecure      bool
+	ExportCache   bool
+}
+
+// NewBuildCmd returns a new build command
+func NewBuildCmd() *cobra.Command {
+	cmd := &BuildCmd{}
+	cobraCmd := &cobra.Command{
+		Use:           "build",
+		Short:         "Build the container",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			return cmd.Run()
+		},
+	}
+
+	cobraCmd.Flags().StringVar(&cmd.Dockerfile, "dockerfile", "", "Dockerfile to build from.")
+	cobraCmd.Flags().StringVar(&cmd.Target, "target", "", "The docker target stage to build.")
+	cobraCmd.Flags().StringVar(&cmd.Context, "context", "", "Context to build from.")
+	cobraCmd.Flags().StringArrayVar(&cmd.BuildArgs, "build-arg", []string{}, "Docker build args.")
+	cobraCmd.Flags().StringArrayVar(&cmd.IgnorePaths, "ignore-path", []string{}, "Extra paths to exclude from deletion.")
+	cobraCmd.Flags().BoolVar(&cmd.Insecure, "insecure", false, "If true, registries may use plain HTTP or certificates that aren't trusted.")
+	cobraCmd.Flags().StringVar(&cmd.RegistryCache, "registry-cache", "", "Registry to use as remote cache.")
+	cobraCmd.Flags().BoolVar(&cmd.ExportCache, "export-cache", false, "If true kanoiko build push cache to registry.")
+	return cobraCmd
+}
+
+func (cmd *BuildCmd) Run() error {
+	// check if we already have built the image
+	_, err := os.Stat(ImageConfigOutput)
+	if err == nil {
+		fmt.Println("skip building, because image is already built")
+		return nil
+	}
+
+	// fill parameters through env
+	if cmd.Dockerfile == "" {
+		cmd.Dockerfile = os.Getenv("DOCKERLESS_DOCKERFILE")
+		if cmd.Dockerfile == "" {
+			return fmt.Errorf("--dockerfile is missing")
+		}
+	}
+	if cmd.Context == "" {
+		cmd.Context = os.Getenv("DOCKERLESS_CONTEXT")
+		if cmd.Context == "" {
+			return fmt.Errorf("--context is missing")
+		}
+	}
+	if cmd.Target == "" {
+		cmd.Target = os.Getenv("DOCKERLESS_TARGET")
+	}
+
+	// parse extra build args
+	buildArgs := os.Getenv("DOCKERLESS_BUILD_ARGS")
+	if buildArgs != "" {
+		extraBuildArgs := []string{}
+		_ = json.Unmarshal([]byte(buildArgs), &extraBuildArgs)
+		cmd.BuildArgs = append(cmd.BuildArgs, extraBuildArgs...)
+	}
+
+	// start actual build
+	image, err := cmd.build()
+	if err != nil {
+		return err
+	}
+
+	// write config file to file
+	configFile, err := image.ConfigFile()
+	if err != nil {
+		return fmt.Errorf("get image config: %w", err)
+	}
+
+	out, err := json.MarshalIndent(configFile, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal image config: %w", err)
+	}
+
+	// kaniko keeps a copy of every file the build changed, which would double the container's
+	// disk use. The image config was read from it above, so it can go now.
+	err = config.CleanupBuild()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: remove build files: %v\n", err)
+	}
+
+	// `start --wait` reads this file as soon as it exists, so it must appear complete.
+	tmp := ImageConfigOutput + ".tmp"
+	err = os.WriteFile(tmp, out, 0666)
+	if err != nil {
+		return fmt.Errorf("write image config: %w", err)
+	}
+	err = os.Rename(tmp, ImageConfigOutput)
+	if err != nil {
+		return fmt.Errorf("write image config: %w", err)
+	}
+
+	return nil
+}
+
+func (cmd *BuildCmd) build() (v1.Image, error) {
+	// add ignore paths
+	buildIgnorePaths(cmd.IgnorePaths)
+
+	// make sure we detect the correct ignore list
+	err := util.InitIgnoreList()
+	if err != nil {
+		return nil, fmt.Errorf("init ignore list: %w", err)
+	}
+
+	// make sure to delete previous contents
+	err = util.DeleteFilesystem()
+	if err != nil {
+		return nil, fmt.Errorf("delete filesystem: %w", err)
+	}
+
+	// change dir before building
+	err = os.Chdir("/")
+	if err != nil {
+		return nil, fmt.Errorf("change dir: %w", err)
+	}
+
+	var targets []string
+	if cmd.Target != "" {
+		targets = []string{cmd.Target}
+	}
+
+	opts := &config.KanikoOptions{
+		Destinations: []string{"local"},
+		// The workspace runs in this container, so the final stage's file system must be
+		// unpacked here even when every layer comes from the cache.
+		Materialize:    true,
+		BuildArgs:      cmd.BuildArgs,
+		DockerfilePath: cmd.Dockerfile,
+		RegistryOptions: config.RegistryOptions{
+			Insecure:      cmd.Insecure,
+			InsecurePull:  cmd.Insecure,
+			SkipTLSVerify: cmd.Insecure,
+		},
+		SrcContext:          cmd.Context,
+		Target:              targets,
+		CustomPlatform:      platforms.Format(platforms.Normalize(platforms.DefaultSpec())),
+		SnapshotMode:        "redo",
+		RunV2:               true,
+		NoPush:              true,
+		KanikoDir:           "/.dockerless",
+		CacheRunLayers:      true,
+		CacheCopyLayers:     true,
+		CompressedCaching:   true,
+		ImageFSExtractRetry: 3,
+		NoPushCache:         !cmd.ExportCache,
+		Compression:         config.ZStd,
+		CompressionLevel:    3,
+		CompressionLevelSet: true,
+		CacheOptions: config.CacheOptions{
+			CacheTTL: time.Hour * 24 * 7,
+		},
+	}
+	// Layers are only cached in a registry. Without one, kaniko would look them up in a
+	// repository named after the "local" destination, on Docker Hub.
+	if cmd.RegistryCache != "" {
+		opts.Cache = true
+		opts.CacheRepo = cmd.RegistryCache
+	} else {
+		opts.CacheDir = defaultCacheDir
+	}
+	if !cmd.ExportCache {
+		opts.SingleSnapshot = true
+	}
+
+	// let's build!
+	image, err := executor.DoBuild(opts)
+	if err != nil {
+		// add a passwd as other we won't be able to exec into this container
+		if addPwdErr := addPasswd(); addPwdErr != nil {
+			return nil, fmt.Errorf("build and add passwd error occurred: %w --- %w", err, addPwdErr)
+		}
+
+		return nil, fmt.Errorf("build error: %w", err)
+	}
+
+	return image, nil
+}
+
+func addPasswd() error {
+	err := os.WriteFile("/etc/passwd", []byte("root:x:0:0:root:/root:/.dockerless/bin/sh"), 0666)
+	if err != nil {
+		return fmt.Errorf("write passwd: %w", err)
+	}
+
+	return nil
+}
+
+func buildIgnorePaths(extraPaths []string) {
+	// we need to add a couple of extra ignore paths for kaniko
+	ignorePaths := append([]string{
+		"/.dockerless",
+		"/workspaces",
+		"/etc/envfile.json",
+		"/etc/resolv.conf",
+		"/var/run",
+		"/product_uuid",
+	}, extraPaths...)
+	for _, ignorePath := range ignorePaths {
+		util.AddToDefaultIgnoreList(util.IgnoreListEntry{
+			Path:            ignorePath,
+			PrefixMatchOnly: false,
+		})
+	}
+}

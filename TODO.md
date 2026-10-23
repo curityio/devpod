@@ -18,6 +18,15 @@ For each provider we keep: fork it to `curityio`, then update its references in 
 (provider sources, `providers/*/provider.yaml`, docs, desktop app and e2e tests).
 Providers we don't keep should be removed from the code and docs.
 
+## Publish the dockerless image
+
+`pkg/devcontainer/single.go` defaults to `ghcr.io/curityio/dockerless:0.3.0`, which
+`.github/workflows/dockerless.yaml` publishes:
+
+- [ ] Push the `dockerless-v0.3.0` tag, so the workflow publishes the image, before the next release
+- [ ] Make the `dockerless` package public in the `curityio` organization's package settings (GHCR makes it
+  private), so that clusters can pull it without credentials
+
 ## Fix links to content that only exists upstream
 
 These links still point to `loft-sh/devpod` because the issues and releases they reference don't exist

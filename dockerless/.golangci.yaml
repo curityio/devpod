@@ -1,0 +1,3 @@
+# dockerless is its own module, linted with golangci-lint v2 and its standard linters; without
+# this file, golangci-lint would read the repository root's v1 configuration.
+version: "2"
