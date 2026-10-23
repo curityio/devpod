@@ -20,7 +20,9 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ["dist/**/*", "src-tauri/**/*", "public/**/*", "src/gen/**/*"],
+    // eslint.config.js is JavaScript, which the TypeScript project (parserOptions.project) doesn't
+    // include, so the TypeScript parser can't lint it.
+    ignores: ["dist/**/*", "src-tauri/**/*", "public/**/*", "src/gen/**/*", "eslint.config.js"],
   },
   ...fixupConfigRules(
     compat.extends(
@@ -109,6 +111,14 @@ export default [
           prefix: ["E"],
         },
       ],
+    },
+  },
+  {
+    // The entry points and the router module export no components, so when they change Vite reloads
+    // the page instead of refreshing components in place, which is fine for them.
+    files: ["src/main.tsx", "src/routes.tsx", "update-window/src/main.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 ]
