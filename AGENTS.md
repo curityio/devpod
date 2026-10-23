@@ -98,7 +98,6 @@ cd src-tauri && cargo +stable check
   - There are no Windows e2e tests: GitHub's Windows runners can't run Linux containers. `windows-tests.yaml`
     only builds the CLI and runs the unit tests on Windows.
 - **Desktop quirks:**
-  - `yarn lint:ci` has 5 errors that already existed at the fork point.
   - The default `cargo` may be too old for the v4 `Cargo.lock`; use `cargo +stable`.
   - `cargo check` needs `desktop/dist/` and the sidecar `desktop/src-tauri/bin/devpod-cli-<target-triple>` to
     exist; empty placeholders are enough (both are gitignored).

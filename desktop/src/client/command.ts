@@ -5,10 +5,14 @@ import {
   Command as ShellCommand,
 } from "@tauri-apps/plugin-shell"
 import { debug, ErrorTypeCancelled, isError, Result, ResultError, Return, sleep } from "../lib"
-import { DEVPOD_BINARY, DEVPOD_FLAG_OPTION, DEVPOD_UI_ENV_VAR, DEVPOD_ADDITIONAL_ENV_VARS } from "./constants"
+import {
+  DEVPOD_BINARY,
+  DEVPOD_FLAG_OPTION,
+  DEVPOD_UI_ENV_VAR,
+  DEVPOD_ADDITIONAL_ENV_VARS,
+} from "./constants"
 import { TStreamEvent } from "./types"
 import { TAURI_SERVER_URL } from "./tauriClient"
-import * as log from "@tauri-apps/plugin-log"
 import { invoke } from "@tauri-apps/api/core"
 
 export type TStreamEventListenerFn = (event: TStreamEvent) => void
@@ -89,7 +93,9 @@ export class Command implements TCommand<ChildProcess<string>> {
         if (this.isFlatpak) {
           this.extraEnvVars["FLATPAK_ID"] = "sh.loft.devpod"
           this.extraEnvVars[DEVPOD_ADDITIONAL_ENV_VARS] = recordToCSV(this.extraEnvVars)
-          this.sidecarCommand = ShellCommand.sidecar(DEVPOD_BINARY, this.args, { env: this.extraEnvVars })
+          this.sidecarCommand = ShellCommand.sidecar(DEVPOD_BINARY, this.args, {
+            env: this.extraEnvVars,
+          })
         }
       }
       const rawResult = await this.sidecarCommand.execute()
@@ -247,5 +253,5 @@ export function serializeRawOptions(
 function recordToCSV(record: Record<string, string>): string {
   return Object.entries(record)
     .map(([key, value]) => `${key}=${value}`)
-    .join(',');
+    .join(",")
 }
