@@ -7,6 +7,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+## v0.9.0 (2026-10-23)
+
 ### Added
 
 - `devpod up --git-user-name` and `--git-user-email` set the git identity that the workspace's dev container
