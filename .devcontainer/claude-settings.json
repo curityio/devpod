@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__atlassian"
+    ],
+    "deny": [
+      "Bash(git merge *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh api *merge*)",
+      "Bash(*/pulls/*/merge*)",
+      "Bash(*/pullrequests/*/merge*)",
+      "mcp__atlassian__executeDestructive"
+    ]
+  }
+}
