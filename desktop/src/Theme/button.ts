@@ -9,21 +9,14 @@ export const Button = defineStyleConfig({
   variants: {
     primary(props) {
       return {
-        color: mode("white", "gray.50")(props),
-        borderColor: "primary.600",
-        _dark: {
-          borderColor: "primary.500",
-          backgroundColor: "primary.600",
-        },
+        color: "white",
+        borderColor: mode("primary.600", "primary.400")(props),
         borderWidth: 1,
         backgroundColor: "primary.500",
         _hover: {
           backgroundColor: "primary.600",
           _disabled: {
             background: "primary.500",
-          },
-          _dark: {
-            backgroundColor: "primary.700",
           },
         },
       }

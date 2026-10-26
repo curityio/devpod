@@ -7,10 +7,10 @@ const { definePartsStyle, defineMultiStyleConfig } = createMultiStyleConfigHelpe
 const muted = definePartsStyle((props) => {
   return {
     tab: {
-      bg: mode("white", "black")(props),
+      bg: mode("white", "transparent")(props),
       fontWeight: "medium",
       _selected: {
-        bg: mode("gray.100", "gray.900")(props),
+        bg: mode("gray.100", "gray.800")(props),
       },
       _hover: {
         bg: mode("gray.50", "gray.700")(props),

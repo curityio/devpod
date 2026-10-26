@@ -19,6 +19,10 @@ export const Input = defineMultiStyleConfig({
           _dark: {
             borderColor: "gray.800",
           },
+          _focusVisible: {
+            borderColor: "focus",
+            boxShadow: "0 0 0 1px var(--chakra-colors-focus)",
+          },
         },
       }
     }),

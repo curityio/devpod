@@ -38,7 +38,7 @@ const Link = defineStyleConfig({
     primary(props) {
       const primary = props.theme.colors.primary
 
-      return { color: mode(primary["800"], primary["400"])(props) }
+      return { color: mode(primary["600"], primary["300"])(props) }
     },
   },
 })
@@ -93,42 +93,57 @@ export const theme = extendTheme({
       }
     },
   },
+  fonts: {
+    heading: `"Google Sans", "Helvetica Neue", Arial, sans-serif`,
+    body: `"Google Sans", "Helvetica Neue", Arial, sans-serif`,
+  },
+  shadows: {
+    outline: "0 0 0 2px var(--chakra-colors-focus)",
+  },
+  semanticTokens: {
+    colors: {
+      // Lilac is too light for a focus ring or small text on the light background
+      focus: { default: "primary.600", _dark: "primary.300" },
+      "text.tertiary": { default: "gray.600", _dark: "gray.400" },
+    },
+  },
+  // Curity 2026 palette: purple #7B4FD4 (500) for fills, lilac #C9A8FF (300) as the highlight,
+  // and greys tinted towards Curity's navy, ending in midnight #130E2B
   colors: {
     primary: {
-      50: "#F8EFFF",
-      100: "#F0DFFF",
-      200: "#D8ABFF",
-      300: "#BF76FF",
-      400: "#B157FF",
-      500: "#A640FF",
-      600: "#9B29FF",
-      700: "#8600DC",
-      800: "#7100B9",
-      900: "#40006A",
+      50: "#F5F0FF",
+      100: "#EBE0FF",
+      200: "#D9C5FF",
+      300: "#C9A8FF",
+      400: "#A27FEA",
+      500: "#7B4FD4",
+      600: "#6A40C0",
+      700: "#5732A3",
+      800: "#40257D",
+      900: "#2D1B69",
     },
     gray: {
-      50: "#F7F5F9",
-      100: "#ECE8F0",
-      200: "#DCD6E1",
-      300: "#C5BFC9",
-      400: "#ABA5B0",
-      500: "#948E99",
-      600: "#7C7581",
-      700: "#655E69",
-      800: "#4A464D",
-      900: "#2C2630",
+      50: "#F6F5FA",
+      100: "#ECEAF4",
+      200: "#DAD7E8",
+      300: "#BFBBD3",
+      400: "#A39EBB",
+      500: "#837D9E",
+      600: "#645E82",
+      700: "#3B3462",
+      800: "#251E48",
+      900: "#130E2B",
     },
     text: {
-      secondary: "#465E75",
-      tertiary: "#5C7997",
+      secondary: "#645E82",
     },
     divider: {
-      main: "#B0C3D6",
-      light: "#DCE5EE",
-      dark: "#465E75",
+      main: "#BFBBD3",
+      light: "#DAD7E8",
+      dark: "#645E82",
     },
     background: {
-      darkest: "rgb(16, 18, 20)",
+      darkest: "#0D0B1A",
     },
   },
   config: {

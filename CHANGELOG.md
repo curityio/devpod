@@ -7,6 +7,14 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Changed
+
+- The desktop app uses Curity's colors and font (Google Sans): Curity purple for buttons and the selected
+  sidebar item, purple (lilac in dark mode) for links and keyboard focus, and grays tinted towards Curity's
+  navy. In dark mode the
+  background is Curity's navy with a purple glow, and cards are translucent purple panels. The Curity logo is
+  white in dark mode.
+
 ## v0.9.0 (2026-10-23)
 
 ### Added
