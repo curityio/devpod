@@ -34,6 +34,12 @@ export function OSSApp() {
   const rootRouteMatch = useMatch(Routes.ROOT)
   const { sidebarPosition } = useSettings()
   const contentBackgroundColor = useColorModeValue("white", "background.darkest")
+  // Curity's purple glow from the top right, see the 2026 styleguide
+  const contentBackgroundImage = useColorModeValue(
+    undefined,
+    "radial-gradient(120% 90% at 88% 6%, rgba(45, 27, 105, 0.9) 0%, rgba(45, 27, 105, 0.3) 38%, rgba(13, 11, 26, 0) 70%)"
+  )
+  const toolbarBackgroundColor = useColorModeValue("white", "transparent")
   const actionHoverColor = useColorModeValue("gray.100", "gray.700")
   const toolbarHeight = useToken("sizes", showTitleBar ? "28" : "20")
   const borderColor = useBorderColor()
@@ -84,13 +90,14 @@ export function OSSApp() {
                 <Box
                   data-tauri-drag-region // keep!
                   backgroundColor={contentBackgroundColor}
+                  backgroundImage={contentBackgroundImage}
                   position="relative"
                   width="full"
                   height="full"
                   overflowY="auto">
                   <Toolbar
                     paddingTop={titleBarSafeArea}
-                    backgroundColor={contentBackgroundColor}
+                    backgroundColor={toolbarBackgroundColor}
                     height={toolbarHeight}
                     position="sticky"
                     zIndex={1}

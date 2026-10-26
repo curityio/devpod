@@ -1,0 +1,32 @@
+/* Google Sans, Curity's brand font (SIL Open Font License, see fonts/OFL.txt) */
+@font-face {
+  font-family: "Google Sans";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-SemiBold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-Bold.ttf") format("truetype");
+}

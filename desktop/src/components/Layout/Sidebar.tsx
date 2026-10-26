@@ -83,10 +83,9 @@ export function SidebarMenuItem({ to, children, icon: iconProps }: TSidebarMenuP
   const settings = useSettings()
   const backgroundColorToken = useColorModeValue("gray.300", "gray.700")
   const backgroundColor = useToken("colors", backgroundColorToken)
-  const borderColorToken = useColorModeValue("primary.600", "primary.600")
+  const borderColorToken = useColorModeValue("primary.600", "primary.400")
   const borderColor = useToken("colors", borderColorToken)
-  const backgroundActiveColorToken = useColorModeValue("primary.500", "primary.700")
-  const backgroundActiveColor = useToken("colors", backgroundActiveColorToken)
+  const backgroundActiveColor = useToken("colors", "primary.500")
   const isLeft = settings.sidebarPosition === "left"
   const icon = cloneElement(iconProps, { boxSize: 4 })
 
