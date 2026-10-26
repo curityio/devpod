@@ -98,7 +98,14 @@ export const theme = extendTheme({
     body: `"Google Sans", "Helvetica Neue", Arial, sans-serif`,
   },
   shadows: {
-    outline: "0 0 0 2px #C9A8FF",
+    outline: "0 0 0 2px var(--chakra-colors-focus)",
+  },
+  semanticTokens: {
+    colors: {
+      // Lilac is too light for a focus ring or small text on the light background
+      focus: { default: "primary.600", _dark: "primary.300" },
+      "text.tertiary": { default: "gray.600", _dark: "gray.400" },
+    },
   },
   // Curity 2026 palette: purple #7B4FD4 (500) for fills, lilac #C9A8FF (300) as the highlight,
   // and greys tinted towards Curity's navy, ending in midnight #130E2B
@@ -129,7 +136,6 @@ export const theme = extendTheme({
     },
     text: {
       secondary: "#645E82",
-      tertiary: "#837D9E",
     },
     divider: {
       main: "#BFBBD3",

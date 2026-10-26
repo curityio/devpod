@@ -2,6 +2,7 @@ import { ChakraProvider, Theme, ToastProviderProps, extendTheme } from "@chakra-
 import { ReactNode, useEffect, useState } from "react"
 import { TSettings, useSettings } from "../contexts"
 import { theme as initialTheme } from "./theme"
+import "./fonts.css"
 const toastOptions: ToastProviderProps = { defaultOptions: { variant: "subtle" } }
 
 const fontSize: Record<TSettings["zoom"], string> = {
