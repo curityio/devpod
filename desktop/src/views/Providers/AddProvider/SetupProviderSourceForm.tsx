@@ -496,7 +496,7 @@ function CustomProviderInput({ field, isInvalid, onAccept }: TCustomProviderInpu
     <InputGroup>
       <Input
         spellCheck={false}
-        placeholder="loft-sh/devpod-provider-terraform"
+        placeholder="my-org/devpod-provider-example"
         type="text"
         value={field.value}
         onBlur={field.onBlur}

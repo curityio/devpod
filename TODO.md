@@ -10,13 +10,23 @@ The built-in and documented providers still live under the `loft-sh` GitHub orga
 - [ ] `devpod-provider-azure`
 - [ ] `devpod-provider-civo`
 - [ ] `devpod-provider-digitalocean`
+- [ ] `devpod-provider-dockerless`
+- [ ] `devpod-provider-ecs`
 - [ ] `devpod-provider-gcloud`
 - [ ] `devpod-provider-kubernetes`
 - [ ] `devpod-provider-ssh`
+- [ ] `devpod-provider-terraform`
 
 For each provider we keep: fork it to `curityio`, then update its references in this repository
 (provider sources, `providers/*/provider.yaml`, docs, desktop app and e2e tests).
 Providers we don't keep should be removed from the code and docs.
+
+A provider given by its name alone (`devpod provider add aws`) is downloaded from
+`curityio/devpod-provider-<name>`, except for the names in `LoftProviders` (`pkg/workspace/provider.go`), which
+are still downloaded from `loft-sh`. Remove each provider from that list as it's migrated, and remove the list
+(and the note about it in `docs/pages/managing-providers/add-provider.mdx`) once it's empty. Providers added
+before they were migrated keep their `loft-sh` repository as their source, so `devpod provider update` keeps
+downloading them from there until they are added again.
 
 ## Fix links to content that only exists upstream
 

@@ -30,6 +30,11 @@ Add new entries to the top of the "Unreleased" section.
   Windows publisher is Curity. On first start, it copies its settings, providers, logs, CLI shims and webview
   storage from the old `sh.loft.devpod` directories, which are kept so that a `PATH` pointing at the old CLI
   shims on Windows still works. The Windows installer finds an installation made with the old identifier.
+- A provider given by its name alone (`devpod provider add <name>`) is downloaded from GitHub's
+  `curityio/devpod-provider-<name>` instead of `loft-sh/devpod-provider-<name>`, except for the providers that
+  only exist under `loft-sh` so far: `aws`, `azure`, `civo`, `digitalocean`, `dockerless`, `ecs`, `gcloud`,
+  `kubernetes`, `ssh` and `terraform`. `devpod provider list-available` lists those and the `devpod-provider-*`
+  repositories of `curityio` (it used to list only the first 30 repositories of `loft-sh`).
 
 ## v0.9.0 (2026-10-23)
 
