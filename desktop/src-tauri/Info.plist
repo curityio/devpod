@@ -8,7 +8,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>sh.loft.devpod</string>
+			<string>io.curity.devpod</string>
 			<key>LSUIElement</key>
 			<true/>
 			<key>CFBundleURLSchemes</key>

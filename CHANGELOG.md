@@ -26,6 +26,10 @@ Add new entries to the top of the "Unreleased" section.
 - The Go module path is `github.com/curityio/devpod` instead of `github.com/loft-sh/devpod` (and
   `github.com/curityio/devpod/dockerless` for `dockerless/`), so stack traces and `-ldflags -X` settings, such as
   `github.com/curityio/devpod/pkg/version.version`, use the new path.
+- The desktop app's identifier is `io.curity.devpod` instead of `sh.loft.devpod` (and the Flatpak id), and its
+  Windows publisher is Curity. On first start, it copies its settings, providers, logs, CLI shims and webview
+  storage from the old `sh.loft.devpod` directories, which are kept so that a `PATH` pointing at the old CLI
+  shims on Windows still works. The Windows installer finds an installation made with the old identifier.
 
 ## v0.9.0 (2026-10-23)
 

@@ -1,5 +1,5 @@
 {
-  "identifier": "sh.loft.devpod.for.devpod.devs",
+  "identifier": "io.curity.devpod.for.devpod.devs",
   "plugins": {
     "updater": {
       "active": false

@@ -2,7 +2,7 @@
 name = "devpod-desktop"
 version = "0.1.0"
 description = "A Tauri App"
-authors = ["loft.sh"]
+authors = ["Curity"]
 license = ""
 repository = ""
 edition = "2021"

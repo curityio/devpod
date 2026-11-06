@@ -423,7 +423,7 @@ jobs:
           export SHA256=$(sha256sum "${debPath}" | cut -f1 -d ' ')
           export DESKTOP_SHA256=$(sha256sum "${desktopPath}" | cut -f1 -d ' ')
           export META_SHA256=$(sha256sum "${metaPath}" | cut -f1 -d ' ')
-          envsubst < desktop/flatpak/sh.loft.devpod.tmpl > desktop/flatpak/sh.loft.devpod.yaml
+          envsubst < desktop/flatpak/io.curity.devpod.tmpl > desktop/flatpak/io.curity.devpod.yaml
 
   publish-updates:
     needs: [build-app, create-release]

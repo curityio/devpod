@@ -62,8 +62,12 @@ cd src-tauri && cargo +stable check
 - **Pull requests go to `curityio/devpod` `main` only, never upstream.** The `upstream` remote is read-only
   reference.
 - **The Go module path is `github.com/curityio/devpod`** (renamed from upstream's `github.com/loft-sh/devpod`).
-  The desktop app identifier `sh.loft.devpod` is still upstream's, deliberately: it is tied to the `devpod://`
-  deep link scheme, the Flatpak id and existing installs.
+- **The desktop app identifier is `io.curity.devpod`** (upstream's was `sh.loft.devpod`). Tauri names the app's
+  data directories after it, so `desktop/src-tauri/src/identifier_migration.rs` copies an existing install's
+  `sh.loft.devpod` directories on first start, and `desktop/src-tauri/windows/installer-hooks.nsh` moves the
+  Windows installer's registry key from `Software\loft` to `Software\Curity` (the `publisher`). Changing the
+  identifier or the publisher again needs the same care. It also appears in `custom_protocol.rs`, `Info.plist`,
+  the Flatpak manifest and `command.ts` (`FLATPAK_ID`).
 - **Dependencies are vendored.** Builds use `-mod=vendor`. After changing imports or `go.mod`, run
   `GOFLAGS=-mod=mod go mod tidy && go mod vendor` and commit `vendor/`.
 - **The agent is embedded in the CLI.** `hack/build-agents.sh` builds the Linux agents (amd64 and arm64, with the
