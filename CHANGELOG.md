@@ -7,6 +7,15 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Fixed
+
+- The kubernetes provider can create a workspace in a namespace that doesn't exist yet on clusters that only
+  give users access to a namespace once it exists (e.g. to whoever creates it). `devpod up` failed with
+  `find dev container: persistentvolumeclaims "devpod-..." is forbidden`, because it looked for the workspace's
+  persistent volume claim before creating the namespace (`CREATE_NAMESPACE`). Now a forbidden lookup in a
+  namespace that doesn't exist finds no workspace, and after creating the namespace DevPod waits up to a minute
+  for access to it.
+
 ### Changed
 
 - The desktop app uses Curity's colors and font (Google Sans): Curity purple for buttons and the selected

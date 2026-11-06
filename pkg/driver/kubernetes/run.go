@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/loft-sh/devpod/pkg/devcontainer/config"
 	"github.com/loft-sh/devpod/pkg/driver"
@@ -15,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
 
@@ -50,9 +52,11 @@ func (k *KubernetesDriver) RunDevContainer(
 
 	// namespace
 	if k.namespace != "" && k.options.CreateNamespace == "true" {
-		err := k.createNamespace(ctx)
+		created, err := k.createNamespace(ctx)
 		if err != nil {
 			return err
+		} else if created {
+			k.waitForNamespaceAccess(ctx, workspaceId)
 		}
 	}
 
@@ -517,19 +521,49 @@ func optionsEqual(a, b *provider2.ProviderKubernetesDriverConfig) bool {
 	return aCopy == bCopy
 }
 
-func (k *KubernetesDriver) createNamespace(ctx context.Context) error {
+// createNamespace creates the driver's namespace if it doesn't exist, and reports whether it did.
+func (k *KubernetesDriver) createNamespace(ctx context.Context) (bool, error) {
 	_, err := k.client.Client().CoreV1().Namespaces().Get(ctx, k.namespace, metav1.GetOptions{})
-	if kerrors.IsNotFound(err) || kerrors.IsForbidden(err) {
-		k.Log.Infof("Create namespace '%s'", k.namespace)
-		_, err := k.client.Client().CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: k.namespace,
-			},
-		}, metav1.CreateOptions{})
-		if err != nil && !kerrors.IsAlreadyExists(err) && !kerrors.IsForbidden(err) {
-			return fmt.Errorf("create namespace: %w", err)
-		}
+	if !kerrors.IsNotFound(err) && !kerrors.IsForbidden(err) {
+		return false, nil
 	}
 
-	return nil
+	k.Log.Infof("Create namespace '%s'", k.namespace)
+	_, err = k.client.Client().CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: k.namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		if kerrors.IsAlreadyExists(err) || kerrors.IsForbidden(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("create namespace: %w", err)
+	}
+
+	return true, nil
+}
+
+// How long to wait for access to a namespace DevPod just created; variables so that tests can shorten them.
+var (
+	namespaceAccessInterval = time.Second
+	namespaceAccessTimeout  = time.Minute
+)
+
+// waitForNamespaceAccess waits until the user may get the workspace's persistent volume claim in the namespace DevPod
+// just created. Clusters that grant access to a namespace to whoever creates it (e.g. with a Kyverno or OPA policy)
+// do that asynchronously, so the first requests in a new namespace can be forbidden. If access isn't granted in time,
+// the next request fails with the forbidden error.
+func (k *KubernetesDriver) waitForNamespaceAccess(ctx context.Context, workspaceId string) {
+	err := wait.PollUntilContextTimeout(ctx, namespaceAccessInterval, namespaceAccessTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err := k.client.Client().CoreV1().PersistentVolumeClaims(k.namespace).Get(ctx, workspaceId, metav1.GetOptions{})
+		if kerrors.IsForbidden(err) {
+			k.Log.Debugf("Waiting for access to namespace '%s': %v", k.namespace, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		k.Log.Warnf("Still no access to the new namespace '%s' after %s", k.namespace, namespaceAccessTimeout)
+	}
 }

@@ -65,6 +65,13 @@ func (k *KubernetesDriver) getDevContainerPvc(ctx context.Context, id string) (*
 		if kerrors.IsNotFound(err) {
 			return nil, nil, nil
 		}
+		if kerrors.IsForbidden(err) && k.namespaceMissing(ctx) {
+			// Clusters that only grant access to a namespace once it exists (e.g. to whoever creates it)
+			// forbid this lookup until then. A namespace that doesn't exist holds no dev container, and
+			// RunDevContainer creates it.
+			k.Log.Debugf("Namespace '%s' doesn't exist yet", k.namespace)
+			return nil, nil, nil
+		}
 
 		return nil, nil, err
 	} else if pvc.Annotations == nil || pvc.Annotations[DevPodInfoAnnotation] == "" {
@@ -79,6 +86,13 @@ func (k *KubernetesDriver) getDevContainerPvc(ctx context.Context, id string) (*
 	}
 
 	return pvc, containerInfo, nil
+}
+
+// namespaceMissing reports whether the driver's namespace is known not to exist. It is false when that can't be
+// determined, e.g. because the user may not get namespaces.
+func (k *KubernetesDriver) namespaceMissing(ctx context.Context) bool {
+	_, err := k.client.Client().CoreV1().Namespaces().Get(ctx, k.namespace, metav1.GetOptions{})
+	return kerrors.IsNotFound(err)
 }
 
 func (k *KubernetesDriver) StopDevContainer(ctx context.Context, workspaceId string) error {
