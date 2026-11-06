@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/log"
+	config2 "github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/log"
 	"gotest.tools/assert"
 )
 

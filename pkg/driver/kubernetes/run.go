@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/driver"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/driver"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"

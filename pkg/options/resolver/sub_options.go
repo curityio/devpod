@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/shell"
+	"github.com/curityio/devpod/pkg/types"
 	"github.com/ghodss/yaml"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/shell"
-	"github.com/loft-sh/devpod/pkg/types"
 	"github.com/pkg/errors"
 )
 

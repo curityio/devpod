@@ -6,17 +6,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/devpod/providers"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/types"
+	"github.com/curityio/devpod/providers"
 
-	"github.com/loft-sh/devpod/pkg/binaries"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/download"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/binaries"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -192,6 +193,35 @@ func ResolveProvider(providerSource string, log log.Logger) ([]byte, *providerpk
 	return nil, nil, fmt.Errorf("unrecognized provider type, please specify either a local file, url or github repository")
 }
 
+// GithubProviderOwner is the GitHub owner of the devpod-provider-<name> repository that a provider given
+// by its name alone is downloaded from, unless it's one of the LoftProviders.
+const GithubProviderOwner = "curityio"
+
+// LoftProviders are the providers that so far only exist under loft-sh's GitHub organization, so a
+// provider given by one of these names is downloaded from loft-sh/devpod-provider-<name> instead.
+// TODO: remove once the providers are migrated to curityio (see TODO.md).
+var LoftProviders = []string{
+	"aws",
+	"azure",
+	"civo",
+	"digitalocean",
+	"dockerless",
+	"ecs",
+	"gcloud",
+	"kubernetes",
+	"ssh",
+	"terraform",
+}
+
+// GithubProviderRepo returns the GitHub repository (owner/repo) of the provider with the given name.
+func GithubProviderRepo(name string) string {
+	owner := GithubProviderOwner
+	if slices.Contains(LoftProviders, name) {
+		owner = "loft-sh"
+	}
+	return owner + "/devpod-provider-" + name
+}
+
 func DownloadProviderGithub(originalPath string, log log.Logger) ([]byte, *providerpkg.ProviderSource, error) {
 	path := strings.TrimPrefix(originalPath, "github.com/")
 
@@ -206,7 +236,7 @@ func DownloadProviderGithub(originalPath string, log log.Logger) ([]byte, *provi
 	// split by separator
 	splitted := strings.Split(strings.TrimSuffix(path, "/"), "/")
 	if len(splitted) == 1 {
-		path = "loft-sh/devpod-provider-" + path
+		path = GithubProviderRepo(path)
 	} else if len(splitted) != 2 {
 		return nil, nil, nil
 	}

@@ -7,13 +7,15 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "Curity",
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "nsis": {
         "displayLanguageSelector": false,
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerHooks": "./windows/installer-hooks.nsh"
       }
     },
     "category": "DeveloperTool",
@@ -64,7 +66,7 @@
   "productName": "DevPod",
   "mainBinaryName": "DevPod Desktop",
   "version": "../package.json",
-  "identifier": "sh.loft.devpod",
+  "identifier": "io.curity.devpod",
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMxRjc1MjVDQUM2MjU1NEUKUldST1ZXS3NYRkwzd1VaY1FrRXBVdHBoWGhPbWlHWmtjbWFORzlIM1VtU3czWnh3TFVxaE1HNFIK",

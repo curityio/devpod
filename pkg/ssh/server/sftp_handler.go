@@ -4,9 +4,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/ssh/sshd"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/ssh/sshd"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 )

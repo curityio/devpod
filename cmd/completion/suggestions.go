@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/workspace"
 )
 
 func RegisterFlagCompletionFuns(rootCmd *cobra.Command, globalFlags *flags.GlobalFlags) error {

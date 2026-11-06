@@ -1,9 +1,9 @@
 package use
 
 import (
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/cmd/ide"
-	"github.com/loft-sh/devpod/cmd/provider"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/cmd/ide"
+	"github.com/curityio/devpod/cmd/provider"
 	"github.com/spf13/cobra"
 )
 

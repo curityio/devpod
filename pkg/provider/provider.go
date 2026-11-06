@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/types"
 )
 
 const (

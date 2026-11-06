@@ -4,8 +4,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 type IDE interface {

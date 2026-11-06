@@ -3,12 +3,12 @@ package driver
 import (
 	"context"
 
-	"github.com/loft-sh/devpod/pkg/compose"
-	config2 "github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/feature"
-	"github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/compose"
+	config2 "github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/devcontainer/feature"
+	"github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/provider"
 )
 
 type DockerDriver interface {

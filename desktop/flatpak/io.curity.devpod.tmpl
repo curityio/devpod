@@ -1,10 +1,10 @@
-id: sh.loft.devpod
+id: io.curity.devpod
 
 runtime: org.gnome.Platform
 runtime-version: '47'
 sdk: org.gnome.Sdk
 
-command: "sh.loft.devpod"
+command: "io.curity.devpod"
 finish-args:
   - --socket=wayland # Permission needed to show the window
   - --socket=fallback-x11 # Permission needed to show the window
@@ -42,11 +42,11 @@ modules:
       - cp devpod-wrapper /app/bin/devpod-cli
       - chmod +x /app/bin/devpod-cli
       - install -Dm755 usr/bin/devpod-cli /app/bin/devpod-bin
-      - install -Dm755 usr/bin/DevPod\ Desktop /app/bin/sh.loft.devpod
-      - install -Dm644 DevPod.desktop /app/share/applications/sh.loft.devpod.desktop
-      - desktop-file-edit --set-key Exec --set-value sh.loft.devpod /app/share/applications/sh.loft.devpod.desktop
-      - desktop-file-edit --set-icon sh.loft.devpod /app/share/applications/sh.loft.devpod.desktop
-      - install -Dm644 usr/share/icons/hicolor/128x128/apps/DevPod\ Desktop.png /app/share/icons/hicolor/128x128/apps/sh.loft.devpod.png
-      - install -Dm644 usr/share/icons/hicolor/32x32/apps/DevPod\ Desktop.png /app/share/icons/hicolor/32x32/apps/sh.loft.devpod.png
-      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/DevPod\ Desktop.png /app/share/icons/hicolor/256x256@2/apps/sh.loft.devpod.png
-      - install -Dm644 DevPod.metainfo.xml /app/share/metainfo/sh.loft.devpod.metainfo.xml
+      - install -Dm755 usr/bin/DevPod\ Desktop /app/bin/io.curity.devpod
+      - install -Dm644 DevPod.desktop /app/share/applications/io.curity.devpod.desktop
+      - desktop-file-edit --set-key Exec --set-value io.curity.devpod /app/share/applications/io.curity.devpod.desktop
+      - desktop-file-edit --set-icon io.curity.devpod /app/share/applications/io.curity.devpod.desktop
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/DevPod\ Desktop.png /app/share/icons/hicolor/128x128/apps/io.curity.devpod.png
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/DevPod\ Desktop.png /app/share/icons/hicolor/32x32/apps/io.curity.devpod.png
+      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/DevPod\ Desktop.png /app/share/icons/hicolor/256x256@2/apps/io.curity.devpod.png
+      - install -Dm644 DevPod.metainfo.xml /app/share/metainfo/io.curity.devpod.metainfo.xml

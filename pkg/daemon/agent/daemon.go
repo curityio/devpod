@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/single"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/single"
 	perrors "github.com/pkg/errors"
 	"github.com/takama/daemon"
 )

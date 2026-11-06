@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
 )
 
 func List(ctx context.Context, devPodConfig *config.Config, log log.Logger) ([]*providerpkg.Workspace, error) {

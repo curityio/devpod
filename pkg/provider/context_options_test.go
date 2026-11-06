@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/config"
 	"gotest.tools/assert"
 )
 

@@ -9,13 +9,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/git"
-	"github.com/loft-sh/devpod/pkg/gitcredentials"
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/util"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/git"
+	"github.com/curityio/devpod/pkg/gitcredentials"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/util"
 	"github.com/moby/patternmatcher/ignorefile"
 )
 

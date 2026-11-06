@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/curityio/devpod/pkg/command"
 	"github.com/gofrs/flock"
-	"github.com/loft-sh/devpod/pkg/command"
 	"github.com/pkg/errors"
 )
 

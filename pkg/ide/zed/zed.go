@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/skratchdot/open-golang/open"
 
-	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/config"
 )
 
 // Open first finds the zed binary for the local platform and then opens the zed editor with the given workspace folder

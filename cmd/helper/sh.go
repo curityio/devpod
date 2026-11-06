@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/loft-sh/devpod/pkg/shell"
+	"github.com/curityio/devpod/pkg/shell"
 	"github.com/spf13/cobra"
 )
 

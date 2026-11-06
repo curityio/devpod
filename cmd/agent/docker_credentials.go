@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/dockercredentials"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/dockercredentials"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 

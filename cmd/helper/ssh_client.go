@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	command2 "github.com/loft-sh/devpod/pkg/command"
+	command2 "github.com/curityio/devpod/pkg/command"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"

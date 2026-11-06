@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	util "github.com/loft-sh/devpod/pkg/util/hash"
+	util "github.com/curityio/devpod/pkg/util/hash"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/pkg/errors"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/hash"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/hash"
 )
 
 func CalculatePrebuildHash(

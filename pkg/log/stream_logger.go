@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/curityio/devpod/pkg/log/hash"
+	"github.com/curityio/devpod/pkg/log/scanner"
+	"github.com/curityio/devpod/pkg/log/survey"
+	"github.com/curityio/devpod/pkg/log/terminal"
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/devpod/pkg/log/hash"
-	"github.com/loft-sh/devpod/pkg/log/scanner"
-	"github.com/loft-sh/devpod/pkg/log/survey"
-	"github.com/loft-sh/devpod/pkg/log/terminal"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

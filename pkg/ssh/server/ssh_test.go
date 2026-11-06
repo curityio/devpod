@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 	gossh "golang.org/x/crypto/ssh"
 )
 

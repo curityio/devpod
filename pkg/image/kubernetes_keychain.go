@@ -28,9 +28,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/kubeclient"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/logs"
-	"github.com/loft-sh/devpod/pkg/kubeclient"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

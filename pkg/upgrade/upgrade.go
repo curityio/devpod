@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/download"
-	"github.com/loft-sh/devpod/pkg/log"
-	versionpkg "github.com/loft-sh/devpod/pkg/version"
+	"github.com/curityio/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/log"
+	versionpkg "github.com/curityio/devpod/pkg/version"
 )
 
 // These are variables so that tests can replace them.

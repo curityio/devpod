@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/config"
-	copy2 "github.com/loft-sh/devpod/pkg/copy"
-	"github.com/loft-sh/devpod/pkg/ide"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/util"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/config"
+	copy2 "github.com/curityio/devpod/pkg/copy"
+	"github.com/curityio/devpod/pkg/ide"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -13,10 +13,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 

@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/copy"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/devcontainer/graph"
+	"github.com/curityio/devpod/pkg/devcontainer/metadata"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/loft-sh/devpod/pkg/copy"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/graph"
-	"github.com/loft-sh/devpod/pkg/devcontainer/metadata"
-	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

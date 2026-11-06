@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/agent"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
-	"github.com/loft-sh/devpod/pkg/driver/custom"
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/agent"
+	"github.com/curityio/devpod/pkg/client/clientimplementation"
+	"github.com/curityio/devpod/pkg/driver/custom"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

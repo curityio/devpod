@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/loft-sh/devpod/cmd/completion"
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
-	logpkg "github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/completion"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
+	logpkg "github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 

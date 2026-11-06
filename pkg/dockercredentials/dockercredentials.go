@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/random"
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/types"
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/random"
 	"github.com/pkg/errors"
 
 	dockerconfig "github.com/containers/image/v5/pkg/docker/config"

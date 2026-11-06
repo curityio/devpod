@@ -3,12 +3,12 @@ package cmd
 import (
 	"context"
 
-	"github.com/loft-sh/devpod/cmd/completion"
-	"github.com/loft-sh/devpod/cmd/flags"
-	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/completion"
+	"github.com/curityio/devpod/cmd/flags"
+	client2 "github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 

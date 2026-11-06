@@ -7,13 +7,13 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/loft-sh/devpod/cmd/completion"
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/table"
-	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/completion"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/table"
+	"github.com/curityio/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 

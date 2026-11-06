@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log/survey"
-	"github.com/loft-sh/devpod/pkg/log/terminal"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log/survey"
+	"github.com/curityio/devpod/pkg/log/terminal"
+	"github.com/curityio/devpod/pkg/types"
 	"github.com/pkg/errors"
 )
 

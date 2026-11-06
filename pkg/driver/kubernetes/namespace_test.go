@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/kubeclient"
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/kubeclient"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"gotest.tools/assert"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,15 +47,15 @@ func fakeDriver(t *testing.T, handler func(method, path string) (int, any)) (*Ku
 	client, err := kubeclient.NewForConfig(&rest.Config{Host: server.URL})
 	assert.NilError(t, err)
 	return &KubernetesDriver{
-			namespace: testNamespace,
-			client:    &Client{client: client},
-			options:   &provider2.ProviderKubernetesDriverConfig{},
-			Log:       log.Discard,
-		}, func() []string {
-			mu.Lock()
-			defer mu.Unlock()
-			return append([]string(nil), requests...)
-		}
+		namespace: testNamespace,
+		client:    &Client{client: client},
+		options:   &provider2.ProviderKubernetesDriverConfig{},
+		Log:       log.Discard,
+	}, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), requests...)
+	}
 }
 
 func status(err *kerrors.StatusError) (int, any) {

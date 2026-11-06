@@ -59,6 +59,11 @@ devpod provider add gcloud
 devpod provider add digitalocean
 ```
 
+A name other than `docker` or `kubernetes` is downloaded from the latest release of the GitHub repository
+`curityio/devpod-provider-<name>`. The providers `aws`, `azure`, `civo`, `digitalocean`, `dockerless`, `ecs`,
+`gcloud`, `ssh` and `terraform` don't have a repository there yet, so they are downloaded from
+`loft-sh/devpod-provider-<name>`.
+
 :::info Multiple providers at the same time
 You can use the `--name` flag to add multiple providers of the same type with different options, for example `devpod provider add aws --name aws-gpu -o AWS_INSTANCE_TYPE=p3.8xlarge`
 :::

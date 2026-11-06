@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/pkg/client"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/pkg/client"
+	provider2 "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/workspace"
 )
 
 func (f *Framework) FindWorkspace(ctx context.Context, id string) (*provider2.Workspace, error) {

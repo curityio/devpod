@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 

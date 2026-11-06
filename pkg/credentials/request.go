@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/log"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"

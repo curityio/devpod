@@ -3,9 +3,9 @@ package workspace
 import (
 	"fmt"
 
-	"github.com/loft-sh/devpod/pkg/gitcredentials"
-	"github.com/loft-sh/devpod/pkg/log"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/gitcredentials"
+	"github.com/curityio/devpod/pkg/log"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
 )
 
 // GitUserOptions are the `devpod up` options for the git identity of the workspace's container.

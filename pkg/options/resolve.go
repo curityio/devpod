@@ -5,14 +5,14 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/loft-sh/devpod/pkg/agent"
-	"github.com/loft-sh/devpod/pkg/binaries"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/options/resolver"
+	"github.com/curityio/devpod/pkg/agent"
+	"github.com/curityio/devpod/pkg/binaries"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/options/resolver"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/types"
 )
 
 func ResolveAndSaveOptionsMachine(

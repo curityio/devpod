@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/util"
 	"github.com/denisbrodbeck/machineid"
 	"github.com/google/uuid"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/util"
 )
 
 const (

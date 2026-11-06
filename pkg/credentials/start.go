@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/agent/tunnel"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/log"
-	portpkg "github.com/loft-sh/devpod/pkg/port"
-	"github.com/loft-sh/devpod/pkg/random"
+	"github.com/curityio/devpod/pkg/agent/tunnel"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/log"
+	portpkg "github.com/curityio/devpod/pkg/port"
+	"github.com/curityio/devpod/pkg/random"
 )
 
 func StartCredentialsServer(ctx context.Context, cancel context.CancelFunc, client tunnel.TunnelClient, log log.Logger) (int, error) {

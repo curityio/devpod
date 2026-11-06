@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/download"
 )
 
 const (

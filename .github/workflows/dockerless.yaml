@@ -49,7 +49,7 @@ jobs:
       - name: Check licenses
         run: |
           go install github.com/google/go-licenses/v2@v2.0.1
-          go-licenses check ./... --ignore github.com/loft-sh/devpod
+          go-licenses check ./... --ignore github.com/curityio/devpod
 
   image:
     needs: check

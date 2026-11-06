@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>sh.loft.devpod</id>
+  <id>io.curity.devpod</id>
 
   <name>Devpod</name>
   <summary>Codespaces but open-source, client-only and unopinionated: Works with any IDE and lets you use any cloud, kubernetes or just localhost docker.</summary>
-  <developer_name>Loft Labs</developer_name>
+  <developer_name>Curity</developer_name>
 
   <metadata_license>FSFAP</metadata_license>
   <project_license>MPL-2.0</project_license>
@@ -25,7 +25,7 @@
     </p>
   </description>
 
-  <launchable type="desktop-id">sh.loft.devpod.desktop</launchable>
+  <launchable type="desktop-id">io.curity.devpod.desktop</launchable>
   <screenshots>
     <screenshot type="default">
       <image>https://devpod.curityio.net/media/add-provider-2.png</image>

@@ -6,8 +6,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/curityio/devpod/pkg/log/survey"
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/devpod/pkg/log/survey"
 	"github.com/sirupsen/logrus"
 )
 

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 	"gotest.tools/assert"
 )
 

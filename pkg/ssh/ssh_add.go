@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/log"
-	devsshagent "github.com/loft-sh/devpod/pkg/ssh/agent"
-	"github.com/loft-sh/devpod/pkg/util"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/log"
+	devsshagent "github.com/curityio/devpod/pkg/ssh/agent"
+	"github.com/curityio/devpod/pkg/util"
 	"golang.org/x/crypto/ssh"
 )
 

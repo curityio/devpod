@@ -4,10 +4,10 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/graph"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/devcontainer/graph"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/types"
 )
 
 const (

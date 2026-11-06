@@ -1,11 +1,11 @@
 package helper
 
 import (
-	"github.com/loft-sh/devpod/cmd/agent"
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/cmd/helper/http"
-	"github.com/loft-sh/devpod/cmd/helper/json"
-	"github.com/loft-sh/devpod/cmd/helper/strings"
+	"github.com/curityio/devpod/cmd/agent"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/cmd/helper/http"
+	"github.com/curityio/devpod/cmd/helper/json"
+	"github.com/curityio/devpod/cmd/helper/strings"
 	"github.com/spf13/cobra"
 )
 

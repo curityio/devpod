@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/extract"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/extract"
 )
 
 var excludedPaths = []string{

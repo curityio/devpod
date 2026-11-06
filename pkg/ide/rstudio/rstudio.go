@@ -14,13 +14,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/config"
-	copypkg "github.com/loft-sh/devpod/pkg/copy"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/ide"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/single"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/config"
+	copypkg "github.com/curityio/devpod/pkg/copy"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/ide"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/single"
 )
 
 const (

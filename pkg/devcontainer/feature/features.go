@@ -10,15 +10,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/extract"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/hash"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/extract"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/hash"
 	"github.com/pkg/errors"
 )
 

@@ -14,6 +14,7 @@ mod custom_protocol;
 mod file_exists;
 mod fix_env;
 mod get_env;
+mod identifier_migration;
 mod install_cli;
 mod logging;
 mod providers;
@@ -61,6 +62,9 @@ fn main() -> anyhow::Result<()> {
     let ctx = tauri::generate_context!();
     let app_name = ctx.package_info().name.to_string();
 
+    // Before the stores are opened and the webview is created
+    let identifier_migration = identifier_migration::migrate_app_dirs(&ctx.config().identifier);
+
     CustomProtocol::forward_deep_link();
 
     let (tx, rx) = mpsc::channel::<UiMessage>(10);
@@ -101,6 +105,12 @@ fn main() -> anyhow::Result<()> {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             info!("Setup application");
+            for result in &identifier_migration {
+                match result {
+                    Ok(msg) => info!("{}", msg),
+                    Err(msg) => error!("{}", msg),
+                }
+            }
 
             providers::check_dangling_provider(&app.handle());
             let window_helper = window::WindowHelper::new(app.handle().clone());

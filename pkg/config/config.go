@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/types"
 	"github.com/ghodss/yaml"
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/types"
 	"github.com/pkg/errors"
 )
 

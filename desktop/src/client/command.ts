@@ -91,7 +91,7 @@ export class Command implements TCommand<ChildProcess<string>> {
       if (this.isFlatpak === undefined) {
         this.isFlatpak = await this.getEnv("FLATPAK_ID")
         if (this.isFlatpak) {
-          this.extraEnvVars["FLATPAK_ID"] = "sh.loft.devpod"
+          this.extraEnvVars["FLATPAK_ID"] = "io.curity.devpod"
           this.extraEnvVars[DEVPOD_ADDITIONAL_ENV_VARS] = recordToCSV(this.extraEnvVars)
           this.sidecarCommand = ShellCommand.sidecar(DEVPOD_BINARY, this.args, {
             env: this.extraEnvVars,

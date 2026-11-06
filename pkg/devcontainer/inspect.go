@@ -3,9 +3,9 @@ package devcontainer
 import (
 	"context"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/driver"
-	"github.com/loft-sh/devpod/pkg/image"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/driver"
+	"github.com/curityio/devpod/pkg/image"
 )
 
 func (r *runner) inspectImage(ctx context.Context, imageName string) (*config.ImageDetails, error) {

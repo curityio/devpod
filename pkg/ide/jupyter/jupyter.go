@@ -5,11 +5,11 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/ide"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/single"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/ide"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/single"
 )
 
 const (

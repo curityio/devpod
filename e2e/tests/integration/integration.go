@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/loft-sh/devpod/e2e/framework"
+	"github.com/curityio/devpod/e2e/framework"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
