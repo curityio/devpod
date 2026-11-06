@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/loft-sh/devpod/e2e/framework"
-	"github.com/loft-sh/devpod/pkg/devcontainer/build"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/dockerfile"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/e2e/framework"
+	"github.com/curityio/devpod/pkg/devcontainer/build"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/dockerfile"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 )
 

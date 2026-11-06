@@ -23,6 +23,9 @@ Add new entries to the top of the "Unreleased" section.
   navy. In dark mode the
   background is Curity's navy with a purple glow, and cards are translucent purple panels. The Curity logo is
   white in dark mode.
+- The Go module path is `github.com/curityio/devpod` instead of `github.com/loft-sh/devpod` (and
+  `github.com/curityio/devpod/dockerless` for `dockerless/`), so stack traces and `-ldflags -X` settings, such as
+  `github.com/curityio/devpod/pkg/version.version`, use the new path.
 
 ## v0.9.0 (2026-10-23)
 

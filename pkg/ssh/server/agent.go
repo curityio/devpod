@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/pkg/ssh/sshd"
+	"github.com/curityio/devpod/pkg/ssh/sshd"
 )
 
 // agentSocketFile is the name of the agent socket in its directory, the same

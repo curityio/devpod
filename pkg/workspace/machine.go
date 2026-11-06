@@ -6,16 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/encoding"
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/survey"
-	"github.com/loft-sh/devpod/pkg/log/terminal"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/client/clientimplementation"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/encoding"
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/survey"
+	"github.com/curityio/devpod/pkg/log/terminal"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/types"
 )
 
 func listMachines(devPodConfig *config.Config, log log.Logger) ([]*providerpkg.Machine, error) {

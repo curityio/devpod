@@ -4,10 +4,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	devcontainerconfig "github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/git"
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/config"
+	devcontainerconfig "github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/git"
+	"github.com/curityio/devpod/pkg/types"
 )
 
 var (

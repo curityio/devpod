@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 // install describes where Upgrade puts a new release.

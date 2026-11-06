@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/provider"
 )
 
 type BaseClient interface {

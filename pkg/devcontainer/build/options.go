@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/devcontainer/feature"
-	"github.com/loft-sh/devpod/pkg/devcontainer/metadata"
-	"github.com/loft-sh/devpod/pkg/dockerfile"
-	"github.com/loft-sh/devpod/pkg/id"
-	"github.com/loft-sh/devpod/pkg/log/hash"
-	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/devcontainer/feature"
+	"github.com/curityio/devpod/pkg/devcontainer/metadata"
+	"github.com/curityio/devpod/pkg/dockerfile"
+	"github.com/curityio/devpod/pkg/id"
+	"github.com/curityio/devpod/pkg/log/hash"
+	"github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 )
 

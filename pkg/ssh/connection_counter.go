@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 func newConnectionCounter(ctx context.Context, timeout time.Duration, onTimeout func(), address string, log log.Logger) *connectionCounter {

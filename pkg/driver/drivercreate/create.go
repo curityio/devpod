@@ -3,12 +3,12 @@ package drivercreate
 import (
 	"fmt"
 
-	"github.com/loft-sh/devpod/pkg/driver"
-	"github.com/loft-sh/devpod/pkg/driver/custom"
-	"github.com/loft-sh/devpod/pkg/driver/docker"
-	"github.com/loft-sh/devpod/pkg/driver/kubernetes"
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/driver"
+	"github.com/curityio/devpod/pkg/driver/custom"
+	"github.com/curityio/devpod/pkg/driver/docker"
+	"github.com/curityio/devpod/pkg/driver/kubernetes"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 )
 
 func NewDriver(workspaceInfo *provider2.AgentWorkspaceInfo, log log.Logger) (driver.Driver, error) {

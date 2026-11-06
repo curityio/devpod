@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 
-	client2 "github.com/loft-sh/devpod/pkg/client"
-	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
-	devssh "github.com/loft-sh/devpod/pkg/ssh"
-	devsshagent "github.com/loft-sh/devpod/pkg/ssh/agent"
+	client2 "github.com/curityio/devpod/pkg/client"
+	config2 "github.com/curityio/devpod/pkg/devcontainer/config"
+	devssh "github.com/curityio/devpod/pkg/ssh"
+	devsshagent "github.com/curityio/devpod/pkg/ssh/agent"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

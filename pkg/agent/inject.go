@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/agent/agentbin"
-	"github.com/loft-sh/devpod/pkg/inject"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/shell"
-	"github.com/loft-sh/devpod/pkg/version"
+	"github.com/curityio/devpod/pkg/agent/agentbin"
+	"github.com/curityio/devpod/pkg/inject"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/shell"
+	"github.com/curityio/devpod/pkg/version"
 )
 
 var waitForInstanceConnectionTimeout = time.Minute * 5

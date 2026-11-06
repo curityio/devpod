@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	config2 "github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/config"
+	config2 "github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/file"
 )
 
 const (

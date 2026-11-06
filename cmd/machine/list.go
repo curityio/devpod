@@ -8,11 +8,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/table"
-	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/table"
+	"github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

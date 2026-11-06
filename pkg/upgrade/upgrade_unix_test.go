@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )

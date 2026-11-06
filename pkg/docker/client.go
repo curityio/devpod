@@ -3,8 +3,8 @@ package docker
 import (
 	"context"
 
+	"github.com/curityio/devpod/pkg/log"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

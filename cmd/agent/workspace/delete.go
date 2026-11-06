@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/agent"
-	agentdaemon "github.com/loft-sh/devpod/pkg/daemon/agent"
-	"github.com/loft-sh/devpod/pkg/log"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/agent"
+	agentdaemon "github.com/curityio/devpod/pkg/daemon/agent"
+	"github.com/curityio/devpod/pkg/log"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

@@ -8,15 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/types"
-	"github.com/loft-sh/devpod/providers"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/types"
+	"github.com/curityio/devpod/providers"
 
-	"github.com/loft-sh/devpod/pkg/binaries"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/download"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/binaries"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
+	"github.com/curityio/devpod/e2e/framework"
 	"github.com/google/uuid"
-	"github.com/loft-sh/devpod/e2e/framework"
 	"github.com/onsi/ginkgo/v2"
 )
 

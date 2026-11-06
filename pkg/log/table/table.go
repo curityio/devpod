@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/mattn/go-runewidth"
 	"github.com/sirupsen/logrus"
 )

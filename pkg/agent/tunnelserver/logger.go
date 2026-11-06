@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/curityio/devpod/pkg/agent/tunnel"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/scanner"
+	"github.com/curityio/devpod/pkg/log/survey"
 	"github.com/go-logr/logr"
-	"github.com/loft-sh/devpod/pkg/agent/tunnel"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/scanner"
-	"github.com/loft-sh/devpod/pkg/log/survey"
 	"github.com/sirupsen/logrus"
 )
 

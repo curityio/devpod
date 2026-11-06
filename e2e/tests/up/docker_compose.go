@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/curityio/devpod/e2e/framework"
+	"github.com/curityio/devpod/pkg/compose"
+	docker "github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/docker/docker/api/types"
-	"github.com/loft-sh/devpod/e2e/framework"
-	"github.com/loft-sh/devpod/pkg/compose"
-	docker "github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )

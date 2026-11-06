@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os/user"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/credentials"
-	"github.com/loft-sh/devpod/pkg/dockercredentials"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/credentials"
+	"github.com/curityio/devpod/pkg/dockercredentials"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 

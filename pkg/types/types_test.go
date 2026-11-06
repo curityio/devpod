@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/loft-sh/devpod/pkg/types"
+	"github.com/curityio/devpod/pkg/types"
 	"gotest.tools/assert"
 )
 

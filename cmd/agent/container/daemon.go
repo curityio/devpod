@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/agent"
-	agentd "github.com/loft-sh/devpod/pkg/daemon/agent"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/agent"
+	agentd "github.com/curityio/devpod/pkg/daemon/agent"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

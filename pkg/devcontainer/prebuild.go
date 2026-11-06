@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/build"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/driver"
-	"github.com/loft-sh/devpod/pkg/image"
-	"github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/devcontainer/build"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/driver"
+	"github.com/curityio/devpod/pkg/image"
+	"github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 )
 

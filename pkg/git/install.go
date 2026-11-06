@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -10,8 +10,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/loft-sh/devpod/pkg/agent/tunnel"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/agent/tunnel"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

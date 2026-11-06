@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/loft-sh/devpod/e2e/framework"
+	"github.com/curityio/devpod/e2e/framework"
 	"github.com/onsi/ginkgo/v2"
 )
 

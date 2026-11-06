@@ -5,11 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/credentials"
-	"github.com/loft-sh/devpod/pkg/gitcredentials"
-	"github.com/loft-sh/devpod/pkg/gpg"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/credentials"
+	"github.com/curityio/devpod/pkg/gitcredentials"
+	"github.com/curityio/devpod/pkg/gpg"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 
