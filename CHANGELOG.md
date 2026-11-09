@@ -7,6 +7,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+## v0.10.0 (2026-11-09)
+
 ### Fixed
 
 - The kubernetes provider can create a workspace in a namespace that doesn't exist yet on clusters that only
