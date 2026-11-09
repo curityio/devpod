@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/download"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 func TestParseVersion(t *testing.T) {

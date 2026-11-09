@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/devpod/e2e/framework"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	docker "github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/e2e/framework"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	docker "github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )

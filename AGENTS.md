@@ -61,9 +61,13 @@ cd src-tauri && cargo +stable check
 
 - **Pull requests go to `curityio/devpod` `main` only, never upstream.** The `upstream` remote is read-only
   reference.
-- **The Go module path is still `github.com/loft-sh/devpod`.** Imports were deliberately not renamed; don't
-  "fix" them. Likewise the desktop app identifier `sh.loft.devpod` is kept because it is tied to the `devpod://`
-  deep link scheme, the Flatpak id and existing installs.
+- **The Go module path is `github.com/curityio/devpod`** (renamed from upstream's `github.com/loft-sh/devpod`).
+- **The desktop app identifier is `io.curity.devpod`** (upstream's was `sh.loft.devpod`). Tauri names the app's
+  data directories after it, so `desktop/src-tauri/src/identifier_migration.rs` copies an existing install's
+  `sh.loft.devpod` directories on first start, and `desktop/src-tauri/windows/installer-hooks.nsh` moves the
+  Windows installer's registry key from `Software\loft` to `Software\Curity` (the `publisher`). Changing the
+  identifier or the publisher again needs the same care. It also appears in `custom_protocol.rs`, `Info.plist`,
+  the Flatpak manifest and `command.ts` (`FLATPAK_ID`).
 - **Dependencies are vendored.** Builds use `-mod=vendor`. After changing imports or `go.mod`, run
   `GOFLAGS=-mod=mod go mod tidy && go mod vendor` and commit `vendor/`.
 - **The agent is embedded in the CLI.** `hack/build-agents.sh` builds the Linux agents (amd64 and arm64, with the
@@ -81,12 +85,12 @@ cd src-tauri && cargo +stable check
   the binary, which also runs as the agent. Use `pkg/kubeclient`, which only registers core/v1 and rbac/v1; add a
   resource or group there if you need one. `go list -deps . | grep '^k8s.io/client-go/kubernetes'` must print
   nothing.
-- **Don't depend on `github.com/loft-sh` modules** (other than this module's own path). They are no longer
+- **Don't depend on `github.com/loft-sh` modules.** They are no longer
   maintained, and the ones DevPod used now live here: the logger is `pkg/log` (`log.Logger`, `log.Default`,
   `pkg/log/table`, `pkg/log/survey`), and the SSH server that runs in the container is `pkg/ssh/sshd`, a copy of
   `gliderlabs/ssh` with unix socket forwarding added. Check that a new dependency is maintained before adding
   it.
-- **`dockerless/` is a separate Go module** (`github.com/loft-sh/devpod/dockerless`), with its own `go.mod`, no
+- **`dockerless/` is a separate Go module** (`github.com/curityio/devpod/dockerless`), with its own `go.mod`, no
   `vendor/`, a newer Go and golangci-lint v2 (its `.golangci.yaml`). Commands run at the root don't see it: run
   them in `dockerless/`, with `GOOS=linux`. Its image is published from a `dockerless-v<version>` tag; DevPod pins
   the version in `pkg/devcontainer/single.go`, so a change to `dockerless/` needs a new tag and that pin bumped.

@@ -245,7 +245,7 @@ fn install(app_handle: AppHandle, force: bool) -> Result<(), InstallCLIError> {
     bin_dir.push("bin");
 
     // Create binary directory in app dir and write bin_files to disk
-    // These will be stored in a /bin folder under our control, usually `%APP_DIR%/sh.loft.devpod/bin`
+    // These will be stored in a /bin folder under our control, usually `%APP_DIR%/io.curity.devpod/bin`
     let cli_path = cli_path.to_str().ok_or(InstallCLIError::PathConversion)?;
 
     let sh_file = BinFile {

@@ -6,20 +6,35 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
+	"github.com/curityio/devpod/cmd/flags"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/spf13/cobra"
 )
+
+const providerRepoPrefix = "devpod-provider-"
 
 // ListAvailableCmd holds the list cmd flags
 type ListAvailableCmd struct {
 	flags.GlobalFlags
 }
 
+type repoSearchResult struct {
+	Items []struct {
+		Name string `json:"name"`
+	} `json:"items"`
+}
+
 func getDevpodProviderList() error {
-	req, err := http.NewRequest("GET", "https://api.github.com/users/loft-sh/repos", nil)
+	url := fmt.Sprintf(
+		"https://api.github.com/search/repositories?q=%s+in:name+org:%s&per_page=100",
+		providerRepoPrefix,
+		workspace.GithubProviderOwner,
+	)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -33,22 +48,39 @@ func getDevpodProviderList() error {
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("list provider repositories: %s: %s", resp.Status, strings.TrimSpace(string(result)))
+	}
 
-	var jsonResult []map[string]interface{}
-	err = json.Unmarshal(result, &jsonResult)
+	var searchResult repoSearchResult
+	err = json.Unmarshal(result, &searchResult)
 	if err != nil {
 		return err
 	}
+	repoNames := make([]string, 0, len(searchResult.Items))
+	for _, item := range searchResult.Items {
+		repoNames = append(repoNames, item.Name)
+	}
 
-	fmt.Println("List of available providers from loft:")
-	for _, v := range jsonResult {
-		if strings.Contains(v["name"].(string), "devpod-provider") {
-			name := strings.TrimPrefix(v["name"].(string), "devpod-provider-")
-			fmt.Println("\t", name)
-		}
+	fmt.Println("List of available providers:")
+	for _, name := range availableProviders(repoNames) {
+		fmt.Println("\t", name)
 	}
 
 	return nil
+}
+
+// availableProviders returns the sorted names of the providers in the given repositories and of the
+// providers that are still downloaded from loft-sh.
+func availableProviders(repoNames []string) []string {
+	names := slices.Clone(workspace.LoftProviders)
+	for _, repoName := range repoNames {
+		if name, ok := strings.CutPrefix(repoName, providerRepoPrefix); ok && name != "" {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
 }
 
 // NewListAvailableCmd creates a new command

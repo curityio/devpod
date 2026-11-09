@@ -10,10 +10,10 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/gitcredentials"
-	devpodhttp "github.com/loft-sh/devpod/pkg/http"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/gitcredentials"
+	devpodhttp "github.com/curityio/devpod/pkg/http"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/spf13/cobra"
 )
 

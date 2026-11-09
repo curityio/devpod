@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/loft-sh/devpod/e2e/framework"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	docker "github.com/loft-sh/devpod/pkg/docker"
-	"github.com/loft-sh/devpod/pkg/language"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/e2e/framework"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	docker "github.com/curityio/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/language"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -183,7 +183,7 @@ var _ = DevPodDescribe("devpod up test suite", func() {
 			ginkgo.DeferCleanup(f.DevPodWorkspaceDelete, context.Background(), name)
 
 			// Wait for devpod workspace to come online (deadline: 30s)
-			err = f.DevPodUp(ctx, "github.com/loft-sh/devpod@pull/3/head")
+			err = f.DevPodUp(ctx, "github.com/curityio/devpod@pull/3/head")
 			framework.ExpectNoError(err)
 		})
 

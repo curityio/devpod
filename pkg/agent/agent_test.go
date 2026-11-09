@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"gotest.tools/assert"
 )
 

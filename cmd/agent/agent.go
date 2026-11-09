@@ -3,13 +3,13 @@ package agent
 import (
 	"os"
 
-	"github.com/loft-sh/devpod/cmd/agent/container"
-	"github.com/loft-sh/devpod/cmd/agent/workspace"
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/envfile"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/agent/container"
+	"github.com/curityio/devpod/cmd/agent/workspace"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/client/clientimplementation"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/envfile"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

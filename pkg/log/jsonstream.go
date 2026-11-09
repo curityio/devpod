@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/loft-sh/devpod/pkg/log/scanner"
+	"github.com/curityio/devpod/pkg/log/scanner"
 	"github.com/sirupsen/logrus"
 )
 

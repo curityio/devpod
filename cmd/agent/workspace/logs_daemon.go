@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/agent"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/agent"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/ghodss/yaml"
-	"github.com/loft-sh/devpod/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )

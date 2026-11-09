@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/loft-sh/devpod/pkg/provider"
-	"github.com/loft-sh/devpod/pkg/util"
+	"github.com/curityio/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/util"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"

@@ -13,8 +13,8 @@ import (
 	"github.com/blang/semver"
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/docker"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/docker"
 	"github.com/pkg/errors"
 )
 

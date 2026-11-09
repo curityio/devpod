@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/copy"
-	"github.com/loft-sh/devpod/pkg/download"
-	"github.com/loft-sh/devpod/pkg/extract"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/hash"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/copy"
+	"github.com/curityio/devpod/pkg/download"
+	"github.com/curityio/devpod/pkg/extract"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/hash"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 )
 

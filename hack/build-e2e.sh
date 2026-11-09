@@ -14,7 +14,7 @@ fi
 # Each build gets its own version, so that DevPod replaces the agent that an earlier build put into a container.
 # The CLI and the agents it embeds must have the same version.
 VERSION="${VERSION:-v0.0.0-dev.$(date -u +%Y%m%d%H%M%S)}"
-LDFLAGS="-s -w -X github.com/loft-sh/devpod/pkg/version.version=$VERSION"
+LDFLAGS="-s -w -X github.com/curityio/devpod/pkg/version.version=$VERSION"
 echo "Building version $VERSION"
 
 # the CLI embeds the Linux agents

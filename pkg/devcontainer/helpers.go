@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/git"
-	"github.com/loft-sh/devpod/pkg/image"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/git"
+	"github.com/curityio/devpod/pkg/image"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 type GetWorkspaceConfigResult struct {

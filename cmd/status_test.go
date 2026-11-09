@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/provider"
-	workspace2 "github.com/loft-sh/devpod/pkg/workspace"
+	client2 "github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/provider"
+	workspace2 "github.com/curityio/devpod/pkg/workspace"
 	"github.com/sirupsen/logrus"
 	"gotest.tools/assert"
 )

@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/log"
 )
 
 // InstallAPKRequirements installs the requirements using apk.

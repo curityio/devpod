@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	log2 "github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/config"
+	log2 "github.com/curityio/devpod/pkg/log"
 )
 
 const (

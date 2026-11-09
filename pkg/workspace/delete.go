@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	client2 "github.com/loft-sh/devpod/pkg/client"
-	"github.com/loft-sh/devpod/pkg/client/clientimplementation"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
+	client2 "github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/client/clientimplementation"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/pkg/errors"
 )
 

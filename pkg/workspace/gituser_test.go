@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	providerpkg "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	providerpkg "github.com/curityio/devpod/pkg/provider"
 	"gotest.tools/assert"
 )
 

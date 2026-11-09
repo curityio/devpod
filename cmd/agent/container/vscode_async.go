@@ -3,11 +3,11 @@ package container
 import (
 	"encoding/json"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/compress"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/ide/vscode"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/compress"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/ide/vscode"
+	"github.com/curityio/devpod/pkg/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

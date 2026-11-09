@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

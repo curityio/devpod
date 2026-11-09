@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/loft-sh/devpod/pkg/ssh"
+	"github.com/curityio/devpod/pkg/ssh"
 	"github.com/pkg/errors"
 )
 

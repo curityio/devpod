@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/workspace"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/workspace"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -46,7 +46,7 @@ func NewUpdateCmd(flags *flags.GlobalFlags) *cobra.Command {
 
 func (cmd *UpdateCmd) Run(ctx context.Context, devPodConfig *config.Config, args []string) error {
 	if len(args) != 1 && len(args) != 2 {
-		return fmt.Errorf("please specify either a local file, url or git repository. E.g. devpod provider update my-provider loft-sh/devpod-provider-gcloud")
+		return fmt.Errorf("please specify either a local file, url or git repository. E.g. devpod provider update my-provider gcloud")
 	}
 
 	providerSource := ""

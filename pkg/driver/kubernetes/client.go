@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/loft-sh/devpod/pkg/kubeclient"
+	"github.com/curityio/devpod/pkg/kubeclient"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"

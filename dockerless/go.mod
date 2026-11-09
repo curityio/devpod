@@ -1,4 +1,4 @@
-module github.com/loft-sh/devpod/dockerless
+module github.com/curityio/devpod/dockerless
 
 go 1.27.2
 

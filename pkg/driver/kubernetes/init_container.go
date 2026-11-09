@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/driver"
+	"github.com/curityio/devpod/pkg/driver"
 	corev1 "k8s.io/api/core/v1"
 )
 

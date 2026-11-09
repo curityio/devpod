@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/loft-sh/devpod/pkg/config"
-	"github.com/loft-sh/devpod/pkg/git"
+	"github.com/curityio/devpod/pkg/config"
+	"github.com/curityio/devpod/pkg/git"
 )
 
 // ApplyContextOptions sets the CLI options that the agent needs from the context options, so that every command

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/loft-sh/devpod/cmd/flags"
-	"github.com/loft-sh/devpod/pkg/image"
+	"github.com/curityio/devpod/cmd/flags"
+	"github.com/curityio/devpod/pkg/image"
 	"github.com/spf13/cobra"
 )
 

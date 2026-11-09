@@ -1,9 +1,9 @@
 package tunnelserver
 
 import (
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/netstat"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/netstat"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 )
 
 type Option func(*tunnelServer) *tunnelServer

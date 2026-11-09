@@ -12,9 +12,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/loft-sh/devpod/pkg/agent/tunnel"
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/agent/tunnel"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/log"
 	"google.golang.org/grpc"
 	"gotest.tools/assert"
 	is "gotest.tools/assert/cmp"

@@ -5,8 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/upgrade"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/upgrade"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

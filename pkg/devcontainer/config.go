@@ -5,9 +5,9 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
-	"github.com/loft-sh/devpod/pkg/language"
-	provider2 "github.com/loft-sh/devpod/pkg/provider"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/language"
+	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
 )
 

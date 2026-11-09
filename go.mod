@@ -1,4 +1,4 @@
-module github.com/loft-sh/devpod
+module github.com/curityio/devpod
 
 go 1.23.1
 

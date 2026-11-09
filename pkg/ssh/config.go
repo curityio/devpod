@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/log/scanner"
-	"github.com/loft-sh/devpod/pkg/util"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/log/scanner"
+	"github.com/curityio/devpod/pkg/util"
 	"github.com/pkg/errors"
 )
 

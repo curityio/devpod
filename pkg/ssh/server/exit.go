@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/log"
-	"github.com/loft-sh/devpod/pkg/ssh/sshd"
+	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/ssh/sshd"
 	perrors "github.com/pkg/errors"
 )
 

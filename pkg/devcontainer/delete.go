@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/devcontainer/config"
+	"github.com/curityio/devpod/pkg/devcontainer/config"
 	"github.com/pkg/errors"
 )
 

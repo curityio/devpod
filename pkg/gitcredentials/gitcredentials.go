@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/loft-sh/devpod/pkg/command"
-	"github.com/loft-sh/devpod/pkg/file"
-	"github.com/loft-sh/devpod/pkg/git"
-	"github.com/loft-sh/devpod/pkg/log/scanner"
+	"github.com/curityio/devpod/pkg/command"
+	"github.com/curityio/devpod/pkg/file"
+	"github.com/curityio/devpod/pkg/git"
+	"github.com/curityio/devpod/pkg/log/scanner"
 	"github.com/pkg/errors"
 )
 
