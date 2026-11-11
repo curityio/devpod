@@ -119,6 +119,7 @@ func BuildRoot() *cobra.Command {
 	rootCmd.AddCommand(NewUpCmd(globalFlags))
 	rootCmd.AddCommand(NewDeleteCmd(globalFlags))
 	rootCmd.AddCommand(NewSSHCmd(globalFlags))
+	rootCmd.AddCommand(NewCpCmd(globalFlags))
 	rootCmd.AddCommand(NewVersionCmd())
 	rootCmd.AddCommand(NewStopCmd(globalFlags))
 	rootCmd.AddCommand(NewListCmd(globalFlags))

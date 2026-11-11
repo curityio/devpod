@@ -322,3 +322,21 @@ Host testhost
 		})
 	}
 }
+
+func TestParseWorkdirFlag(t *testing.T) {
+	for _, workdir := range []string{"", "/workspaces/foo", "/home/me/my project"} {
+		config, err := addHostSection("", "/path/to/devpod", "foo.devpod", "me", "default", "foo", workdir, "", false, true, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := ""
+		for _, line := range strings.Split(config, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+				got = parseWorkdirFlag(line)
+			}
+		}
+		if got != workdir {
+			t.Errorf("expected workdir %q, got %q from:\n%s", workdir, got, config)
+		}
+	}
+}

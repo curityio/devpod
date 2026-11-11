@@ -24,6 +24,7 @@ func NewHelperCmd(globalFlags *flags.GlobalFlags) *cobra.Command {
 	helperCmd.AddCommand(json.NewJSONCmd(globalFlags))
 	helperCmd.AddCommand(strings.NewStringsCmd(globalFlags))
 	helperCmd.AddCommand(NewSSHServerCmd(globalFlags))
+	helperCmd.AddCommand(NewSFTPServerCmd(globalFlags))
 	helperCmd.AddCommand(NewGetWorkspaceNameCmd(globalFlags))
 	helperCmd.AddCommand(NewGetWorkspaceUIDCmd(globalFlags))
 	helperCmd.AddCommand(NewGetWorkspaceConfigCommand(globalFlags))

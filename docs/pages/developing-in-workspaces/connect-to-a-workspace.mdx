@@ -88,6 +88,34 @@ Optionally you can also define a command to run:
 devpod ssh my-workspace --command "echo Hello World"
 ```
 
+### Copy Files
+
+`devpod cp` copies files and directories between your machine and a workspace. A path in the workspace is
+written as `WORKSPACE_NAME:PATH`, like with `scp`. A relative path is relative to the workspace folder, and an
+empty one is the workspace folder itself:
+```
+# copy a file into the workspace folder
+devpod cp my-file.txt my-workspace:
+
+# copy a file to a path relative to the workspace folder, under another name
+devpod cp ./here/file-here.txt my-workspace:file-in-container.txt
+
+# copy a directory into an absolute path in the container
+devpod cp ./temp/ my-workspace:/opt/
+
+# copy a file from the workspace to the current directory
+devpod cp my-workspace:/etc/os-release .
+```
+
+Like `docker cp`, a file or directory is copied into the destination if that is an existing directory, and to the
+destination otherwise. A destination that ends with `/` must be a directory, and is created if it's missing. A
+source that ends with `/.` copies a directory's contents instead of the directory. Directories are copied with
+everything in them, keeping permissions, modification times and symlinks.
+
+Files are copied as the workspace's user, who owns the files copied into the workspace. To write where only root
+can, such as `/usr/local`, add `--user root`. To copy a local file whose name has a colon in it, start its path
+with `./`.
+
 ## IDE Commands
 
 This section shows additional commands to configure DevPod's behavior when opening a workspace.

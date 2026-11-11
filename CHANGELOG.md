@@ -7,6 +7,20 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Added
+
+- `devpod cp` copies files and directories to or from a workspace, such as `devpod cp ./temp/ my-workspace:/opt/`
+  or `devpod cp my-workspace:out.log .`. A relative path in the workspace is relative to the workspace folder. It
+  copies as the workspace's user (`--user` to change), over SFTP through the same connection as `devpod ssh`.
+
+### Fixed
+
+- A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
+  keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
+  directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs
+  each SFTP session in a `devpod helper sftp-server` process started in the home directory, like OpenSSH's
+  `sftp-server`.
+
 ## v0.10.0 (2026-11-09)
 
 ### Fixed
