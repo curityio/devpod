@@ -124,11 +124,20 @@ ssh -L 8080:localhost:3000 my-workspace.devpod
 
 ### Copy files
 
-The `my-workspace.devpod` host works with any tool that uses ssh:
+`devpod cp` copies files and directories to and from a workspace. A relative path in the workspace is relative to the
+workspace folder:
+```
+devpod cp ./settings.json my-workspace:
+devpod cp my-workspace:build .
+```
+
+The `my-workspace.devpod` host also works with any tool that uses ssh:
 ```
 scp ./settings.json my-workspace.devpod:/workspaces/my-workspace/
 rsync -av my-workspace.devpod:/workspaces/my-workspace/build/ ./build/
 ```
+
+See [Copy Files](./copy-files.mdx) for where files land, which user they belong to, and what's kept.
 
 ## IDE Commands
 

@@ -30,6 +30,8 @@ Other providers, such as `kubernetes` or `ssh`, are added the same way. See
 | Run one command in the workspace | `devpod ssh my-workspace --command 'make test'` |
 | Open the workspace in an IDE | `devpod up my-workspace --ide vscode` |
 | Forward a port from the workspace to my computer | `devpod ssh my-workspace -L 8080:localhost:8080` |
+| Copy a file or directory into the workspace folder | `devpod cp ./test-data my-workspace:` |
+| Copy a file or directory from the workspace to my computer | `devpod cp my-workspace:build/report.html .` |
 | List my workspaces | `devpod list` |
 | See whether a workspace is running | `devpod status my-workspace` |
 | See the status of all workspaces | `devpod status --all` |
@@ -50,6 +52,10 @@ devpod up github.com/my-org/my-repo --ide none
 # Work in it, with your IDE over ssh (my-repo.devpod), or from a terminal
 devpod ssh my-repo
 devpod ssh my-repo --command 'git status --short'
+
+# Hand the workspace a file, and bring a result home
+devpod cp ~/Downloads/test-data.csv my-repo:fixtures/
+devpod cp my-repo:build/report.html .
 
 # Pull in a change to .devcontainer/devcontainer.json
 devpod up my-repo --recreate
@@ -163,5 +169,6 @@ from stopping while the agent works.
 
 - [Create a Workspace](../developing-in-workspaces/create-a-workspace.mdx): sources, options, recreating and resetting.
 - [Connect to a Workspace](../developing-in-workspaces/connect-to-a-workspace.mdx): IDEs, ssh, port forwarding.
+- [Copy Files](../developing-in-workspaces/copy-files.mdx): copying files to and from a workspace.
 - [devcontainer.json](../developing-in-workspaces/devcontainer-json.mdx): what goes in the dev container.
 - [Managing Providers](../managing-providers/what-are-providers.mdx): where workspaces run.
