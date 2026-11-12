@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/pkg/client"
 	"github.com/curityio/devpod/pkg/config"
@@ -54,10 +55,11 @@ func (cmd *LogsDaemonCmd) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	command := fmt.Sprintf("'%s' agent workspace logs-daemon --context '%s' --id '%s'", workspaceClient.AgentPath(), workspaceClient.Context(), workspaceClient.Workspace())
+	agentArgs := []string{workspaceClient.AgentPath(), "agent", "workspace", "logs-daemon", "--context", workspaceClient.Context(), "--id", workspaceClient.Workspace()}
 	if agentInfo.Agent.DataPath != "" {
-		command += fmt.Sprintf(" --agent-dir '%s'", agentInfo.Agent.DataPath)
+		agentArgs = append(agentArgs, "--agent-dir", agentInfo.Agent.DataPath)
 	}
+	command := shellescape.QuoteCommand(agentArgs)
 
 	// read daemon logs
 	return workspaceClient.Command(ctx, client.CommandOptions{

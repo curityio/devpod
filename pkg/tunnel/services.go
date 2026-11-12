@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/agent"
 	"github.com/curityio/devpod/pkg/agent/tunnelserver"
 	"github.com/curityio/devpod/pkg/config"
@@ -110,26 +111,27 @@ func RunServices(
 		writer := log.ErrorStreamOnly().Writer(logrus.DebugLevel, false)
 		defer writer.Close()
 
-		command := fmt.Sprintf("'%s' agent container credentials-server --user '%s'", agent.ContainerDevPodHelperLocation, user)
+		args := []string{agent.ContainerDevPodHelperLocation, "agent", "container", "credentials-server", "--user", user}
 		if configureGitCredentials {
-			command += " --configure-git-helper"
+			args = append(args, "--configure-git-helper")
 		}
 		if configureGitSSHSignatureHelper {
 			format, userSigningKey, err := gitsshsigning.ExtractGitConfiguration()
 			if err == nil && format == gitsshsigning.GPGFormatSSH && userSigningKey != "" {
 				encodedKey := base64.StdEncoding.EncodeToString([]byte(userSigningKey))
-				command += fmt.Sprintf(" --git-user-signing-key %s", encodedKey)
+				args = append(args, "--git-user-signing-key", encodedKey)
 			}
 		}
 		if configureDockerCredentials {
-			command += " --configure-docker-helper"
+			args = append(args, "--configure-docker-helper")
 		}
 		if forwardPorts {
-			command += " --forward-ports"
+			args = append(args, "--forward-ports")
 		}
 		if log.GetLevel() == logrus.DebugLevel {
-			command += " --debug"
+			args = append(args, "--debug")
 		}
+		command := shellescape.QuoteCommand(args)
 
 		err = devssh.Run(cancelCtx, containerClient, command, stdinReader, stdoutWriter, writer, nil)
 		if err != nil {

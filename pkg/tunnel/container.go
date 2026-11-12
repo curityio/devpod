@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/agent"
 	"github.com/curityio/devpod/pkg/client"
 	"github.com/curityio/devpod/pkg/config"
@@ -84,7 +85,7 @@ func (c *ContainerTunnel) Run(ctx context.Context, handler Handler, cfg *config.
 		defer writer.Close()
 		defer c.log.Debugf("Tunnel to host closed")
 
-		command := fmt.Sprintf("'%s' helper ssh-server --stdio", c.client.AgentPath())
+		command := shellescape.QuoteCommand([]string{c.client.AgentPath(), "helper", "ssh-server", "--stdio"})
 		if c.log.GetLevel() == logrus.DebugLevel {
 			command += " --debug"
 		}
@@ -172,10 +173,11 @@ func (c *ContainerTunnel) updateConfig(ctx context.Context, sshClient *ssh.Clien
 
 			// update workspace remotely
 			buf := &bytes.Buffer{}
-			command := fmt.Sprintf("'%s' agent workspace update-config --workspace-info '%s'", c.client.AgentPath(), workspaceInfo)
+			args := []string{c.client.AgentPath(), "agent", "workspace", "update-config", "--workspace-info", workspaceInfo}
 			if agentInfo.Agent.DataPath != "" {
-				command += fmt.Sprintf(" --agent-dir '%s'", agentInfo.Agent.DataPath)
+				args = append(args, "--agent-dir", agentInfo.Agent.DataPath)
 			}
+			command := shellescape.QuoteCommand(args)
 
 			c.log.Debugf("Run command in container: %s", command)
 			err = devssh.Run(ctx, sshClient, command, nil, buf, buf, nil)
@@ -222,7 +224,7 @@ func (c *ContainerTunnel) runInContainer(ctx context.Context, sshClient *ssh.Cli
 		c.log.Debugf("Run container tunnel")
 		defer c.log.Debugf("Container tunnel exited")
 
-		command := fmt.Sprintf("'%s' agent container-tunnel --workspace-info '%s'", c.client.AgentPath(), workspaceInfo)
+		command := shellescape.QuoteCommand([]string{c.client.AgentPath(), "agent", "container-tunnel", "--workspace-info", workspaceInfo})
 		if c.log.GetLevel() == logrus.DebugLevel {
 			command += " --debug"
 		}

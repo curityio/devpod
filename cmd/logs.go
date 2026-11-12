@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/completion"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/pkg/agent"
@@ -68,7 +68,7 @@ func (cmd *LogsCmd) Run(ctx context.Context, args []string) error {
 	defer stdoutWriter.Close()
 	defer stdinWriter.Close()
 	// ssh tunnel command
-	sshServerCmd := fmt.Sprintf("'%s' helper ssh-server --stdio", client.AgentPath())
+	sshServerCmd := shellescape.QuoteCommand([]string{client.AgentPath(), "helper", "ssh-server", "--stdio"})
 	if log.GetLevel() == logrus.DebugLevel {
 		sshServerCmd += " --debug"
 	}
@@ -102,7 +102,7 @@ func (cmd *LogsCmd) Run(ctx context.Context, args []string) error {
 	}()
 
 	// create agent command
-	agentCommand := fmt.Sprintf("'%s' agent workspace logs --context '%s' --id '%s'", client.AgentPath(), client.Context(), client.Workspace())
+	agentCommand := shellescape.QuoteCommand([]string{client.AgentPath(), "agent", "workspace", "logs", "--context", client.Context(), "--id", client.Workspace()})
 	if log.GetLevel() == logrus.DebugLevel {
 		agentCommand += " --debug"
 	}

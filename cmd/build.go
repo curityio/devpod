@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/pkg/agent"
 	"github.com/curityio/devpod/pkg/agent/tunnelserver"
@@ -168,7 +169,7 @@ func buildAgentClient(ctx context.Context, workspaceClient client.WorkspaceClien
 	}
 
 	// create container etc.
-	command := fmt.Sprintf("'%s' agent workspace %s --workspace-info '%s'", workspaceClient.AgentPath(), agentCommand, workspaceInfo)
+	command := shellescape.QuoteCommand([]string{workspaceClient.AgentPath(), "agent", "workspace", agentCommand, "--workspace-info", workspaceInfo})
 	if log.GetLevel() == logrus.DebugLevel {
 		command += " --debug"
 	}

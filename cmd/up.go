@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/pkg/agent"
 	"github.com/curityio/devpod/pkg/agent/tunnelserver"
@@ -394,17 +395,13 @@ func (cmd *UpCmd) devPodUpMachine(
 	defer log.Debugf("Done creating devcontainer")
 
 	// ssh tunnel command
-	sshTunnelCmd := fmt.Sprintf("'%s' helper ssh-server --stdio", client.AgentPath())
+	sshTunnelCmd := shellescape.QuoteCommand([]string{client.AgentPath(), "helper", "ssh-server", "--stdio"})
 	if log.GetLevel() == logrus.DebugLevel {
 		sshTunnelCmd += " --debug"
 	}
 
 	// create agent command
-	agentCommand := fmt.Sprintf(
-		"'%s' agent workspace up --workspace-info '%s'",
-		client.AgentPath(),
-		workspaceInfo,
-	)
+	agentCommand := shellescape.QuoteCommand([]string{client.AgentPath(), "agent", "workspace", "up", "--workspace-info", workspaceInfo})
 
 	if log.GetLevel() == logrus.DebugLevel {
 		agentCommand += " --debug"
