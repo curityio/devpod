@@ -2,12 +2,14 @@ package filetransfer
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -465,5 +467,125 @@ func TestSFTPErrorsAreRemote(t *testing.T) {
 	_, err = Copy(LocalFS{}, filepath.Join(root, "missing.txt"), newSFTPFS(t, root), "", log.Discard)
 	if errors.As(err, &remoteErr) || !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("expected a local not-exist error, got %v", err)
+	}
+}
+
+func TestCopyRejectsInvalidSourceName(t *testing.T) {
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"bad.txt": "bad", "bad-dir/x.txt": "x"})
+
+	// into an existing directory, into a directory written with a trailing slash, and into a missing directory
+	for _, src := range []string{"bad.txt", "bad-dir"} {
+		for _, dst := range []string{dstRoot, filepath.Join(dstRoot, "new") + string(os.PathSeparator)} {
+			_, err := Copy(LocalFS{}, filepath.Join(srcRoot, src), strictFS{}, dst, log.Discard)
+			if err == nil || !strings.Contains(err.Error(), "isn't a valid file name") {
+				t.Errorf("copy %s to %s: expected an invalid name error, got %v", src, dst, err)
+			}
+		}
+	}
+	if files := readTree(t, dstRoot); len(files) > 1 || (len(files) == 1 && files["new"] != "dir/") {
+		t.Errorf("expected nothing to be copied, got %v", files)
+	}
+}
+
+// observingFS records the permissions of the directory each file is created in, at the time it's created.
+type observingFS struct {
+	LocalFS
+	mu    sync.Mutex
+	modes map[string]fs.FileMode
+}
+
+func (f *observingFS) CreateNew(p string) (io.WriteCloser, error) {
+	info, err := os.Stat(filepath.Dir(p))
+	if err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	f.modes[filepath.Dir(p)] = info.Mode().Perm()
+	f.mu.Unlock()
+	return f.LocalFS.CreateNew(p)
+}
+
+func TestCopyKeepsNewDirectoriesPrivateUntilDone(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no such permissions")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"private/x.txt": "x", "private/sub/y.txt": "y"})
+	if err := os.Chmod(filepath.Join(srcRoot, "private"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	dst := &observingFS{modes: map[string]fs.FileMode{}}
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "private"), dst, dstRoot, log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for dir, mode := range dst.modes {
+		if mode != 0o700 {
+			t.Errorf("expected %s to be 0700 while files were copied into it, got %v", dir, mode)
+		}
+	}
+	if len(dst.modes) != 2 {
+		t.Errorf("expected files in 2 directories, got %v", dst.modes)
+	}
+	for p, mode := range map[string]fs.FileMode{"private": 0o700, "private/sub": 0o755} {
+		info, err := os.Stat(filepath.Join(dstRoot, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Errorf("expected %s to end up %v like its source, got %v", p, mode, info.Mode().Perm())
+		}
+	}
+}
+
+func TestCopyCreatesDestinationParentsWithUsualPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no such permissions")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"a.txt": "a"})
+
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "a.txt"), newSFTPFS(t, dstRoot), "x/y/", log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"x", "x/y"} {
+		info, err := os.Stat(filepath.Join(dstRoot, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("expected %s to be 0755, got %v", p, info.Mode().Perm())
+		}
+	}
+}
+
+func TestCopyLongFileName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the SFTP server is only used in Linux containers")
+	}
+	// file systems limit names to 255 bytes
+	name := strings.Repeat("n", 250)
+	localRoot, remoteRoot := t.TempDir(), t.TempDir()
+	writeTree(t, localRoot, tree{name: "up"})
+	writeTree(t, remoteRoot, tree{"down/" + name: "down"})
+
+	_, err := Copy(LocalFS{}, filepath.Join(localRoot, name), newSFTPFS(t, remoteRoot), "", log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Copy(newSFTPFS(t, remoteRoot), "down", LocalFS{}, localRoot, log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readTree(t, remoteRoot)[name]; got != "up" {
+		t.Errorf("expected the upload to be copied, got %q", got)
+	}
+	if got := readTree(t, localRoot)["down/"+name]; got != "down" {
+		t.Errorf("expected the download to be copied, got %q", got)
 	}
 }

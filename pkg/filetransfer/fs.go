@@ -47,8 +47,8 @@ type FS interface {
 	CreateNew(p string) (io.WriteCloser, error)
 	// Rename moves oldPath to newPath, replacing newPath if it exists and isn't a directory.
 	Rename(oldPath, newPath string) error
+	// Mkdir creates a directory that only its owner can use, until its permissions are set.
 	Mkdir(p string) error
-	MkdirAll(p string) error
 	Remove(p string) error
 	Symlink(target, p string) error
 	Chmod(p string, mode fs.FileMode) error
@@ -69,8 +69,7 @@ func (LocalFS) ToSlash(p string) string                 { return filepath.ToSlas
 func (LocalFS) FromSlash(p string) string               { return filepath.FromSlash(p) }
 func (LocalFS) Readlink(p string) (string, error)       { return os.Readlink(p) }
 func (LocalFS) Open(p string) (io.ReadCloser, error)    { return os.Open(p) }
-func (LocalFS) Mkdir(p string) error                    { return os.Mkdir(p, 0o755) }
-func (LocalFS) MkdirAll(p string) error                 { return os.MkdirAll(p, 0o755) }
+func (LocalFS) Mkdir(p string) error                    { return os.Mkdir(p, 0o700) }
 func (LocalFS) Remove(p string) error                   { return os.Remove(p) }
 func (LocalFS) Chmod(p string, mode fs.FileMode) error  { return os.Chmod(p, mode) }
 func (LocalFS) Chtimes(p string, mtime time.Time) error { return os.Chtimes(p, mtime, mtime) }
@@ -238,8 +237,15 @@ func (s SFTPFS) Rename(oldPath, newPath string) error {
 	return remote(s.Client.PosixRename(oldPath, newPath))
 }
 
-func (s SFTPFS) Mkdir(p string) error           { return remote(s.Client.Mkdir(p)) }
-func (s SFTPFS) MkdirAll(p string) error        { return remote(s.Client.MkdirAll(p)) }
+func (s SFTPFS) Mkdir(p string) error {
+	err := s.Client.Mkdir(p)
+	if err != nil {
+		return remote(err)
+	}
+	// The server creates directories as 0755 unless its umask is restricted, which the client of devpod cp asks
+	// for but an older agent doesn't do; in that case, restrict it before anything is written into it.
+	return remote(s.Client.Chmod(p, 0o700))
+}
 func (s SFTPFS) Remove(p string) error          { return remote(s.Client.Remove(p)) }
 func (s SFTPFS) Symlink(target, p string) error { return remote(s.Client.Symlink(target, p)) }
 func (s SFTPFS) Chmod(p string, m fs.FileMode) error {

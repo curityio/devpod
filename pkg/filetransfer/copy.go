@@ -71,24 +71,38 @@ func Copy(src FS, srcPath string, dst FS, dstPath string, log log.Logger) (Stats
 	if dstExists && !dstInfo.IsDir() && (dstMustBeDir || srcInfo.IsDir()) {
 		return Stats{}, fmt.Errorf("%s is not a directory", dstPath)
 	}
+	// the source's name, when it's copied into dstPath, is checked like the names in a directory, so that it can't
+	// refer to another directory on the destination
+	join := func() (string, error) {
+		if src.Dir(srcPath) == srcPath {
+			// the root directory, which has no name: copy its contents
+			return dstPath, nil
+		}
+		name := src.Base(srcPath)
+		if !dst.ValidName(name) {
+			return "", fmt.Errorf("can't copy %s: %q isn't a valid file name on the destination", srcPath, name)
+		}
+		return dst.Join(dstPath, name), nil
+	}
+
 	target := dstPath
+	err = nil
 	switch {
 	case dstExists && dstInfo.IsDir():
 		if !srcInfo.IsDir() || !contentsOnly {
-			target = dst.Join(dstPath, src.Base(srcPath))
+			target, err = join()
 		}
 	case dstMustBeDir && srcInfo.IsDir():
 		// dstPath becomes the copy of the directory, so only its parents are created here
-		err = mkdirAll(dst, dst.Dir(dstPath))
-		if err != nil {
-			return Stats{}, err
-		}
+		err = makeDirs(dst, dst.Dir(dstPath))
 	case dstMustBeDir:
-		err = mkdirAll(dst, dstPath)
-		if err != nil {
-			return Stats{}, err
+		err = makeDirs(dst, dstPath)
+		if err == nil {
+			target, err = join()
 		}
-		target = dst.Join(dstPath, src.Base(srcPath))
+	}
+	if err != nil {
+		return Stats{}, err
 	}
 
 	// List everything before writing anything, so that copying a directory into itself (which is possible when the
@@ -138,12 +152,30 @@ func Copy(src FS, srcPath string, dst FS, dstPath string, log log.Logger) (Stats
 	return c.stats, nil
 }
 
-func mkdirAll(f FS, p string) error {
-	err := f.MkdirAll(p)
+// makeDirs creates directory p and any missing parents, which aren't copies of source directories, so they are
+// given the usual 0755 permissions instead of the private ones Mkdir creates directories with.
+func makeDirs(f FS, p string) error {
+	info, err := f.Stat(p)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("%s is not a directory", p)
+		}
+		return nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	if parent := f.Dir(p); parent != p {
+		err = makeDirs(f, parent)
+		if err != nil {
+			return err
+		}
+	}
+	err = f.Mkdir(p)
 	if err != nil {
 		return fmt.Errorf("create directory %s: %w", p, err)
 	}
-	return nil
+	return f.Chmod(p, 0o755)
 }
 
 // endsWithDot reports whether p ends with a separator followed by ".", which means a directory's contents.
@@ -271,7 +303,8 @@ func (c *copier) copyFile(e entry) (err error) {
 	}
 	defer in.Close()
 
-	tmp := c.dst.Join(e.dstDir, "."+c.dst.Base(e.dstPath)+".devpod-cp-"+randomSuffix())
+	// a short name, which stays within the file system's name length limit however long the file's name is
+	tmp := c.dst.Join(e.dstDir, ".devpod-cp-"+randomSuffix())
 	out, err := c.dst.CreateNew(tmp)
 	if err != nil {
 		return fmt.Errorf("create %s: %w", tmp, err)
@@ -284,6 +317,8 @@ func (c *copier) copyFile(e entry) (err error) {
 
 	n, err := io.Copy(out, in)
 	closeErr := out.Close()
+	// Windows can't replace a file that's open, which the source is when copying a file onto itself
+	_ = in.Close()
 	if err != nil {
 		return fmt.Errorf("copy %s to %s: %w", e.srcPath, e.dstPath, err)
 	} else if closeErr != nil {

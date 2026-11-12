@@ -18,6 +18,7 @@ import (
 	"github.com/curityio/devpod/pkg/filetransfer"
 	"github.com/curityio/devpod/pkg/log"
 	devssh "github.com/curityio/devpod/pkg/ssh"
+	sshserver "github.com/curityio/devpod/pkg/ssh/server"
 	"github.com/curityio/devpod/pkg/tunnel"
 	workspace2 "github.com/curityio/devpod/pkg/workspace"
 	"github.com/pkg/sftp"
@@ -261,7 +262,30 @@ func withContainerSFTP(
 	}
 	defer sshClient.Close()
 
-	sftpClient, err := sftp.NewClient(sshClient, sftp.UseConcurrentWrites(true))
+	session, err := sshClient.NewSession()
+	if err != nil {
+		return fmt.Errorf("start SFTP session: %w", err)
+	}
+	defer session.Close()
+	// create files and directories private, so that nothing is readable before its permissions are set; an older
+	// agent ignores this, and Copy then restricts them right after creating them
+	err = session.Setenv(sshserver.SFTPUmaskEnv, "077")
+	if err != nil {
+		log.Debugf("Set %s: %v", sshserver.SFTPUmaskEnv, err)
+	}
+	sftpIn, err := session.StdinPipe()
+	if err != nil {
+		return err
+	}
+	sftpOut, err := session.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	err = session.RequestSubsystem("sftp")
+	if err != nil {
+		return fmt.Errorf("start SFTP session: %w", err)
+	}
+	sftpClient, err := sftp.NewClientPipe(sftpOut, sftpIn, sftp.UseConcurrentWrites(true))
 	if err != nil {
 		return fmt.Errorf("start SFTP session: %w", err)
 	}
