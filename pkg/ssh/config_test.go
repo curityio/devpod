@@ -292,3 +292,40 @@ Host testhost
 		})
 	}
 }
+
+func TestParseWorkdirFlag(t *testing.T) {
+	workdirs := append([]string{"", "/workspaces/foo", "/home/me/my project"}, awkwardProxyCommandValues...)
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, workdir := range workdirs {
+			config, err := addHostSection(goos, "", "/path/to/my devpod", "foo.devpod", "me", "default", "foo", workdir, false, true, "/home/me/.devpod")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ""
+			for _, line := range strings.Split(config, "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+					got = parseWorkdirFlag(goos, line)
+				}
+			}
+			if got != workdir {
+				t.Errorf("%s: expected workdir %q, got %q from:\n%s", goos, workdir, got, config)
+			}
+		}
+	}
+}
+
+// TestParseWorkdirFlagOldFormat reads the ProxyCommand lines older versions of DevPod wrote, with the values in
+// double quotes.
+func TestParseWorkdirFlagOldFormat(t *testing.T) {
+	tests := []struct{ goos, line, expected string }{
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --devpod-home "/home/me/.devpod" --workdir "/workspaces/my project" --gpg-agent-forwarding`, "/workspaces/my project"},
+		{"darwin", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --workdir "/workspaces/o'brien"`, "/workspaces/o'brien"},
+		{"windows", `  ProxyCommand "C:\Program Files\DevPod\devpod.exe" ssh --stdio --context default --user root foo --devpod-home "C:\Users\me\.devpod" --workdir "/workspaces/my project"`, "/workspaces/my project"},
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo`, ""},
+	}
+	for _, tt := range tests {
+		if got := parseWorkdirFlag(tt.goos, tt.line); got != tt.expected {
+			t.Errorf("%s: expected workdir %q, got %q from %s", tt.goos, tt.expected, got, tt.line)
+		}
+	}
+}

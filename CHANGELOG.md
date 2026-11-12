@@ -9,6 +9,9 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Added
 
+- `devpod cp` copies files and directories to or from a workspace, such as `devpod cp ./temp/ my-workspace:/opt/`
+  or `devpod cp my-workspace:out.log .`. A relative path in the workspace is relative to the workspace folder. It
+  copies as the workspace's user (`--user` to change), over SFTP through the same connection as `devpod ssh`.
 - The documentation has a new [Everyday Commands](https://devpod.curityio.net/daily-usage/everyday-commands) page
   with the commands used in daily usage and an example that runs a Claude agent in a dev container unattended, and
   every page about the CLI shows example commands for the actions it describes. The features added since the fork that
@@ -25,6 +28,11 @@ Add new entries to the top of the "Unreleased" section.
   OpenSSH reject the whole config file. DevPod now quotes each value for the shell on Linux and macOS, and for the
   Windows command line on Windows, where OpenSSH starts the `ProxyCommand` without a shell. `devpod up` also
   refuses to write a value that contains a line break, which would have added its own lines to the config file.
+- A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
+  keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
+  directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs
+  each SFTP session in a `devpod helper sftp-server` process started in the home directory, like OpenSSH's
+  `sftp-server`.
 
 ## v0.10.0 (2026-11-09)
 

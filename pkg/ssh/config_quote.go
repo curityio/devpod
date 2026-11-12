@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -96,6 +97,107 @@ func quoteWindowsArg(s string, always bool) string {
 	b.WriteString(strings.Repeat(`\`, slashes))
 	b.WriteByte('"')
 	return b.String()
+}
+
+// splitProxyCommandLine splits a ProxyCommand value written by proxyCommandLine for goos back into its arguments.
+// It also reads the values older versions of DevPod wrote in double quotes.
+func splitProxyCommandLine(goos, value string) []string {
+	value = strings.ReplaceAll(value, "%%", "%")
+	if goos == "windows" {
+		return windowsCommandLineToArgv(value)
+	}
+	return splitUnixWords(value)
+}
+
+// splitUnixWords splits s into words like a POSIX shell, without expanding anything.
+func splitUnixWords(s string) []string {
+	var words []string
+	var b strings.Builder
+	inWord := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == ' ' || c == '\t':
+			if inWord {
+				words = append(words, b.String())
+				b.Reset()
+				inWord = false
+			}
+			continue
+		case c == '\'':
+			// everything up to the next single quote is literal
+			end := strings.IndexByte(s[i+1:], '\'')
+			if end < 0 {
+				end = len(s) - i - 1
+			}
+			b.WriteString(s[i+1 : i+1+end])
+			i += end + 1
+		case c == '"':
+			// in double quotes, a backslash only escapes ", \, $ and `
+			for i++; i < len(s) && s[i] != '"'; i++ {
+				if s[i] == '\\' && i+1 < len(s) && strings.IndexByte("\"\\$`", s[i+1]) >= 0 {
+					i++
+				}
+				b.WriteByte(s[i])
+			}
+		case c == '\\' && i+1 < len(s):
+			i++
+			b.WriteByte(s[i])
+		default:
+			b.WriteByte(c)
+		}
+		inWord = true
+	}
+	if inWord {
+		words = append(words, b.String())
+	}
+	return words
+}
+
+// windowsCommandLineToArgv splits a command line like a Go program on Windows does (os.commandLineToArgv).
+func windowsCommandLineToArgv(cmd string) []string {
+	var args []string
+	for len(cmd) > 0 {
+		if cmd[0] == ' ' || cmd[0] == '\t' {
+			cmd = cmd[1:]
+			continue
+		}
+		var b []byte
+		inquote := false
+		nslash := 0
+	arg:
+		for ; len(cmd) > 0; cmd = cmd[1:] {
+			c := cmd[0]
+			switch c {
+			case ' ', '\t':
+				if !inquote {
+					break arg
+				}
+			case '"':
+				b = append(b, bytes.Repeat([]byte{'\\'}, nslash/2)...)
+				if nslash%2 == 0 {
+					// a doubled quote in quotes is a literal quote
+					if inquote && len(cmd) > 1 && cmd[1] == '"' {
+						b = append(b, c)
+						cmd = cmd[1:]
+					}
+					inquote = !inquote
+				} else {
+					b = append(b, c)
+				}
+				nslash = 0
+				continue
+			case '\\':
+				nslash++
+				continue
+			}
+			b = append(b, bytes.Repeat([]byte{'\\'}, nslash)...)
+			nslash = 0
+			b = append(b, c)
+		}
+		args = append(args, string(append(b, bytes.Repeat([]byte{'\\'}, nslash)...)))
+	}
+	return args
 }
 
 // checkSSHConfigValue returns an error if value can't be written into an SSH config line: a line break would end
