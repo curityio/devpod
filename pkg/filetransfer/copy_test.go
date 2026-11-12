@@ -72,8 +72,15 @@ func readTree(t *testing.T, root string) tree {
 	return files
 }
 
-// newSFTPFS serves the local file system over SFTP in-process, the way the container's SSH server does.
+// newSFTPFS serves the local file system over SFTP in-process, the way the container's SSH server does for devpod
+// cp, with a 077 umask until the test ends.
 func newSFTPFS(t *testing.T, workDir string) SFTPFS {
+	t.Helper()
+	setUmask(t, 0o077)
+	return newSFTPFSWithoutUmask(t, workDir)
+}
+
+func newSFTPFSWithoutUmask(t *testing.T, workDir string) SFTPFS {
 	t.Helper()
 	serverConn, clientConn := net.Pipe()
 	server, err := sftp.NewServer(serverConn)
@@ -417,12 +424,13 @@ func TestValidName(t *testing.T) {
 			t.Errorf("expected %q to be invalid", name)
 		}
 	}
-	for _, name := range []string{"a.txt", ".hidden", "..."} {
+	for _, name := range []string{"a.txt", ".hidden"} {
 		if !(SFTPFS{}).ValidName(name) || !(LocalFS{}).ValidName(name) {
 			t.Errorf("expected %q to be valid", name)
 		}
 	}
-	for _, name := range []string{`..\..\evil`, "a:b"} {
+	// see TestValidWindowsName for the rest of what Windows rejects
+	for _, name := range []string{`..\..\evil`, "a:b", "...", "report?.txt", "CON"} {
 		if !(SFTPFS{}).ValidName(name) {
 			t.Errorf("expected %q to be valid in a container", name)
 		}
@@ -587,5 +595,136 @@ func TestCopyLongFileName(t *testing.T) {
 	}
 	if got := readTree(t, localRoot)["down/"+name]; got != "down" {
 		t.Errorf("expected the download to be copied, got %q", got)
+	}
+}
+
+func TestCopyIntoSymlinkedDestination(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs privileges on Windows")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"temp/x.txt": "x"})
+	writeTree(t, dstRoot, tree{"real": "dir/", "linked": "-> real", "workspace": "-> real"})
+
+	// a destination directory that's a symlink, and a workspace folder that's one
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "temp")+"/.", LocalFS{}, filepath.Join(dstRoot, "linked")+"/", log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Copy(LocalFS{}, filepath.Join(srcRoot, "temp")+"/.", newSFTPFS(t, filepath.Join(dstRoot, "workspace")), "", log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := tree{"real": "dir/", "real/x.txt": "x", "linked": "-> real", "workspace": "-> real"}
+	if diff := cmp.Diff(expected, readTree(t, dstRoot)); diff != "" {
+		t.Errorf("unexpected destination (-want +got):\n%s", diff)
+	}
+}
+
+func TestCopyRejectsSymlinkInDestinationTree(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs privileges on Windows")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"temp/sub/x.txt": "x"})
+	writeTree(t, dstRoot, tree{"elsewhere": "dir/", "temp/sub": "-> ../elsewhere"})
+
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "temp"), LocalFS{}, dstRoot, log.Discard)
+	if err == nil || !strings.Contains(err.Error(), "is not a directory") {
+		t.Errorf("expected a symlink in the destination tree to be rejected, got %v", err)
+	}
+	if files := readTree(t, filepath.Join(dstRoot, "elsewhere")); len(files) != 0 {
+		t.Errorf("expected nothing to be written through the symlink, got %v", files)
+	}
+}
+
+func TestCopyRestoresDirectoryPermissionsWhenItFails(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs read-only directories and a user that can't read everything")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"repo/a.txt": "a", "repo/unreadable.txt": "u"})
+	writeTree(t, dstRoot, tree{"repo/a.txt": "old"})
+	if err := os.Chmod(filepath.Join(srcRoot, "repo/unreadable.txt"), 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(dstRoot, "repo"), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dstRoot, "repo"), 0o755) })
+
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "repo"), LocalFS{}, dstRoot, log.Discard)
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("expected the unreadable file to fail the copy, got %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dstRoot, "repo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o555 {
+		t.Errorf("expected the directory to be read-only again, got %v", info.Mode().Perm())
+	}
+}
+
+// noSymlinkFS can't create symlinks, like Windows without Developer Mode.
+type noSymlinkFS struct{ LocalFS }
+
+func (noSymlinkFS) Symlink(target, p string) error {
+	return errors.Join(ErrSymlinkNotPermitted, errors.New("a required privilege is not held by the client"))
+}
+
+func TestCopySkippedSymlinkKeepsDestination(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs privileges on Windows")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"temp/x.txt": "x", "temp/link": "-> x.txt"})
+	writeTree(t, dstRoot, tree{"temp/link": "keep me"})
+
+	_, err := Copy(LocalFS{}, filepath.Join(srcRoot, "temp"), noSymlinkFS{}, dstRoot, log.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := tree{"temp": "dir/", "temp/x.txt": "x", "temp/link": "keep me"}
+	if diff := cmp.Diff(expected, readTree(t, dstRoot)); diff != "" {
+		t.Errorf("unexpected destination (-want +got):\n%s", diff)
+	}
+}
+
+func TestValidWindowsName(t *testing.T) {
+	for _, name := range []string{"a.txt", ".hidden", "...a", "con-notes.txt", "COM10", "my file.txt", "\u00e9t\u00e9.txt"} {
+		if !validWindowsName(name) {
+			t.Errorf("expected %q to be valid on Windows", name)
+		}
+	}
+	for _, name := range []string{
+		"", ".", "..", `..\..\evil`, "a/b", "a:b", "report?.txt", "a*b", `a"b`, "a<b", "a>b", "a|b", "tab\there",
+		"trailing.", "trailing ", "CON", "con.txt", "Nul", "COM1.log", "lpt9", "AUX .txt", "COM\u00b9",
+	} {
+		if validWindowsName(name) {
+			t.Errorf("expected %q to be invalid on Windows", name)
+		}
+	}
+}
+
+func TestSFTPRefusesFilesThatArentPrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the SFTP server is only used in Linux containers")
+	}
+	srcRoot, dstRoot := t.TempDir(), t.TempDir()
+	writeTree(t, srcRoot, tree{"a.txt": "a", "dir/b.txt": "b"})
+	setUmask(t, 0o022)
+
+	for _, src := range []string{"a.txt", "dir"} {
+		_, err := Copy(LocalFS{}, filepath.Join(srcRoot, src), newSFTPFSWithoutUmask(t, dstRoot), "", log.Discard)
+		if !errors.Is(err, ErrNotPrivate) {
+			t.Errorf("copy %s: expected ErrNotPrivate from a server without the umask, got %v", src, err)
+		}
+	}
+	if files := readTree(t, dstRoot); len(files) != 0 {
+		t.Errorf("expected nothing to be left behind, got %v", files)
 	}
 }

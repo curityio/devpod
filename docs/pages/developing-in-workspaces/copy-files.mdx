@@ -76,7 +76,8 @@ file is an error. Existing files are replaced, and other files in an existing di
 - Permissions and modification times are kept.
 - Symlinks in a directory are copied as symlinks, with the same target. A symlink given as the source is followed.
 - Files that aren't regular files, directories or symlinks, such as sockets, are skipped with a warning, and so are
-  files whose names can't be used on the destination, such as a name with a `\` or `:` copied to Windows.
+  files whose names can't be used on the destination, such as `report?.txt`, `CON` or a name ending with a dot copied
+  to Windows.
 
 Each file is written to a temporary file next to it, named `.devpod-cp-...`, which is then renamed over the
 destination. So a file that's copied onto itself (which can happen when the workspace folder is your local folder,

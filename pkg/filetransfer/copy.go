@@ -112,12 +112,16 @@ func Copy(src FS, srcPath string, dst FS, dstPath string, log log.Logger) (Stats
 	if err != nil {
 		return Stats{}, err
 	}
+	// a destination directory that was given, rather than derived from the source's name, may be a symlink to one,
+	// such as a symlinked workspace folder
+	entries[0].follow = target == dstPath
 
 	// Directories first, parents before children, so that files can then be copied in any order.
 	for _, e := range entries {
 		if e.info.IsDir() {
 			err = c.copyDir(e)
 			if err != nil {
+				c.restoreRelaxed()
 				return c.stats, err
 			}
 		}
@@ -138,6 +142,7 @@ func Copy(src FS, srcPath string, dst FS, dstPath string, log log.Logger) (Stats
 	}
 	err = group.Wait()
 	if err != nil {
+		c.restoreRelaxed()
 		return c.stats, err
 	}
 
@@ -188,6 +193,14 @@ type entry struct {
 	srcPath, dstPath string
 	// dstDir is the directory dstPath is in.
 	dstDir string
+	// follow is set when an existing dstPath may be a symlink to a directory.
+	follow bool
+}
+
+// relaxedDir is an existing directory that was made writable to copy into it.
+type relaxedDir struct {
+	path string
+	mode fs.FileMode
 }
 
 type copier struct {
@@ -197,6 +210,9 @@ type copier struct {
 	// created holds the directories this copy created, which can't have anything in them yet. It's only written
 	// to before files are copied concurrently.
 	created map[string]bool
+	// relaxed holds the existing directories that were made writable, to restore them if the copy fails (otherwise
+	// they get the source's permissions).
+	relaxed []relaxedDir
 
 	mu    sync.Mutex
 	stats Stats
@@ -246,14 +262,20 @@ func (c *copier) copy(e entry) error {
 
 func (c *copier) copyDir(e entry) error {
 	if !c.created[e.dstDir] {
-		existing, err := c.dst.Lstat(e.dstPath)
+		stat := c.dst.Lstat
+		if e.follow {
+			stat = c.dst.Stat
+		}
+		existing, err := stat(e.dstPath)
 		switch {
 		case err == nil && !existing.IsDir():
 			return fmt.Errorf("%s is not a directory", e.dstPath)
 		case err == nil:
 			// a read-only directory, maybe from an earlier copy, has to be writable until its metadata is set
-			if existing.Mode().Perm()&0o200 == 0 {
-				_ = c.dst.Chmod(e.dstPath, existing.Mode().Perm()|0o700)
+			if mode := existing.Mode().Perm(); mode&0o200 == 0 {
+				if c.dst.Chmod(e.dstPath, mode|0o700) == nil {
+					c.relaxed = append(c.relaxed, relaxedDir{path: e.dstPath, mode: mode})
+				}
 			}
 			return nil
 		case !errors.Is(err, fs.ErrNotExist):
@@ -277,22 +299,46 @@ func (c *copier) copySymlink(e entry) error {
 	}
 	target = c.dst.FromSlash(c.src.ToSlash(target))
 
-	if !c.created[e.dstDir] {
-		err = c.removeExisting(e.dstPath)
-		if err != nil {
-			return err
-		}
-	}
+	// created under a temporary name and renamed over the destination, so that what's there is only replaced
+	// once the symlink exists
 	c.log.Debugf("Creating symlink %s -> %s", e.dstPath, target)
-	err = c.dst.Symlink(target, e.dstPath)
+	tmp := c.dst.Join(e.dstDir, ".devpod-cp-"+randomSuffix())
+	err = c.dst.Symlink(target, tmp)
 	if errors.Is(err, ErrSymlinkNotPermitted) {
 		c.log.Warnf("Skipping symlink %s -> %s: %v", e.srcPath, target, err)
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("create symlink %s: %w", e.dstPath, err)
 	}
+	err = c.replace(tmp, e.dstPath)
+	if err != nil {
+		return err
+	}
 	c.count(0)
 	return nil
+}
+
+// replace renames tmp over dstPath, and removes tmp if that fails.
+func (c *copier) replace(tmp, dstPath string) error {
+	err := c.dst.Rename(tmp, dstPath)
+	if err == nil {
+		return nil
+	}
+	_ = c.dst.Remove(tmp)
+	if existing, statErr := c.dst.Lstat(dstPath); statErr == nil && existing.IsDir() {
+		return fmt.Errorf("%s is a directory", dstPath)
+	}
+	return fmt.Errorf("replace %s: %w", dstPath, err)
+}
+
+// restoreRelaxed restores the permissions of the existing directories that were made writable, after a failure.
+func (c *copier) restoreRelaxed() {
+	for _, dir := range c.relaxed {
+		err := c.dst.Chmod(dir.path, dir.mode)
+		if err != nil {
+			c.log.Warnf("Restore permissions of %s: %v", dir.path, err)
+		}
+	}
 }
 
 func (c *copier) copyFile(e entry) (err error) {
@@ -333,12 +379,9 @@ func (c *copier) copyFile(e entry) (err error) {
 		c.log.Warnf("Set modification time of %s: %v", e.dstPath, chtimesErr)
 	}
 
-	err = c.dst.Rename(tmp, e.dstPath)
+	err = c.replace(tmp, e.dstPath)
 	if err != nil {
-		if existing, statErr := c.dst.Lstat(e.dstPath); statErr == nil && existing.IsDir() {
-			return fmt.Errorf("%s is a directory", e.dstPath)
-		}
-		return fmt.Errorf("replace %s: %w", e.dstPath, err)
+		return err
 	}
 
 	c.count(n)
@@ -350,20 +393,6 @@ func (c *copier) count(bytes int64) {
 	defer c.mu.Unlock()
 	c.stats.Files++
 	c.stats.Bytes += bytes
-}
-
-func (c *copier) removeExisting(p string) error {
-	existing, err := c.dst.Lstat(p)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	if existing.IsDir() {
-		return fmt.Errorf("%s is a directory", p)
-	}
-	return c.dst.Remove(p)
 }
 
 // setDirMetadata copies a directory's permission bits and modification time. It only warns of failures: an existing

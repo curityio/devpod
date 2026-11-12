@@ -75,12 +75,35 @@ func (LocalFS) Chmod(p string, mode fs.FileMode) error  { return os.Chmod(p, mod
 func (LocalFS) Chtimes(p string, mtime time.Time) error { return os.Chtimes(p, mtime, mtime) }
 
 func (LocalFS) ValidName(name string) bool {
-	invalid := `/`
 	if runtime.GOOS == "windows" {
-		// a colon names an alternate data stream
-		invalid = `/\:`
+		return validWindowsName(name)
 	}
-	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, invalid)
+	return name != "" && name != "." && name != ".." && !strings.Contains(name, "/")
+}
+
+// windowsReservedNames are the device names Windows reserves, with or without an extension.
+var windowsReservedNames = map[string]bool{
+	"CON": true, "PRN": true, "AUX": true, "NUL": true,
+	"COM1": true, "COM2": true, "COM3": true, "COM4": true, "COM5": true, "COM6": true, "COM7": true, "COM8": true,
+	"COM9": true, "COM\u00b9": true, "COM\u00b2": true, "COM\u00b3": true,
+	"LPT1": true, "LPT2": true, "LPT3": true, "LPT4": true, "LPT5": true, "LPT6": true, "LPT7": true, "LPT8": true,
+	"LPT9": true, "LPT\u00b9": true, "LPT\u00b2": true, "LPT\u00b3": true,
+}
+
+// validWindowsName reports whether name can be a file name on Windows, so that it names that file and no other:
+// Windows rejects some characters and reserved device names, and drops a trailing dot or space, so that "a." would
+// be "a".
+func validWindowsName(name string) bool {
+	if name == "" || name == "." || name == ".." || strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || strings.ContainsRune(`<>:"/\|?*`, r) {
+			return false
+		}
+	}
+	base, _, _ := strings.Cut(name, ".")
+	return !windowsReservedNames[strings.ToUpper(strings.TrimRight(base, " "))]
 }
 
 func (LocalFS) CreateNew(p string) (io.WriteCloser, error) {
@@ -218,13 +241,20 @@ func (s SFTPFS) Open(p string) (io.ReadCloser, error) {
 	return f, nil
 }
 
+// ErrNotPrivate is returned when the SFTP server creates a file or directory that others can access, which happens
+// when it doesn't have the umask the client of devpod cp asks for (see server.SFTPUmaskEnv). DevPod injects its own
+// version of the agent before connecting, so the server has it; this checks that it does.
+var ErrNotPrivate = errors.New("the SFTP server created it accessible to others")
+
 func (s SFTPFS) CreateNew(p string) (io.WriteCloser, error) {
 	f, err := s.Client.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
 	if err != nil {
 		return nil, remote(err)
 	}
-	// the server creates files as 0644, so restrict it before writing anything
-	err = f.Chmod(0o600)
+	info, err := f.Stat()
+	if err == nil && info.Mode().Perm()&0o077 != 0 {
+		err = ErrNotPrivate
+	}
 	if err != nil {
 		_ = f.Close()
 		_ = s.Client.Remove(p)
@@ -242,9 +272,15 @@ func (s SFTPFS) Mkdir(p string) error {
 	if err != nil {
 		return remote(err)
 	}
-	// The server creates directories as 0755 unless its umask is restricted, which the client of devpod cp asks
-	// for but an older agent doesn't do; in that case, restrict it before anything is written into it.
-	return remote(s.Client.Chmod(p, 0o700))
+	info, err := s.Client.Lstat(p)
+	if err == nil && info.Mode().Perm()&0o077 != 0 {
+		err = ErrNotPrivate
+	}
+	if err != nil {
+		_ = s.Client.RemoveDirectory(p)
+		return remote(err)
+	}
+	return nil
 }
 func (s SFTPFS) Remove(p string) error          { return remote(s.Client.Remove(p)) }
 func (s SFTPFS) Symlink(target, p string) error { return remote(s.Client.Symlink(target, p)) }

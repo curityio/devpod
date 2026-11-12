@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/completion"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/pkg/agent"
@@ -219,13 +220,7 @@ func withContainerSFTP(
 	log log.Logger,
 	fn func(*sftp.Client) error,
 ) error {
-	command := fmt.Sprintf("'%s' helper ssh-server --stdio --workdir '%s'", agent.ContainerDevPodHelperLocation, workdir)
-	if log.GetLevel() == logrus.DebugLevel {
-		command += " --debug"
-	}
-	if user != "" && user != "root" {
-		command = fmt.Sprintf("su -c \"%s\" '%s'", command, user)
-	}
+	command := containerSSHServerCommand(user, workdir, log.GetLevel() == logrus.DebugLevel)
 
 	stdoutReader, stdoutWriter, err := os.Pipe()
 	if err != nil {
@@ -292,4 +287,18 @@ func withContainerSFTP(
 	defer sftpClient.Close()
 
 	return fn(sftpClient)
+}
+
+// containerSSHServerCommand returns the shell command that starts an SSH server in the container as user, which
+// tracks activity, like devpod ssh's, so that the workspace isn't stopped for inactivity while files are copied.
+func containerSSHServerCommand(user, workdir string, debug bool) string {
+	args := []string{agent.ContainerDevPodHelperLocation, "helper", "ssh-server", "--stdio", "--track-activity", "--workdir", workdir}
+	if debug {
+		args = append(args, "--debug")
+	}
+	command := shellescape.QuoteCommand(args)
+	if user != "" && user != "root" {
+		command = "su -c " + shellescape.Quote(command) + " " + shellescape.Quote(user)
+	}
+	return command
 }
