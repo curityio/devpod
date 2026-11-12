@@ -48,6 +48,19 @@ Specifying a custom install script:
 devpod up https://github.com/example/repo --dotfiles https://github.com/my-user/my-dotfiles-repo --dotfiles-script custom/location/install.sh
 ```
 
+Pass variables to the install script, directly or from a file:
+
+```
+devpod up https://github.com/example/repo --dotfiles https://github.com/my-user/my-dotfiles-repo \
+  --dotfiles-script-env EDITOR=vim --dotfiles-script-env-file ./dotfiles.env
+```
+
+A local path works too, which is useful while you write the dotfiles:
+
+```
+devpod up https://github.com/example/repo --dotfiles ~/dotfiles
+```
+
 #### For all Workspaces
 
 You can setup these options on a **context wide scope** so that you won't have to specify
@@ -60,3 +73,9 @@ devpod context set-options -o DOTFILES_URL=https://github.com/89luca89/dotfiles 
 ```
 
 All new Workspaces will be created with that dotfile repository and install script.
+
+To check which options the context has set:
+
+```
+devpod context options
+```

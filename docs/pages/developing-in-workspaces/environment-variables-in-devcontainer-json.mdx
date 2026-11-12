@@ -41,3 +41,37 @@ systemctl restart ssh.service
 ```console
 devpod up <GITHUB-REPOSITORY-URL> --ide=none
 ```
+
+### Without changing the ssh configuration
+
+`${localEnv:...}` reads the environment of the machine DevPod runs on, so with providers that run DevPod on your computer,
+such as `docker` and `kubernetes`, it needs none of the steps above:
+
+```bash
+IMAGE_VERSION=0-18-bullseye devpod up <GITHUB-REPOSITORY-URL> --ide none
+```
+
+To give the processes in the workspace variables that `devcontainer.json` doesn't mention, pass them to `devpod up`.
+They are saved with the workspace, so you don't need to pass them on every `devpod up`:
+
+```bash
+devpod up my-workspace --workspace-env API_URL=https://api.example.com --workspace-env LOG_LEVEL=debug
+devpod up my-workspace --workspace-env-file ./workspace.env
+```
+
+where `workspace.env` has one `NAME=VALUE` per line. For one `devpod ssh` session only, use `--set-env`, or
+`--send-env` to send a variable of your computer:
+
+```bash
+devpod ssh my-workspace --set-env LOG_LEVEL=trace
+devpod ssh my-workspace --send-env AWS_PROFILE
+```
+
+Variables that don't need to come from outside belong in `devcontainer.json`:
+
+```json
+{
+  "containerEnv": { "LOG_LEVEL": "debug" },
+  "remoteEnv": { "API_TOKEN": "${localEnv:API_TOKEN}" }
+}
+```

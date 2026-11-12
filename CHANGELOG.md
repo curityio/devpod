@@ -7,6 +7,14 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Added
+
+- The documentation has a new [Everyday Commands](https://devpod.curityio.net/daily-usage/everyday-commands) page
+  with the commands used in daily usage and an example that runs a Claude agent in a dev container unattended, and
+  every page about the CLI shows example commands for the actions it describes. The features added since the fork that
+  weren't documented yet are now: `devpod status --all`, the kubernetes provider's namespace, dead pod and dockerless
+  options, `--use=false` for `devpod provider add` and `update`, and the embedded agent.
+
 ### Fixed
 
 - The kubernetes provider can create a workspace in a namespace that doesn't exist yet on clusters that only
