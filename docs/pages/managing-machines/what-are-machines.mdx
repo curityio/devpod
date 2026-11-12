@@ -11,3 +11,15 @@ You can directly manage all the machines in the various workspaces using:
 ```sh
 devpod machine
 ```
+
+For example, to see your machines and which workspaces they host, and to create a workspace on one of them:
+
+```sh
+devpod machine list
+devpod list
+devpod up github.com/my-org/my-repo --provider aws --machine my-machine
+```
+
+A workspace only uses a machine that exists beforehand when you pass `--machine`. Otherwise DevPod creates a machine
+for it, or, with the provider's `--single-machine` option, shares one machine between all of the provider's workspaces
+(see [Single Machine Provider](../managing-providers/add-provider.mdx#single-machine-provider)).

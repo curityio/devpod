@@ -12,6 +12,11 @@ Add new entries to the top of the "Unreleased" section.
 - `devpod cp` copies files and directories to or from a workspace, such as `devpod cp ./temp/ my-workspace:/opt/`
   or `devpod cp my-workspace:out.log .`. A relative path in the workspace is relative to the workspace folder. It
   copies as the workspace's user (`--user` to change), over SFTP through the same connection as `devpod ssh`.
+- The documentation has a new [Everyday Commands](https://devpod.curityio.net/daily-usage/everyday-commands) page
+  with the commands used in daily usage and an example that runs a Claude agent in a dev container unattended, and
+  every page about the CLI shows example commands for the actions it describes. The features added since the fork that
+  weren't documented yet are now: `devpod status --all`, the kubernetes provider's namespace, dead pod and dockerless
+  options, `--use=false` for `devpod provider add` and `update`, and the embedded agent.
 
 ### Fixed
 

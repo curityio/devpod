@@ -49,3 +49,15 @@ When you open the workspace, the DevPod logs give you the user/machine combinati
 
 Since DevPods target environment is a docker container, you can also ssh into it and install your vim/neovim configuration like you would on any new machine.
 To connect to the workspace, run the command DevPod gives you after starting the workspace, usually `ssh WORKSPACE_NAME.devpod`.
+
+### With the CLI
+
+The same, from a terminal (see the [CLI quickstart](./devpod-cli.mdx)):
+
+```
+devpod provider add docker
+devpod up github.com/microsoft/vscode-remote-try-node --ide none
+ssh vscode-remote-try-node.devpod
+# or, without ssh installed:
+devpod ssh vscode-remote-try-node
+```

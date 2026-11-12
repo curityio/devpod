@@ -12,3 +12,89 @@ This means you can already reuse projects that use this configuration to spin up
 A workspace in DevPod can be stopped and restarted without losing its state. This allows you to install additional programs or change configuration without the need to reconfigure the container.
 Depending on the Provider, DevPod will also automatically determine when a workspace is currently not be used and shutdown any unused resources to save costs.
 
+
+## Working with workspaces
+
+These are the commands you use with workspaces. Each one has its own page with the details.
+
+Create a workspace, or start an existing one (see [Create a Workspace](./create-a-workspace.mdx)):
+
+```bash
+devpod up github.com/microsoft/vscode-remote-try-node   # from a git repository
+devpod up ./my-project                                  # from a local folder
+devpod up my-workspace                                  # an existing workspace, started if it was stopped
+```
+
+Connect to it (see [Connect to a Workspace](./connect-to-a-workspace.mdx)):
+
+```bash
+devpod ssh my-workspace                            # a shell in the workspace
+devpod ssh my-workspace --command 'make test'      # one command
+devpod up my-workspace --ide vscode                # your IDE
+```
+
+List your workspaces:
+
+```bash
+devpod list
+```
+
+```
+   NAME         |  SOURCE                                                | MACHINE | PROVIDER | IDE  | LAST USED | AGE
+  --------------+--------------------------------------------------------+---------+----------+------+-----------+------
+   my-workspace | git:https://github.com/microsoft/vscode-remote-try-node |         | docker   | none | 2m3s      | 3h2m
+```
+
+`devpod list --output json` prints the same as JSON, for scripts.
+
+Check whether a workspace is running:
+
+```bash
+devpod status my-workspace
+```
+
+```
+11:02:41 info Workspace 'my-workspace' is 'Running'
+```
+
+The state is `Running`, `Stopped`, `Busy` (something is starting or stopping it) or `NotFound`. To see all workspaces
+of the context at once, use `--all`:
+
+```bash
+devpod status --all
+```
+
+```
+   NAME         | PROVIDER   | STATUS
+  --------------+------------+---------
+   my-workspace | docker     | Running
+   api          | kubernetes | Stopped
+   old          | ssh        | Error
+```
+
+The statuses are retrieved concurrently, each within `--timeout` (30 seconds by default). A workspace whose status
+can't be retrieved, for example because its cluster is unreachable, is shown as `Error` with the reason in a warning,
+and the command exits with an error after showing the others. With `--output json`, each entry has an `error` field
+instead, and the command succeeds so that you can use the other statuses:
+
+```bash
+devpod status --all --timeout 10s --output json
+```
+
+When something goes wrong, read the workspace's logs from the machine it runs on, or collect everything needed for a
+bug report:
+
+```bash
+devpod logs my-workspace
+devpod troubleshoot my-workspace
+```
+
+Stop it, rebuild it, or delete it (see [Stop a Workspace](./stop-a-workspace.mdx),
+[Recreating a workspace](./create-a-workspace.mdx#recreating-a-workspace) and
+[Delete a Workspace](./delete-a-workspace.mdx)):
+
+```bash
+devpod stop my-workspace
+devpod up my-workspace --recreate
+devpod delete my-workspace
+```

@@ -46,3 +46,13 @@ ssh MY_WORKSPACE_NAME.devpod
 
 If you want to use env variables e.g. for dynamic control over container image version
 please follow this instruction: [Environment variables in devcontainer.json](../developing-in-workspaces/environment-variables-in-devcontainer-json.mdx)
+
+### With the CLI
+
+The same, from a terminal (see the [CLI quickstart](./devpod-cli.mdx)):
+
+```
+devpod provider add docker
+devpod up github.com/microsoft/vscode-remote-try-node --ide none
+ssh vscode-remote-try-node.devpod
+```

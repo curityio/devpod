@@ -7,7 +7,7 @@ import AddProvider from '../fragments/add-provider.mdx'
 
 ## Quickstart with DevPod CLI
 
-Make sure you have installed [DevPod CLI](./install.mdx#optional-install-devpod-cli) on your system.
+Make sure you have installed [DevPod CLI](./install.mdx#install-devpod-cli) on your system.
 
 ### Add a Provider
 
@@ -41,3 +41,17 @@ If you have selected an IDE it should popup automatically. If not, you can conne
 ```
 ssh MY_WORKSPACE_NAME.devpod
 ```
+
+### Everyday commands
+
+```
+devpod list                                    # your workspaces
+devpod status vscode-remote-try-node           # is it running?
+devpod ssh vscode-remote-try-node              # a shell in it
+devpod stop vscode-remote-try-node             # stop it, keeping its state
+devpod up vscode-remote-try-node               # start it again
+devpod delete vscode-remote-try-node           # remove it
+```
+
+See [Everyday Commands](../daily-usage/everyday-commands.mdx) for more, including how to run an AI agent in a
+workspace unattended.

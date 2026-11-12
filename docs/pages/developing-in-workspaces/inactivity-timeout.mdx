@@ -20,6 +20,28 @@ More info about the provider's auto-shutdown can be found in the [agent's develo
 That will explain how this is done and what can be configured.
 :::
 
+For example, to see the options of a provider, keep the workspaces of the docker provider running for an hour of
+inactivity, or never stop the ones of the kubernetes provider (an empty value turns the timeout off):
+
+```
+devpod provider options kubernetes
+devpod provider set-options docker -o INACTIVITY_TIMEOUT=1h
+devpod provider set-options kubernetes -o INACTIVITY_TIMEOUT=
+```
+
+A provider's options apply to workspaces when they start, so restart a running workspace to apply a new value:
+
+```
+devpod stop my-workspace
+devpod up my-workspace
+```
+
+To not install the activity tracking into a machine at all, use `--disable-daemon`:
+
+```
+devpod up github.com/my-org/my-repo --disable-daemon
+```
+
 ## How does it work?
 
 ### Non-Machine Providers

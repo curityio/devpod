@@ -36,6 +36,28 @@ An example of this can be the SSH, Kubernetes and Docker providers.
 Those providers will **not** create any VMs, but instead directly run the workspace
 container on the target.
 
+## Seeing your providers
+
+```sh
+devpod provider list
+```
+
+```
+    NAME   | VERSION | DEFAULT | INITIALIZED |   DESCRIPTION
+  ---------+---------+---------+-------------+-------------------
+    docker | v0.0.1  | true    | true        | DevPod on Docker
+```
+
+The default provider is the one a new workspace uses when you don't pass `--provider`. To see which providers you can
+add:
+
+```sh
+devpod provider list-available
+```
+
+It lists this fork's built-in providers, the providers that are only available from `loft-sh` so far, and the
+`devpod-provider-*` repositories of `curityio`.
+
 ## Managing providers
 
 You can head over the next sections on how to manage DevPod providers:

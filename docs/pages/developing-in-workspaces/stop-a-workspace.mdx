@@ -21,10 +21,23 @@ Run the following command to stop a workspace:
 devpod stop my-workspace
 ```
 
+`devpod down my-workspace` does the same. Check that it stopped:
+```
+devpod status my-workspace
+```
+
 Afterwards, you can start the workspace via:
 ```
 devpod up my-workspace
 ```
+
+To stop the machine of a workspace, for a provider that creates machines, see [Manage Machines](../managing-machines/manage-machines.mdx#stop-a-machine):
+```
+devpod machine stop my-machine
+```
+
+Stopping a workspace keeps the files in its folder, and what you installed in the container. To also remove
+them, [delete the workspace](./delete-a-workspace.mdx).
 
 ## Automatic stopping via a Provider
 

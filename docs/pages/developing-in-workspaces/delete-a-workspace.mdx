@@ -20,6 +20,14 @@ However, this means the workspace will only be deleted on the DevPod side locall
 
 ### Via DevPod CLI
 
+List the workspaces to find the name, and check what you are deleting. Everything in the workspace that wasn't
+pushed or copied out is lost:
+```
+devpod list
+devpod ssh my-workspace --command 'git status --short'
+```
+
+
 Run the following command to delete a workspace:
 ```
 devpod delete my-workspace
@@ -31,3 +39,17 @@ devpod delete my-workspace --force
 ```
 
 However, this means the workspace will only be deleted on the DevPod side locally, and any error raised by the used provider will be ignored. Only use this option with caution as this might leave previously created resources behind.
+
+### In scripts
+
+Make a delete that finds no workspace succeed, so that a cleanup script can run more than once, and limit how long DevPod
+waits for the provider:
+```
+devpod delete my-workspace --ignore-not-found
+devpod delete my-workspace --grace-period 2m
+```
+
+After deleting, the workspace is gone from the list:
+```
+devpod list
+```

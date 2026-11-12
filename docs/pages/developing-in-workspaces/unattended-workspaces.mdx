@@ -228,3 +228,15 @@ devpod ssh my-workspace --command 'git remote get-url --push origin && GIT_TERMI
 The first command prints an `https://` url. The second one prints a commit hash. If it fails with
 `could not read Username`, no credential helper answered for that host. If it fails with an authentication error,
 the token is wrong or doesn't have access to the repository.
+
+### 6. Run an agent
+
+With the workspace set up, start the agent so that it doesn't depend on your connection, and read its output later:
+
+```bash
+devpod ssh my-workspace --command "nohup sh -c 'claude -p \"Fix the failing tests\" > ~/agent.log 2>&1' > /dev/null 2>&1 &"
+devpod ssh my-workspace --command 'tail -n 50 ~/agent.log'
+```
+
+[Everyday Commands](../daily-usage/everyday-commands.mdx#example-run-a-claude-agent-in-a-dev-container-unattended)
+has the whole sequence for a Claude agent, from the dev container to fetching its work.

@@ -88,33 +88,47 @@ Optionally you can also define a command to run:
 devpod ssh my-workspace --command "echo Hello World"
 ```
 
-### Copy Files
-
-`devpod cp` copies files and directories between your machine and a workspace. A path in the workspace is
-written as `WORKSPACE_NAME:PATH`, like with `scp`. A relative path is relative to the workspace folder, and an
-empty one is the workspace folder itself:
+`devpod ssh` has more options for how the session runs:
 ```
-# copy a file into the workspace folder
-devpod cp my-file.txt my-workspace:
+# Start in another folder, or as another user
+devpod ssh my-workspace --workdir /workspaces/my-workspace/api --user root
 
-# copy a file to a path relative to the workspace folder, under another name
-devpod cp ./here/file-here.txt my-workspace:file-in-container.txt
+# Set variables in the container, or send ones from your computer
+devpod ssh my-workspace --set-env MODE=debug --send-env HOME_REGION
 
-# copy a directory into an absolute path in the container
-devpod cp ./temp/ my-workspace:/opt/
-
-# copy a file from the workspace to the current directory
-devpod cp my-workspace:/etc/os-release .
+# Don't forward your ssh-agent into the workspace
+devpod ssh my-workspace --agent-forwarding=false
 ```
 
-Like `docker cp`, a file or directory is copied into the destination if that is an existing directory, and to the
-destination otherwise. A destination that ends with `/` must be a directory, and is created if it's missing. A
-source that ends with `/.` copies a directory's contents instead of the directory. Directories are copied with
-everything in them, keeping permissions, modification times and symlinks.
+### Forward ports
 
-Files are copied as the workspace's user, who owns the files copied into the workspace. To write where only root
-can, such as `/usr/local`, add `--user root`. To copy a local file whose name has a colon in it, start its path
-with `./`.
+Reach a server that runs in the workspace on `localhost` of your computer, as long as the session is open. The
+syntax is the one of `ssh -L`:
+```
+# http://localhost:8080 on your computer reaches port 3000 in the workspace
+devpod ssh my-workspace -L 8080:localhost:3000
+
+# Forward without a shell, and end when nothing has used the port for 10 minutes
+devpod ssh my-workspace -L 8080:localhost:3000 --command "sleep infinity" --forward-ports-timeout 10m
+```
+
+To make a service on your computer reachable from the workspace, use `-R` in the same way:
+```
+devpod ssh my-workspace -R 5432:localhost:5432
+```
+
+With `ssh`, the same works through the workspace's host name:
+```
+ssh -L 8080:localhost:3000 my-workspace.devpod
+```
+
+### Copy files
+
+The `my-workspace.devpod` host works with any tool that uses ssh:
+```
+scp ./settings.json my-workspace.devpod:/workspaces/my-workspace/
+rsync -av my-workspace.devpod:/workspaces/my-workspace/build/ ./build/
+```
 
 ## IDE Commands
 
@@ -137,6 +151,9 @@ devpod ide set-options openvscode -o VERSION=v1.76.2
 To change the default IDE DevPod will use for connecting to a workspace, please run:
 ```
 devpod ide use vscode
+
+# Don't open an IDE after `devpod up`, unless one is given with --ide
+devpod ide use none
 ```
 
 ### List supported IDEs
