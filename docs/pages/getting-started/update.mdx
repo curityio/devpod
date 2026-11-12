@@ -33,5 +33,19 @@ new package](https://github.com/curityio/devpod/releases/latest/), and install i
 
 ## Optional: Update DevPod CLI
 
-If you just installed the CLI, you just need to download the latest version again
-to update.
+`devpod upgrade` replaces the CLI with the newest stable release, if it is newer than yours:
+
+```sh
+devpod version                         # the version you have
+devpod upgrade --dry-run               # is there a newer one, and could this user replace the CLI?
+sudo devpod upgrade                    # upgrade, when the CLI is in a directory you can't write to
+devpod upgrade --version v0.8.0        # install another release
+```
+
+See [Upgrade DevPod CLI](./install.mdx#upgrade-devpod-cli) for the details. After an upgrade, a workspace created by
+an older version keeps working, and DevPod warns when it replaces the agent in its dev container. To give the
+workspace the new version's setup, recreate it:
+
+```sh
+devpod up my-workspace --recreate
+```

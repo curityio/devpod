@@ -45,3 +45,70 @@ Amazon ECR has no built-in support. To use it, install
   }
 }
 ```
+
+## Using the kubernetes provider
+
+Add the provider, choose the namespace, and create a workspace. DevPod uses the cluster of your current `kubectl`
+context, or the one you give it:
+
+```bash
+devpod provider add kubernetes -o KUBERNETES_NAMESPACE=team-a
+devpod provider add kubernetes --name staging -o KUBERNETES_CONTEXT=staging-cluster -o KUBERNETES_NAMESPACE=team-a --use=false
+devpod up github.com/my-org/my-repo --provider staging
+```
+
+Options you will probably use (see all of them with `devpod provider options kubernetes`):
+
+```bash
+devpod provider set-options kubernetes \
+  -o DISK_SIZE=30Gi \
+  -o STORAGE_CLASS=fast-ssd \
+  -o RESOURCES=requests.cpu=2,limits.memory=8Gi \
+  -o NODE_SELECTOR=disktype=ssd \
+  -o INACTIVITY_TIMEOUT=2h
+```
+
+### Namespaces
+
+With `CREATE_NAMESPACE` (on by default), DevPod creates the namespace when it doesn't exist. This also works on
+clusters that give you access to a namespace only once it exists, for example to whoever creates it: DevPod treats a
+forbidden lookup of the workspace's persistent volume claim in a namespace that doesn't exist as no workspace, creates
+the namespace, and waits up to a minute for access to it. To use a namespace that an administrator created for you,
+turn it off:
+
+```bash
+devpod provider set-options kubernetes -o CREATE_NAMESPACE=false -o KUBERNETES_NAMESPACE=team-a
+```
+
+### Stopped and dead pods
+
+`devpod stop` stops the workspace's pod and keeps its persistent volume claim, and `devpod up` starts it again. If the
+pod is dead, because its phase is `Failed`, `Succeeded` or `Unknown`, its dev container has terminated, or it is
+being deleted (for example after the node restarted), `devpod up` recreates the pod, keeping the claim and so the
+workspace's files, instead of waiting for an agent that won't come:
+
+```bash
+devpod status my-workspace
+devpod up my-workspace
+```
+
+### Building images without Docker
+
+Kubernetes workspaces build their dev container in the pod, without a docker daemon, with the image
+`ghcr.io/curityio/dockerless` (built from the `dockerless/` directory of this repository on
+[kaniko](https://github.com/osscontainertools/kaniko)). It checks the registries' TLS certificates. Use another image,
+or disable the build in the pod (then the workspace needs an image that doesn't need a build):
+
+```bash
+devpod provider set-options kubernetes -o DOCKERLESS_IMAGE=registry.example.com/dockerless:0.3.0
+devpod provider set-options kubernetes -o DOCKERLESS_DISABLED=true
+```
+
+For a registry you trust on a network you trust, such as a registry cache inside the cluster that uses plain HTTP or
+a certificate the pod doesn't trust, allow it with `DOCKERLESS_INSECURE`. It applies to base images and the registry
+cache:
+
+```bash
+devpod context set-options -o REGISTRY_CACHE=registry.registry.svc.cluster.local:5000/devpod-cache
+devpod provider set-options kubernetes -o DOCKERLESS_INSECURE=true
+```

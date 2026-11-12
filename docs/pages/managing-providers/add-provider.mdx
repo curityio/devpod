@@ -64,6 +64,16 @@ A name other than `docker` or `kubernetes` is downloaded from the latest release
 `gcloud`, `ssh` and `terraform` don't have a repository there yet, so they are downloaded from
 `loft-sh/devpod-provider-<name>`.
 
+To add a provider without making it the default, and keep the options you give it, use `--use=false`:
+
+```sh
+devpod provider add kubernetes --use=false -o KUBERNETES_NAMESPACE=team-a
+devpod provider list
+```
+
+The options are saved and the provider is initialized, but the default provider doesn't change. Use it for a workspace
+with `--provider kubernetes`, or make it the default later with `devpod provider use kubernetes`.
+
 :::info Multiple providers at the same time
 You can use the `--name` flag to add multiple providers of the same type with different options, for example `devpod provider add aws --name aws-gpu -o AWS_INSTANCE_TYPE=p3.8xlarge`
 :::

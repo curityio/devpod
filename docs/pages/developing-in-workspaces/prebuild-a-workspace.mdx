@@ -24,6 +24,13 @@ devpod build github.com/my-org/my-repo --repository ghcr.io/my-org/my-repo
 DevPod will only build the workspace if there isn't an existing prebuild found in the specified docker image repository
 :::
 
+Push more than one tag, build for other platforms, or build without pushing to check that the build works:
+```
+devpod build github.com/my-org/my-repo --repository ghcr.io/my-org/my-repo --tag latest,main
+devpod build github.com/my-org/my-repo --repository ghcr.io/my-org/my-repo --platform linux/amd64,linux/arm64
+devpod build github.com/my-org/my-repo --skip-push
+```
+
 DevPod will use the current provider for doing this, which means you can also use remote providers to prebuild an image. You can even have a separate provider just for prebuilding images.
 
 ## Using Prebuilds
@@ -54,3 +61,16 @@ It's also possible to include the prebuild repository directly in the `devcontai
   }
 }
 ```
+
+### Prebuild in CI
+
+A CI job can prebuild the image whenever the `devcontainer.json` changes. For example, with GitHub Actions and the `docker` provider:
+
+```yaml
+- name: Prebuild the dev container
+  run: |
+    devpod provider add docker
+    devpod build . --repository ghcr.io/${{ github.repository }}
+```
+
+Log in to the registry before it with `docker login`, as DevPod uses your docker credentials to push.

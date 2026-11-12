@@ -1,0 +1,167 @@
+---
+title: Everyday Commands
+sidebar_label: Everyday Commands
+---
+
+This page lists the DevPod CLI commands you need in daily usage, and shows how they fit together. Each command links
+to the page that covers it in detail. Run `devpod <command> --help` for every flag a command has.
+
+## One-time setup
+
+Install the [CLI](../getting-started/install.mdx#install-devpod-cli), add a provider, and check that it works:
+
+```bash
+devpod provider add docker      # the workspace runs in your local Docker
+devpod provider list            # shows the providers and which one is the default
+devpod up github.com/microsoft/vscode-remote-try-node --ide none
+```
+
+Other providers, such as `kubernetes` or `ssh`, are added the same way. See
+[Add a Provider](../managing-providers/add-provider.mdx).
+
+## The daily loop
+
+| I want to... | Command |
+| --- | --- |
+| Create a workspace from a git repository, or start a stopped one | `devpod up github.com/my-org/my-repo` |
+| Create a workspace from the folder I'm in | `devpod up .` |
+| Start an existing workspace by name | `devpod up my-workspace` |
+| Get a shell in the workspace | `devpod ssh my-workspace` |
+| Run one command in the workspace | `devpod ssh my-workspace --command 'make test'` |
+| Open the workspace in an IDE | `devpod up my-workspace --ide vscode` |
+| Forward a port from the workspace to my computer | `devpod ssh my-workspace -L 8080:localhost:8080` |
+| List my workspaces | `devpod list` |
+| See whether a workspace is running | `devpod status my-workspace` |
+| See the status of all workspaces | `devpod status --all` |
+| Apply changes to `devcontainer.json` | `devpod up my-workspace --recreate` |
+| Start from a clean slate (also re-clones the source) | `devpod up my-workspace --reset` |
+| Stop a workspace, keeping its state | `devpod stop my-workspace` |
+| Delete a workspace and its state | `devpod delete my-workspace` |
+| Read the workspace's logs | `devpod logs my-workspace` |
+| Collect information for a bug report | `devpod troubleshoot my-workspace` |
+| Update the CLI | `devpod upgrade` |
+
+A typical day looks like this:
+
+```bash
+# Morning: start the workspace (creates it the first time, restarts it when it was stopped)
+devpod up github.com/my-org/my-repo --ide none
+
+# Work in it, with your IDE over ssh (my-repo.devpod), or from a terminal
+devpod ssh my-repo
+devpod ssh my-repo --command 'git status --short'
+
+# Pull in a change to .devcontainer/devcontainer.json
+devpod up my-repo --recreate
+
+# Evening: stop it, which keeps everything in the workspace
+devpod stop my-repo
+
+# Done with it for good
+devpod delete my-repo
+```
+
+The workspace is named after the repository or folder. Use `devpod list` to see the names, and
+`devpod up --id <name>` to choose one, for example to have several workspaces of the same repository.
+
+## Example: run a Claude agent in a dev container, unattended
+
+A dev container is a good sandbox for an AI agent: it can only change what's inside the workspace, and you can
+delete the workspace when it's done. This example starts [Claude Code](https://code.claude.com/docs/en/overview)
+in a workspace on a Kubernetes cluster, tells it to do a task, and goes away. The agent keeps working when you
+close your laptop, as long as the workspace's provider runs the workspace somewhere else than your computer, and
+everything the agent needs is inside the workspace.
+
+**1. Make Claude available in the dev container.** Add it to the repository's `.devcontainer/devcontainer.json`,
+here with Node.js, which installs it, and the GitHub CLI, which lets the agent push branches and open pull requests:
+
+```json
+{
+  "name": "my-repo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && gh auth setup-git"
+}
+```
+
+**2. Create the credentials the agent uses.** Run `claude setup-token` on your computer to get a long-lived
+`CLAUDE_CODE_OAUTH_TOKEN` for Claude, and create a fine-grained GitHub token for the repository (see
+[Create tokens](../developing-in-workspaces/unattended-workspaces.mdx#2-create-tokens)). Put them in a file that
+only you can read:
+
+```bash
+mkdir -p ~/.config/devpod && touch ~/.config/devpod/agent.env && chmod 600 ~/.config/devpod/agent.env
+cat >> ~/.config/devpod/agent.env <<'EOF'
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+GH_TOKEN=github_pat_...
+EOF
+```
+
+**3. Make the workspace independent of your computer.** These options stop DevPod from forwarding your ssh-agent
+and git credentials, which only work while you're connected, and make git in the workspace use https with the
+`GH_TOKEN` above. Use a separate context so that your other workspaces keep working as they do now:
+
+```bash
+devpod context create unattended
+devpod context set-options unattended \
+  -o SSH_AGENT_FORWARDING=false \
+  -o SSH_INJECT_GIT_CREDENTIALS=false \
+  -o GIT_SSH_SIGNATURE_FORWARDING=false
+```
+
+**4. Start the workspace.** The tokens become environment variables of everything in the workspace, and stay
+there, so you don't have to pass the file again later:
+
+```bash
+devpod provider add kubernetes --context unattended
+devpod up github.com/my-org/my-repo@my-branch \
+  --context unattended \
+  --id my-agent \
+  --ide none \
+  --workspace-env-file ~/.config/devpod/agent.env
+```
+
+**5. Start Claude so that it doesn't depend on your connection.** `claude -p` runs one prompt without asking you
+anything and prints the answer. `nohup` keeps it running when `devpod ssh` ends, and its output goes to a file:
+
+```bash
+devpod ssh my-agent --context unattended --command \
+  "nohup sh -c 'claude -p \"Fix the failing tests in the api module, commit the fix and push the branch\" \
+     --allowedTools \"Bash,Edit,Read,Write\" > ~/agent.log 2>&1' > /dev/null 2>&1 &"
+```
+
+`--allowedTools` is the list of tools Claude may use without asking, so it must be enough for the task. A
+`.claude/settings.json` in the repository can give Claude more detailed permissions.
+
+**6. Come back later.** Look at what the agent did, and bring its work home:
+
+```bash
+devpod status my-agent --context unattended
+devpod ssh my-agent --context unattended --command 'tail -n 50 ~/agent.log'
+devpod ssh my-agent --context unattended --command 'git log --oneline -5 && git status --short'
+
+git fetch origin my-branch     # the agent pushed it
+```
+
+When you don't need the workspace anymore, delete it. Anything that wasn't pushed is gone:
+
+```bash
+devpod delete my-agent --context unattended
+```
+
+:::info
+The workspace is only as safe as the tokens in it. Everything in the workspace can read them, including the
+agent, so give them access to only what the agent should touch, and an expiry date.
+[Run Workspaces Unattended](../developing-in-workspaces/unattended-workspaces.mdx) explains what depends on your
+computer, how DevPod makes git use https, how to give git other hosts' credentials, and how to keep the workspace
+from stopping while the agent works.
+:::
+
+## Where to go next
+
+- [Create a Workspace](../developing-in-workspaces/create-a-workspace.mdx): sources, options, recreating and resetting.
+- [Connect to a Workspace](../developing-in-workspaces/connect-to-a-workspace.mdx): IDEs, ssh, port forwarding.
+- [devcontainer.json](../developing-in-workspaces/devcontainer-json.mdx): what goes in the dev container.
+- [Managing Providers](../managing-providers/what-are-providers.mdx): where workspaces run.

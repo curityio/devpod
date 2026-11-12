@@ -15,6 +15,18 @@ Be aware at this time, the desktop application does not have an update button
 for a provider.
 :::
 
+Check the version before and after:
+
+```sh
+devpod provider list
+```
+
+To update a provider and keep the default provider as it is, also keeping the options you give:
+
+```sh
+devpod provider update <name> --use=false -o KEY=value
+```
+
 ## From GitHub
 
 Similar to adding a provider, you can update via:

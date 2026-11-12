@@ -37,6 +37,12 @@ Example output:
 08:48:58 info Machine '<name-of-machine>' is 'Running'
 ```
 
+To see everything DevPod knows about a machine, such as its provider and options:
+
+```sh
+devpod machine inspect <name-of-machine>
+```
+
 ## SSH into a machine
 
 It is possible to SSH directly into the provider's machine using
@@ -65,6 +71,22 @@ Example output:
 
 ```
 08:58:58 info Machine '<name-of-machine>' is 'Stopped, you can start it via 'devpod machine start <name-of-machine>''
+```
+
+Start it again with:
+
+```sh
+devpod machine start <name-of-machine>
+```
+
+Starting a workspace on a stopped machine, for example with `devpod up my-workspace`, starts the machine too.
+
+## Use a machine for a workspace
+
+Create the workspace on a machine that already exists:
+
+```sh
+devpod up github.com/my-org/my-repo --provider aws --machine <name-of-machine>
 ```
 
 ## Delete a machine

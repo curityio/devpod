@@ -29,3 +29,16 @@ ports over the SSH connection. Once this is done DevPod starts your local IDE an
 
 If you developer environment requires any port forwarding, then your IDE or an SSH connection must be running. That's because devpod needs the SSH server running on the agent to perform the forwarding,
 which is deployed when starting the IDE or SSH session.
+
+## The agent comes with the CLI
+
+The DevPod CLI embeds the Linux agent, for amd64 and arm64, whatever platform the CLI runs on, and copies it into
+machines and dev containers itself. It never downloads an agent, so the agent always has the CLI's version, and
+you can create workspaces without access to GitHub. When you upgrade the CLI, DevPod replaces the agent of an existing
+dev container the next time it starts the workspace, and warns that you may want to recreate the workspace:
+
+```
+devpod upgrade
+devpod up my-workspace            # replaces the agent, and warns
+devpod up my-workspace --recreate # give the workspace the new version's setup
+```

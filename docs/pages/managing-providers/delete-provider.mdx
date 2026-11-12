@@ -16,6 +16,8 @@ remove that workspace, in order to then remove the provider.
 An already installed provider can be removed by using:
 
 ```sh
+devpod list                     # find the workspaces that use the provider...
+devpod delete my-workspace      # ...and delete them first
 devpod provider delete <provider name>
 ```
 

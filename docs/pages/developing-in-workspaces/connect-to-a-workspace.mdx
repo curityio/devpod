@@ -88,6 +88,48 @@ Optionally you can also define a command to run:
 devpod ssh my-workspace --command "echo Hello World"
 ```
 
+`devpod ssh` has more options for how the session runs:
+```
+# Start in another folder, or as another user
+devpod ssh my-workspace --workdir /workspaces/my-workspace/api --user root
+
+# Set variables in the container, or send ones from your computer
+devpod ssh my-workspace --set-env MODE=debug --send-env HOME_REGION
+
+# Don't forward your ssh-agent into the workspace
+devpod ssh my-workspace --agent-forwarding=false
+```
+
+### Forward ports
+
+Reach a server that runs in the workspace on `localhost` of your computer, as long as the session is open. The
+syntax is the one of `ssh -L`:
+```
+# http://localhost:8080 on your computer reaches port 3000 in the workspace
+devpod ssh my-workspace -L 8080:localhost:3000
+
+# Forward without a shell, and end when nothing has used the port for 10 minutes
+devpod ssh my-workspace -L 8080:localhost:3000 --command "sleep infinity" --forward-ports-timeout 10m
+```
+
+To make a service on your computer reachable from the workspace, use `-R` in the same way:
+```
+devpod ssh my-workspace -R 5432:localhost:5432
+```
+
+With `ssh`, the same works through the workspace's host name:
+```
+ssh -L 8080:localhost:3000 my-workspace.devpod
+```
+
+### Copy files
+
+The `my-workspace.devpod` host works with any tool that uses ssh:
+```
+scp ./settings.json my-workspace.devpod:/workspaces/my-workspace/
+rsync -av my-workspace.devpod:/workspaces/my-workspace/build/ ./build/
+```
+
 ## IDE Commands
 
 This section shows additional commands to configure DevPod's behavior when opening a workspace.
@@ -109,6 +151,9 @@ devpod ide set-options openvscode -o VERSION=v1.76.2
 To change the default IDE DevPod will use for connecting to a workspace, please run:
 ```
 devpod ide use vscode
+
+# Don't open an IDE after `devpod up`, unless one is given with --ide
+devpod ide use none
 ```
 
 ### List supported IDEs

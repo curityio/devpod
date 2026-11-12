@@ -57,6 +57,16 @@ module.exports = {
     },
     {
       type: "category",
+      label: "Daily Usage",
+      items: [
+        {
+          type: "doc",
+          id: "daily-usage/everyday-commands",
+        },
+      ],
+    },
+    {
+      type: "category",
       label: "Developing in a Workspace",
       items: [
         {

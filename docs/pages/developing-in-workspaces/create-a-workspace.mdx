@@ -44,7 +44,7 @@ For example: setting `devpod-home=/mnt/c/Users/MyUser/` will result in a workspa
 
 ### Via DevPod CLI
 
-Make sure to [install the DevPod CLI locally](../getting-started/install.mdx#optional-install-devpod-cli) and select a provider you would like to host the workspace on (such as local docker) via:
+Make sure to [install the DevPod CLI locally](../getting-started/install.mdx#install-devpod-cli) and select a provider you would like to host the workspace on (such as local docker) via:
 ```
 # Add a provider if you haven't already
 devpod provider add docker
@@ -152,6 +152,76 @@ This only works with the `docker` provider.
 :::info
 Using `--recreate` on a workspace based on an already existing container will be rejected.
 :::
+
+## Common options
+
+`devpod up` has many flags. These are the ones you use most, each with an example. `devpod up --help` lists them all.
+
+Choose the name of the workspace, for example to have two workspaces of the same repository, and choose the provider
+and its options for this workspace only:
+
+```bash
+devpod up github.com/my-org/my-repo --id my-repo-experiment
+devpod up github.com/my-org/my-repo --provider kubernetes --provider-option KUBERNETES_NAMESPACE=team-a
+```
+
+Choose what to open the workspace with, or open nothing and only start it (see
+[Connect to a Workspace](./connect-to-a-workspace.mdx)):
+
+```bash
+devpod up my-workspace --ide goland
+devpod up my-workspace --ide none
+devpod up my-workspace --ide vscode --open-ide=false   # install the IDE's server, but don't open the IDE
+```
+
+Use another `devcontainer.json`, or an image, instead of the one in the project (see
+[devcontainer.json](./devcontainer-json.mdx)):
+
+```bash
+devpod up . --devcontainer-path .devcontainer/backend/devcontainer.json
+devpod up . --devcontainer-image mcr.microsoft.com/devcontainers/go:1.23
+devpod up . --fallback-image ubuntu:24.04    # only used if the project has no devcontainer.json
+```
+
+Clone less of a big repository, or its submodules too:
+
+```bash
+devpod up github.com/my-org/big-repo --git-clone-strategy blobless
+devpod up github.com/my-org/big-repo --git-clone-strategy shallow
+devpod up github.com/my-org/my-repo --git-clone-recursive-submodules
+```
+
+Give the dev container environment variables, a dotfiles repository or a git identity (see
+[Environment variables](./environment-variables-in-devcontainer-json.mdx),
+[Dotfiles](./dotfiles-in-a-workspace.mdx) and [Git identity](./credentials.mdx#git-identity)):
+
+```bash
+devpod up my-workspace --workspace-env MY_ENV_VAR=my-value --workspace-env-file ./workspace.env
+devpod up my-workspace --dotfiles https://github.com/my-user/dotfiles
+devpod up my-workspace --git-user-name "My Name" --git-user-email me@company.com
+```
+
+Use a prebuilt image, or a machine that already exists (see [Prebuild a Workspace](./prebuild-a-workspace.mdx) and
+[Manage Machines](../managing-machines/manage-machines.mdx)):
+
+```bash
+devpod up github.com/my-org/my-repo --prebuild-repository ghcr.io/my-org/my-repo
+devpod up github.com/my-org/my-repo --provider aws --machine my-big-machine
+```
+
+Don't add the workspace to `~/.ssh/config`, or add it to another file:
+
+```bash
+devpod up my-workspace --configure-ssh=false
+devpod up my-workspace --ssh-config ~/.ssh/devpod-config
+```
+
+Change where DevPod keeps its state for one command, or for the whole shell:
+
+```bash
+devpod up my-workspace --devpod-home /mnt/c/Users/MyUser
+export DEVPOD_HOME=/mnt/c/Users/MyUser
+```
 
 ## Recreating a workspace
 
