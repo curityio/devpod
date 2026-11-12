@@ -163,6 +163,38 @@ func GetUser(workspaceID string, sshConfigPath string) (string, error) {
 	return user, nil
 }
 
+// GetWorkdir returns the folder DevPod's SSH config entry for the workspace opens, which `devpod up` sets to the
+// workspace folder in the container. It returns "" if the entry doesn't set one.
+func GetWorkdir(workspaceID string, sshConfigPath string) (string, error) {
+	path, err := ResolveSSHConfigPath(sshConfigPath)
+	if err != nil {
+		return "", errors.Wrap(err, "Invalid ssh config path")
+	}
+
+	workdir := ""
+	_, err = transformHostSection(path, workspaceID+"."+"devpod", func(line string) string {
+		if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+			workdir = parseWorkdirFlag(line)
+		}
+		return line
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return workdir, nil
+}
+
+// parseWorkdirFlag returns the value of the `--workdir "<dir>"` that addHostSection adds to the ProxyCommand.
+func parseWorkdirFlag(proxyCommand string) string {
+	_, value, found := strings.Cut(proxyCommand, ` --workdir "`)
+	if !found {
+		return ""
+	}
+	value, _, _ = strings.Cut(value, `"`)
+	return value
+}
+
 func RemoveFromConfig(workspaceID string, sshConfigPath string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()

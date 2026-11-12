@@ -1,0 +1,119 @@
+---
+title: Copy Files
+sidebar_label: Copy Files
+---
+
+## Copy Files
+
+`devpod cp` copies files and directories between your computer and a workspace, in either direction. A path in the
+workspace is written as `WORKSPACE_NAME:PATH`, like with `scp`:
+```
+devpod cp SOURCE my-workspace:DESTINATION
+devpod cp my-workspace:SOURCE DESTINATION
+```
+
+Exactly one of the two paths is in a workspace. To copy between two workspaces, copy to your computer first.
+
+### Paths in the workspace
+
+A relative path is relative to the workspace folder, the folder `devpod ssh` starts in, such as
+`/workspaces/my-workspace` or the `workspaceFolder` of the [devcontainer.json](./devcontainer-json.mdx). An empty
+path is the workspace folder itself, and an absolute path is used as it is:
+```
+# into the workspace folder
+devpod cp notes.txt my-workspace:
+
+# to a path in the workspace folder, under another name
+devpod cp ./here/file-here.txt my-workspace:docs/file-in-container.txt
+
+# to an absolute path in the container
+devpod cp ./certs/ my-workspace:/tmp/certs/
+```
+
+`~` isn't expanded: to copy into the home directory, write its path, such as `my-workspace:/home/vscode/`.
+
+To copy a local file whose name has a colon in it, start its path with `./`, so that it isn't read as a
+workspace: `devpod cp ./report:v2.txt my-workspace:`.
+
+### Examples
+
+```
+# copy a file from the workspace to the current directory
+devpod cp my-workspace:build/report.html .
+
+# copy a whole directory into the workspace folder
+devpod cp ./fixtures my-workspace:
+
+# copy only what's in a directory, into an existing one
+devpod cp ./config/. my-workspace:config/
+
+# bring the build output home
+devpod cp my-workspace:dist ./dist-from-workspace
+
+# write where only root can
+devpod cp --user root ./my-tool my-workspace:/usr/local/bin/
+```
+
+### Where files land
+
+`devpod cp` follows the rules of `docker cp`. A destination that ends with `/` must be a directory:
+
+| Source | Destination | Result |
+| --- | --- | --- |
+| a file | an existing directory | the file is copied into it, under the same name |
+| a file | an existing file, or a path that doesn't exist | the file is copied to that path, replacing what's there |
+| a file | a path ending with `/` that doesn't exist | the directory is created, with any missing parents, and the file copied into it |
+| a directory | an existing directory | the directory is copied into it, under the same name |
+| a directory | a path that doesn't exist | the directory is copied to that path |
+| a directory ending with `/.` | an existing directory | what's in the directory is copied into it |
+
+Without a `/` at the end of the destination, the directory it's in must exist. Copying a directory onto an existing
+file is an error. Existing files are replaced, and other files in an existing directory are kept.
+
+### What's copied
+
+- Directories are copied with everything in them.
+- Permissions and modification times are kept.
+- Symlinks in a directory are copied as symlinks, with the same target. A symlink given as the source is followed.
+- Files that aren't regular files, directories or symlinks, such as sockets, are skipped with a warning, and so are
+  files whose names can't be used on the destination, such as `report?.txt`, `CON` or a name ending with a dot copied
+  to Windows.
+
+Each file is written to a temporary file next to it, named `.devpod-cp-...`, which is then renamed over the
+destination. So a file that's copied onto itself (which can happen when the workspace folder is your local folder,
+mounted into the container) keeps its contents, and read-only files can be replaced. If a copy is interrupted, such
+a temporary file may be left behind.
+
+### Users and permissions
+
+Files are copied as the workspace's user, the one `devpod ssh` logs in as, who owns the files copied into the
+workspace. Copying somewhere that user can't write, or reading a file it can't read, fails with `permission denied`.
+Use `--user` to copy as another user, such as `root`:
+```
+devpod cp --user root my-workspace:/var/log/app.log .
+```
+
+Files and directories that are copied into a workspace are only readable by their owner until they have their final
+permissions, so a private file, such as a key, is never readable by other users in the container while it's copied.
+
+### Notes
+
+- The workspace must be running. Start it with `devpod up my-workspace` first.
+- `--context` selects the context the workspace is in, like for other commands.
+- On Windows, a path that starts with a drive letter, such as `C:\Users\me\file.txt` or `C:file.txt`, is a local
+  path. This means that a workspace with a one-letter name can't be used with `devpod cp` on Windows.
+- On Windows, symlinks are only created when Windows allows it (in Developer Mode, or as an administrator), and are
+  skipped with a warning otherwise.
+
+## Other tools
+
+`devpod up` adds the workspace to your ssh config as `my-workspace.devpod`, so any tool that uses ssh can copy files
+too, such as `scp`, `sftp` or `rsync` (if it's installed in the container):
+```
+scp ./settings.json my-workspace.devpod:/workspaces/my-workspace/
+rsync -av my-workspace.devpod:/workspaces/my-workspace/build/ ./build/
+```
+
+These need an ssh client on your computer. Use absolute paths in the workspace with them: they don't all resolve a
+relative path against the workspace folder (`scp` and `sftp` use the user's home directory). `rsync` only copies
+what changed, which helps with a large directory that you copy again and again.
