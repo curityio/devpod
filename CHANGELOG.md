@@ -15,6 +15,8 @@ Add new entries to the top of the "Unreleased" section.
   weren't documented yet are now: `devpod status --all`, the kubernetes provider's namespace, dead pod and dockerless
   options, `--use=false` for `devpod provider add` and `update`, and the embedded agent.
 
+## v0.10.0 (2026-11-09)
+
 ### Fixed
 
 - The kubernetes provider can create a workspace in a namespace that doesn't exist yet on clusters that only
