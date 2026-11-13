@@ -22,10 +22,9 @@ Add new entries to the top of the "Unreleased" section.
 
 - `devpod ssh --workdir` works with a directory whose name contains an apostrophe, and no longer lets the
   container's shell expand `$`, backticks and `\` in it when connecting as a user other than root. The same
-  goes for the user name, the gpg-agent forwarding's socket path and git signing key, and `--reuse-ssh-auth-sock`.
-  DevPod now shell-quotes every value it puts in the commands it runs on the machine and in the container (also
-  the agent path, the context name and the agent's data directory), instead of wrapping them in single or double
-  quotes.
+  goes for the user name, the gpg-agent forwarding's socket path and git signing key, `--reuse-ssh-auth-sock`,
+  the user the credentials server runs for, and the context name in `devpod logs`: DevPod shell-quotes them
+  instead of wrapping them in single or double quotes.
 - A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
   keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
   directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs
