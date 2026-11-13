@@ -20,6 +20,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- Installing the agent works with an agent path that contains a space, quotes, `$` or a backtick, and no longer
+  lets the shell expand them: the install script shell-quotes the path, including in the commands it runs with
+  `sudo` or `su`. The same goes for the workspace folder given to Jupyter Notebook, the extensions installed into
+  VS Code Server and OpenVSCode Server, and OpenVSCode Server's host and port, which DevPod put in single quotes.
 - `ssh <workspace>.devpod` works when the workspace folder (or the path of the devpod executable, the DevPod home
   directory or the context name) contains `$`, backticks, `\`, `"`, `'` or `%`. `devpod up` wrapped these values
   in double quotes in the `ProxyCommand` it writes into `~/.ssh/config`, so the local shell OpenSSH runs it with

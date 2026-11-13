@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strconv"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/config"
 	"github.com/curityio/devpod/pkg/ide"
@@ -77,7 +78,7 @@ func (o *JupyterNotbookServer) installNotebook() error {
 	}
 
 	// install notebook command
-	runCommand := fmt.Sprintf("%s install notebook", baseCommand)
+	runCommand := shellescape.QuoteCommand([]string{baseCommand, "install", "notebook"})
 	args := []string{}
 	if o.userName != "" {
 		args = append(args, "su", o.userName, "-c", runCommand)
@@ -99,7 +100,7 @@ func (o *JupyterNotbookServer) installNotebook() error {
 func (o *JupyterNotbookServer) Start() error {
 	return single.Single("jupyter.pid", func() (*exec.Cmd, error) {
 		o.log.Infof("Starting jupyter notebook in background...")
-		runCommand := fmt.Sprintf("jupyter notebook --ip='*' --NotebookApp.notebook_dir='%s' --NotebookApp.token='' --NotebookApp.password='' --no-browser --port '%s' --allow-root", o.workspaceFolder, strconv.Itoa(DefaultServerPort))
+		runCommand := notebookCommand(o.workspaceFolder, DefaultServerPort)
 		args := []string{}
 		if o.userName != "" {
 			args = append(args, "su", o.userName, "-w", "SSH_AUTH_SOCK", "-l", "-c", runCommand)
@@ -109,5 +110,19 @@ func (o *JupyterNotbookServer) Start() error {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Dir = o.workspaceFolder
 		return cmd, nil
+	})
+}
+
+// notebookCommand is the shell command that starts a notebook server for the workspace folder.
+func notebookCommand(workspaceFolder string, port int) string {
+	return shellescape.QuoteCommand([]string{
+		"jupyter", "notebook",
+		"--ip=*",
+		"--NotebookApp.notebook_dir=" + workspaceFolder,
+		"--NotebookApp.token=",
+		"--NotebookApp.password=",
+		"--no-browser",
+		"--port", strconv.Itoa(port),
+		"--allow-root",
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/config"
 	copy2 "github.com/curityio/devpod/pkg/copy"
@@ -190,7 +191,7 @@ func (o *OpenVSCodeServer) installExtensions() error {
 	binaryPath := filepath.Join(location, "bin", "openvscode-server")
 	for _, extension := range o.extensions {
 		o.log.Info("Install extension " + extension + "...")
-		runCommand := fmt.Sprintf("%s --install-extension '%s'", binaryPath, extension)
+		runCommand := installExtensionCommand(binaryPath, extension)
 		args := []string{}
 		if o.userName != "" {
 			args = append(args, "su", o.userName, "-c", runCommand)
@@ -261,7 +262,7 @@ func (o *OpenVSCodeServer) Start() error {
 
 	return single.Single("openvscode.pid", func() (*exec.Cmd, error) {
 		o.log.Infof("Starting openvscode in background...")
-		runCommand := fmt.Sprintf("%s server-local --without-connection-token --host '%s' --port '%s'", binaryPath, o.host, o.port)
+		runCommand := serverCommand(binaryPath, o.host, o.port)
 		args := []string{}
 		if o.userName != "" {
 			args = append(args, "su", o.userName, "-c", runCommand)
@@ -293,4 +294,14 @@ func prepareOpenVSCodeServerLocation(userName string) (string, error) {
 	}
 
 	return folder, nil
+}
+
+// serverCommand is the shell command that starts the server at binaryPath, listening on host and port.
+func serverCommand(binaryPath, host, port string) string {
+	return shellescape.QuoteCommand([]string{binaryPath, "server-local", "--without-connection-token", "--host", host, "--port", port})
+}
+
+// installExtensionCommand is the shell command that makes the server at binaryPath install extension.
+func installExtensionCommand(binaryPath, extension string) string {
+	return shellescape.QuoteCommand([]string{binaryPath, "--install-extension", extension})
 }
