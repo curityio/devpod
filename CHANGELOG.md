@@ -28,6 +28,11 @@ Add new entries to the top of the "Unreleased" section.
   OpenSSH reject the whole config file. DevPod now quotes each value for the shell on Linux and macOS, and for the
   Windows command line on Windows, where OpenSSH starts the `ProxyCommand` without a shell. `devpod up` also
   refuses to write a value that contains a line break, which would have added its own lines to the config file.
+- `devpod ssh --workdir` works with a directory whose name contains an apostrophe, and no longer lets the
+  container's shell expand `$`, backticks and `\` in it when connecting as a user other than root. The same
+  goes for the user name, the gpg-agent forwarding's socket path and git signing key, `--reuse-ssh-auth-sock`,
+  the user the credentials server runs for, and the context name in `devpod logs`: DevPod shell-quotes them
+  instead of wrapping them in single or double quotes.
 - A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
   keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
   directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs

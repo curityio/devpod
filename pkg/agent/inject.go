@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/agent/agentbin"
 	"github.com/curityio/devpod/pkg/inject"
 	"github.com/curityio/devpod/pkg/log"
@@ -96,7 +97,7 @@ func injectAgentAndExecute(
 		remoteAgentPath = RemoteDevPodHelperLocation
 	}
 
-	versionCheck := fmt.Sprintf(`[ "$(%s version 2>/dev/null || echo 'false')" != "%s" ]`, remoteAgentPath, version.GetVersion())
+	versionCheck := fmt.Sprintf(`[ "$(%s version 2>/dev/null || echo 'false')" != %s ]`, shellescape.Quote(remoteAgentPath), shellescape.Quote(version.GetVersion()))
 
 	// install devpod into the target
 	// do a simple hello world to check if we can get something
