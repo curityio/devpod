@@ -8,8 +8,9 @@ import (
 	"testing"
 )
 
-// Awkward is a value with characters a shell treats specially: a space, quotes, expansions and a backslash.
-const Awkward = "it's a \"$HOME\" `id` $(id) \\ path"
+// Awkward is a value with characters a shell treats specially, in and out of quotes: a space, quotes, expansions,
+// a backslash, a command separator and a glob. It contains no slash, so it can be a file name.
+const Awkward = "o'brien \"quoted\" $HOME `id` $(id) \\ ; *"
 
 // Words returns the words sh splits command into, after quote removal and without running the command or any
 // expansions in it.
