@@ -1,8 +1,6 @@
 package ssh
 
 import (
-	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -11,7 +9,9 @@ import (
 
 func TestAddHostSection(t *testing.T) {
 	tests := []struct {
-		name      string
+		name string
+		// goos defaults to linux
+		goos      string
 		config    string
 		execPath  string
 		host      string
@@ -19,7 +19,6 @@ func TestAddHostSection(t *testing.T) {
 		context   string
 		workspace string
 		workdir   string
-		command   string
 		gpgagent  bool
 		// noAgentForwarding is the inverse of addHostSection's forwardAgent, so that the cases default to forwarding
 		noAgentForwarding bool
@@ -35,7 +34,6 @@ func TestAddHostSection(t *testing.T) {
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "",
 			expected: `# DevPod Start testhost
@@ -45,7 +43,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost`,
 		},
@@ -65,12 +63,13 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost`,
 		},
 		{
-			name:       "Basic host addition with DEVPOD_HOME",
+			name:       "Basic host addition with DEVPOD_HOME on Windows",
+			goos:       "windows",
 			config:     "",
 			execPath:   "/path/to/exec",
 			host:       "testhost",
@@ -78,7 +77,6 @@ Host testhost
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "C:\\\\White Space\\devpod\\test",
 			expected: `# DevPod Start testhost
@@ -101,7 +99,6 @@ Host testhost
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "/path/to/workdir",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "",
 			expected: `# DevPod Start testhost
@@ -111,7 +108,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace --workdir "/path/to/workdir"
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace --workdir /path/to/workdir
   User testuser
 # DevPod End testhost`,
 		},
@@ -124,7 +121,6 @@ Host testhost
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   true,
 			devPodHome: "",
 			expected: `# DevPod Start testhost
@@ -134,30 +130,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace --gpg-agent-forwarding
-  User testuser
-# DevPod End testhost`,
-		},
-		{
-			name:       "Host addition with custom command",
-			config:     "",
-			execPath:   "/path/to/exec",
-			host:       "testhost",
-			user:       "testuser",
-			context:    "testcontext",
-			workspace:  "testworkspace",
-			workdir:    "",
-			command:    "ssh -W %h:%p bastion",
-			gpgagent:   false,
-			devPodHome: "",
-			expected: `# DevPod Start testhost
-Host testhost
-  ForwardAgent yes
-  LogLevel error
-  StrictHostKeyChecking no
-  UserKnownHostsFile /dev/null
-  HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "ssh -W %h:%p bastion"
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace --gpg-agent-forwarding
   User testuser
 # DevPod End testhost`,
 		},
@@ -171,7 +144,6 @@ Host testhost
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "",
 			expected: `# DevPod Start testhost
@@ -181,7 +153,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost
 Host existinghost
@@ -196,7 +168,7 @@ Host existingtesthost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost
 
@@ -208,7 +180,6 @@ Host existinghost
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "",
 			expected: `# DevPod Start testhost
@@ -218,7 +189,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost
 # DevPod Start existingtesthost
@@ -228,7 +199,7 @@ Host existingtesthost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost
 
@@ -250,7 +221,6 @@ Include ~/config3`,
 			context:    "testcontext",
 			workspace:  "testworkspace",
 			workdir:    "",
-			command:    "",
 			gpgagent:   false,
 			devPodHome: "",
 			expected: `Include ~/config1 
@@ -267,7 +237,7 @@ Host testhost
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
   HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa
-  ProxyCommand "/path/to/exec" ssh --stdio --context testcontext --user testuser testworkspace
+  ProxyCommand /path/to/exec ssh --stdio --context testcontext --user testuser testworkspace
   User testuser
 # DevPod End testhost`,
 		},
@@ -275,14 +245,18 @@ Host testhost
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := addHostSection(tt.config, tt.execPath, tt.host, tt.user, tt.context, tt.workspace, tt.workdir, tt.command, tt.gpgagent, !tt.noAgentForwarding, tt.devPodHome)
+			goos := tt.goos
+			if goos == "" {
+				goos = "linux"
+			}
+			result, err := addHostSection(goos, tt.config, tt.execPath, tt.host, tt.user, tt.context, tt.workspace, tt.workdir, tt.gpgagent, !tt.noAgentForwarding, tt.devPodHome)
 			if err != nil {
 				t.Errorf("Failed with err: %v", err)
 			}
 
 			// addHostSection joins lines with \r\n on Windows
 			expected, config := tt.expected, tt.config
-			if runtime.GOOS == "windows" {
+			if goos == "windows" {
 				expected = strings.ReplaceAll(expected, "\n", "\r\n")
 				config = strings.ReplaceAll(config, "\n", "\r\n")
 			}
@@ -304,11 +278,7 @@ Host testhost
 				t.Errorf("Result does not contain the User line: User %s", tt.user)
 			}
 
-			if tt.command != "" && !strings.Contains(result, fmt.Sprintf("ProxyCommand \"%s\"", tt.command)) {
-				t.Errorf("Result does not contain the custom ProxyCommand: %s", tt.command)
-			}
-
-			if tt.workdir != "" && !strings.Contains(result, fmt.Sprintf("--workdir \"%s\"", tt.workdir)) {
+			if tt.workdir != "" && !strings.Contains(result, "--workdir "+tt.workdir) {
 				t.Errorf("Result does not contain the workdir: %s", tt.workdir)
 			}
 
@@ -324,19 +294,64 @@ Host testhost
 }
 
 func TestParseWorkdirFlag(t *testing.T) {
-	for _, workdir := range []string{"", "/workspaces/foo", "/home/me/my project"} {
-		config, err := addHostSection("", "/path/to/devpod", "foo.devpod", "me", "default", "foo", workdir, "", false, true, "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		got := ""
-		for _, line := range strings.Split(config, "\n") {
-			if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
-				got = parseWorkdirFlag(line)
+	workdirs := append([]string{"", "/workspaces/foo", "/home/me/my project", invalidUTF8Path}, awkwardProxyCommandValues...)
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, workdir := range workdirs {
+			config, err := addHostSection(goos, "", "/path/to/my devpod", "foo.devpod", "me", "default", "foo", workdir, false, true, "/home/me/.devpod")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ""
+			for _, line := range strings.Split(config, "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+					got = parseWorkdirFlag(goos, line)
+				}
+			}
+			if got != workdir {
+				t.Errorf("%s: expected workdir %q, got %q from:\n%s", goos, workdir, got, config)
 			}
 		}
-		if got != workdir {
-			t.Errorf("expected workdir %q, got %q from:\n%s", workdir, got, config)
+	}
+}
+
+// TestParseWorkdirFlagSkipsOptionValues checks that a context, user or DevPod home that looks like an option
+// isn't read as one. The context comes from `devpod context create`, the user from the container and the DevPod
+// home from DEVPOD_HOME, so any of them can be `--workdir`.
+func TestParseWorkdirFlagSkipsOptionValues(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, decoy := range []string{"--workdir", "--devpod-home", "--gpg-agent-forwarding"} {
+			// the decoy is the user, the context and the DevPod home at once
+			config, err := addHostSection(goos, "", "/path/to/devpod", "foo.devpod", decoy, decoy, "foo", "/real/dir", false, true, decoy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ""
+			for _, line := range strings.Split(config, "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+					got = parseWorkdirFlag(goos, line)
+				}
+			}
+			if got != "/real/dir" {
+				t.Errorf("%s with %s as the context, user and DevPod home: expected workdir /real/dir, got %q from:\n%s", goos, decoy, got, config)
+			}
+		}
+	}
+}
+
+// TestParseWorkdirFlagOldFormat reads the ProxyCommand lines older versions of DevPod wrote, with the values in
+// double quotes.
+func TestParseWorkdirFlagOldFormat(t *testing.T) {
+	tests := []struct{ goos, line, expected string }{
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --devpod-home "/home/me/.devpod" --workdir "/workspaces/my project" --gpg-agent-forwarding`, "/workspaces/my project"},
+		{"darwin", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --workdir "/workspaces/o'brien"`, "/workspaces/o'brien"},
+		{"windows", `  ProxyCommand "C:\Program Files\DevPod\devpod.exe" ssh --stdio --context default --user root foo --devpod-home "C:\Users\me\.devpod" --workdir "/workspaces/my project"`, "/workspaces/my project"},
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo`, ""},
+		// OpenSSH expands %% to % in the ProxyCommand, so this is the directory the old entry connects to
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --workdir "/workspaces/100%%"`, "/workspaces/100%"},
+	}
+	for _, tt := range tests {
+		if got := parseWorkdirFlag(tt.goos, tt.line); got != tt.expected {
+			t.Errorf("%s: expected workdir %q, got %q from %s", tt.goos, tt.expected, got, tt.line)
 		}
 	}
 }
