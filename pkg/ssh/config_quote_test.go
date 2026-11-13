@@ -141,8 +141,15 @@ func TestProxyCommandWindows(t *testing.T) {
 				if err != nil {
 					t.Fatalf("ssh rejects the config: %v: %s\n%s", err, out, config)
 				}
-				if !strings.Contains(string(out), "\nproxycommand "+proxyCommand+"\n") {
-					t.Errorf("ssh read a different ProxyCommand than %s:\n%s", proxyCommand, out)
+				// ssh prints each setting on its own line, with CRLF on Windows
+				got := ""
+				for _, line := range strings.Split(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n") {
+					if value, found := strings.CutPrefix(line, "proxycommand "); found {
+						got = value
+					}
+				}
+				if got != proxyCommand {
+					t.Errorf("ssh read the ProxyCommand as\n%s\nexpected\n%s", got, proxyCommand)
 				}
 			}
 
