@@ -294,7 +294,7 @@ Host testhost
 }
 
 func TestParseWorkdirFlag(t *testing.T) {
-	workdirs := append([]string{"", "/workspaces/foo", "/home/me/my project"}, awkwardProxyCommandValues...)
+	workdirs := append([]string{"", "/workspaces/foo", "/home/me/my project", invalidUTF8Path}, awkwardProxyCommandValues...)
 	for _, goos := range []string{"linux", "darwin", "windows"} {
 		for _, workdir := range workdirs {
 			config, err := addHostSection(goos, "", "/path/to/my devpod", "foo.devpod", "me", "default", "foo", workdir, false, true, "/home/me/.devpod")
@@ -314,6 +314,30 @@ func TestParseWorkdirFlag(t *testing.T) {
 	}
 }
 
+// TestParseWorkdirFlagSkipsOptionValues checks that a context, user or DevPod home that looks like an option
+// isn't read as one. The context comes from `devpod context create`, the user from the container and the DevPod
+// home from DEVPOD_HOME, so any of them can be `--workdir`.
+func TestParseWorkdirFlagSkipsOptionValues(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, decoy := range []string{"--workdir", "--devpod-home", "--gpg-agent-forwarding"} {
+			// the decoy is the user, the context and the DevPod home at once
+			config, err := addHostSection(goos, "", "/path/to/devpod", "foo.devpod", decoy, decoy, "foo", "/real/dir", false, true, decoy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := ""
+			for _, line := range strings.Split(config, "\n") {
+				if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
+					got = parseWorkdirFlag(goos, line)
+				}
+			}
+			if got != "/real/dir" {
+				t.Errorf("%s with %s as the context, user and DevPod home: expected workdir /real/dir, got %q from:\n%s", goos, decoy, got, config)
+			}
+		}
+	}
+}
+
 // TestParseWorkdirFlagOldFormat reads the ProxyCommand lines older versions of DevPod wrote, with the values in
 // double quotes.
 func TestParseWorkdirFlagOldFormat(t *testing.T) {
@@ -322,6 +346,8 @@ func TestParseWorkdirFlagOldFormat(t *testing.T) {
 		{"darwin", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --workdir "/workspaces/o'brien"`, "/workspaces/o'brien"},
 		{"windows", `  ProxyCommand "C:\Program Files\DevPod\devpod.exe" ssh --stdio --context default --user root foo --devpod-home "C:\Users\me\.devpod" --workdir "/workspaces/my project"`, "/workspaces/my project"},
 		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo`, ""},
+		// OpenSSH expands %% to % in the ProxyCommand, so this is the directory the old entry connects to
+		{"linux", `  ProxyCommand "/usr/local/bin/devpod" ssh --stdio --context default --user root foo --workdir "/workspaces/100%%"`, "/workspaces/100%"},
 	}
 	for _, tt := range tests {
 		if got := parseWorkdirFlag(tt.goos, tt.line); got != tt.expected {

@@ -50,8 +50,11 @@ func quoteUnixArg(s string) string {
 	}
 	var b strings.Builder
 	inQuote := false
-	for _, r := range s {
-		if r == '\'' || r == '\\' {
+	// byte by byte, so that a path that isn't valid UTF-8 (which os.Executable can return) keeps its bytes;
+	// every byte that needs escaping is ASCII, which never appears inside a UTF-8 sequence
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\'' || c == '\\' {
 			if inQuote {
 				b.WriteByte('\'')
 				inQuote = false
@@ -61,7 +64,7 @@ func quoteUnixArg(s string) string {
 			b.WriteByte('\'')
 			inQuote = true
 		}
-		b.WriteRune(r)
+		b.WriteByte(c)
 	}
 	if inQuote {
 		b.WriteByte('\'')
@@ -101,6 +104,11 @@ func quoteWindowsArg(s string, always bool) string {
 
 // splitProxyCommandLine splits a ProxyCommand value written by proxyCommandLine for goos back into its arguments.
 // It also reads the values older versions of DevPod wrote in double quotes.
+//
+// Undoing %% is what OpenSSH does to the line before running it, whichever version wrote it, so the arguments
+// are the ones the ProxyCommand passes to devpod. Older versions didn't escape %, so a line one of them wrote
+// for a workspace folder containing % is mangled the same way here as it is when OpenSSH runs it; the next
+// `devpod up` rewrites the line with the % escaped.
 func splitProxyCommandLine(goos, value string) []string {
 	value = strings.ReplaceAll(value, "%%", "%")
 	if goos == "windows" {

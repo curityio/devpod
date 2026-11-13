@@ -32,6 +32,10 @@ var awkwardProxyCommandValues = []string{
 	"-dash",
 }
 
+// invalidUTF8Path is a path that isn't valid UTF-8, which Unix allows and os.Executable returns as it is. It is
+// left out of the Windows test, where paths are UTF-16 and Win32-OpenSSH converts the config file's text.
+const invalidUTF8Path = "/work/bad\xffname"
+
 // proxyCommandOf returns the ProxyCommand value in config.
 func proxyCommandOf(t *testing.T, config string) string {
 	t.Helper()
@@ -80,7 +84,7 @@ func TestProxyCommandUnix(t *testing.T) {
 		}
 	}
 
-	for _, value := range awkwardProxyCommandValues {
+	for _, value := range append(append([]string{}, awkwardProxyCommandValues...), invalidUTF8Path) {
 		config, err := addHostSection(runtime.GOOS, "", execPath, "testhost", proxyCommandTestUser, value, value, value, false, true, value)
 		if err != nil {
 			t.Fatal(err)

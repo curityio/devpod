@@ -197,9 +197,15 @@ func parseWorkdirFlag(goos, line string) string {
 		return ""
 	}
 	args := splitProxyCommandLine(goos, value)
-	for i := 1; i+1 < len(args); i++ {
-		if args[i] == "--workdir" {
-			return args[i+1]
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--workdir":
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		case "--context", "--user", "--devpod-home":
+			// skip the flag's value, which can be "--workdir" itself
+			i++
 		}
 	}
 	return ""
