@@ -2,7 +2,6 @@ package ssh
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,14 +24,10 @@ var (
 )
 
 func ConfigureSSHConfig(sshConfigPath, context, workspace, user, workdir string, gpgagent, forwardAgent bool, devPodHome string, log log.Logger) error {
-	return configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, "", gpgagent, forwardAgent, devPodHome, log)
-}
-
-func configureSSHConfigSameFile(sshConfigPath, context, workspace, user, workdir, command string, gpgagent, forwardAgent bool, devPodHome string, log log.Logger) error {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, command, gpgagent, forwardAgent, devPodHome)
+	newFile, err := addHost(sshConfigPath, workspace+"."+"devpod", user, context, workspace, workdir, gpgagent, forwardAgent, devPodHome)
 	if err != nil {
 		return errors.Wrap(err, "parse ssh config")
 	}
@@ -46,7 +41,7 @@ type DevPodSSHEntry struct {
 	Workspace string
 }
 
-func addHost(path, host, user, context, workspace, workdir, command string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
+func addHost(path, host, user, context, workspace, workdir string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
 	newConfig, err := removeFromConfig(path, host)
 	if err != nil {
 		return "", err
@@ -58,10 +53,25 @@ func addHost(path, host, user, context, workspace, workdir, command string, gpga
 		return "", err
 	}
 
-	return addHostSection(newConfig, execPath, host, user, context, workspace, workdir, command, gpgagent, forwardAgent, devPodHome)
+	return addHostSection(runtime.GOOS, newConfig, execPath, host, user, context, workspace, workdir, gpgagent, forwardAgent, devPodHome)
 }
 
-func addHostSection(config, execPath, host, user, context, workspace, workdir, command string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
+// addHostSection adds the host's section to config, for OpenSSH on goos.
+func addHostSection(goos, config, execPath, host, user, context, workspace, workdir string, gpgagent, forwardAgent bool, devPodHome string) (string, error) {
+	for _, value := range []struct{ name, value string }{
+		{"devpod executable path", execPath},
+		{"host", host},
+		{"user", user},
+		{"context", context},
+		{"workspace", workspace},
+		{"workdir", workdir},
+		{"devpod home", devPodHome},
+	} {
+		if err := checkSSHConfigValue(value.name, value.value); err != nil {
+			return config, err
+		}
+	}
+
 	newLines := []string{}
 	// add new section
 	startMarker := MarkerStartPrefix + host
@@ -78,23 +88,17 @@ func addHostSection(config, execPath, host, user, context, workspace, workdir, c
 	newLines = append(newLines, "  UserKnownHostsFile /dev/null")
 	newLines = append(newLines, "  HostKeyAlgorithms rsa-sha2-256,rsa-sha2-512,ssh-rsa")
 
-	proxyCommand := ""
-	if command != "" {
-		proxyCommand = fmt.Sprintf("  ProxyCommand \"%s\"", command)
-	} else {
-		proxyCommand = fmt.Sprintf("  ProxyCommand \"%s\" ssh --stdio --context %s --user %s %s", execPath, context, user, workspace)
-	}
-
+	args := []string{execPath, "ssh", "--stdio", "--context", context, "--user", user, workspace}
 	if devPodHome != "" {
-		proxyCommand = fmt.Sprintf("%s --devpod-home \"%s\"", proxyCommand, devPodHome)
+		args = append(args, "--devpod-home", devPodHome)
 	}
 	if workdir != "" {
-		proxyCommand = fmt.Sprintf("%s --workdir \"%s\"", proxyCommand, workdir)
+		args = append(args, "--workdir", workdir)
 	}
 	if gpgagent {
-		proxyCommand = fmt.Sprintf("%s --gpg-agent-forwarding", proxyCommand)
+		args = append(args, "--gpg-agent-forwarding")
 	}
-	newLines = append(newLines, proxyCommand)
+	newLines = append(newLines, "  ProxyCommand "+proxyCommandLine(goos, args...))
 	newLines = append(newLines, "  User "+user)
 	newLines = append(newLines, endMarker)
 
@@ -133,7 +137,7 @@ func addHostSection(config, execPath, host, user, context, workspace, workdir, c
 	lines = slices.Insert(lines, lineNumber, newLines...)
 
 	newLineSep := "\n"
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		newLineSep = "\r\n"
 	}
 
@@ -174,7 +178,7 @@ func GetWorkdir(workspaceID string, sshConfigPath string) (string, error) {
 	workdir := ""
 	_, err = transformHostSection(path, workspaceID+"."+"devpod", func(line string) string {
 		if strings.HasPrefix(strings.TrimSpace(line), "ProxyCommand ") {
-			workdir = parseWorkdirFlag(line)
+			workdir = parseWorkdirFlag(runtime.GOOS, line)
 		}
 		return line
 	})
@@ -185,14 +189,26 @@ func GetWorkdir(workspaceID string, sshConfigPath string) (string, error) {
 	return workdir, nil
 }
 
-// parseWorkdirFlag returns the value of the `--workdir "<dir>"` that addHostSection adds to the ProxyCommand.
-func parseWorkdirFlag(proxyCommand string) string {
-	_, value, found := strings.Cut(proxyCommand, ` --workdir "`)
+// parseWorkdirFlag returns the value of the --workdir that addHostSection adds to the ProxyCommand line, written
+// for goos.
+func parseWorkdirFlag(goos, line string) string {
+	value, found := strings.CutPrefix(strings.TrimSpace(line), "ProxyCommand ")
 	if !found {
 		return ""
 	}
-	value, _, _ = strings.Cut(value, `"`)
-	return value
+	args := splitProxyCommandLine(goos, value)
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--workdir":
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		case "--context", "--user", "--devpod-home":
+			// skip the flag's value, which can be "--workdir" itself
+			i++
+		}
+	}
+	return ""
 }
 
 func RemoveFromConfig(workspaceID string, sshConfigPath string, log log.Logger) error {

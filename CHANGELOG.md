@@ -20,6 +20,14 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- `ssh <workspace>.devpod` works when the workspace folder (or the path of the devpod executable, the DevPod home
+  directory or the context name) contains `$`, backticks, `\`, `"`, `'` or `%`. `devpod up` wrapped these values
+  in double quotes in the `ProxyCommand` it writes into `~/.ssh/config`, so the local shell OpenSSH runs it with
+  expanded `$x` and command substitutions in them (e.g. `ssh` landed in the home directory instead of
+  `/work/o'brien $x proj`), OpenSSH expanded `%h` and failed on other `%` signs, and a folder ending in `\` made
+  OpenSSH reject the whole config file. DevPod now quotes each value for the shell on Linux and macOS, and for the
+  Windows command line on Windows, where OpenSSH starts the `ProxyCommand` without a shell. `devpod up` also
+  refuses to write a value that contains a line break, which would have added its own lines to the config file.
 - `devpod ssh --workdir` works with a directory whose name contains an apostrophe, and no longer lets the
   container's shell expand `$`, backticks and `\` in it when connecting as a user other than root. The same
   goes for the user name, the gpg-agent forwarding's socket path and git signing key, `--reuse-ssh-auth-sock`,
