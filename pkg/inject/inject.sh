@@ -4,11 +4,15 @@ set -e
 # Compatibility fix for zsh shells
 setopt SH_WORD_SPLIT 2>/dev/null || :
 
-INSTALL_DIR="{{ .InstallDir }}"
-INSTALL_FILENAME="{{ .InstallFilename }}"
+INSTALL_DIR={{ .InstallDir }}
+INSTALL_FILENAME={{ .InstallFilename }}
 
 INSTALL_PATH="$INSTALL_DIR/$INSTALL_FILENAME"
 CHMOD_PATH="{{ .ChmodPath }}"
+
+# INSTALL_DIR and INSTALL_PATH, shell-quoted for the command strings run with $sh_c
+INSTALL_DIR_ARG={{ .InstallDirArg }}
+INSTALL_PATH_ARG={{ .InstallPathArg }}
 
 # start marker
 echo "ping"
@@ -54,11 +58,11 @@ check_noexec() {
 # Exits afterwards: the caller runs the command again once the agent is installed.
 inject() {
   echo "ARM-$(is_arm && printf 'true' || printf 'false') $PREVIOUS_VERSION"
-  $sh_c "cat > $INSTALL_PATH.$$"
-  $sh_c "mv $INSTALL_PATH.$$ $INSTALL_PATH"
+  $sh_c "cat > $INSTALL_PATH_ARG.$$"
+  $sh_c "mv $INSTALL_PATH_ARG.$$ $INSTALL_PATH_ARG"
 
   if [ "$CHMOD_PATH" = "true" ]; then
-    $sh_c "chmod +x $INSTALL_PATH"
+    $sh_c "chmod +x $INSTALL_PATH_ARG"
   fi
 
   echo "done"
@@ -79,7 +83,7 @@ if {{ .ExistsCheck }}; then
 
   # Try to create the install dir, if we fail, we search for sudo
   # else let's continue without sudo, we don't need it.
-  if (! mkdir -p $INSTALL_DIR 2>/dev/null || ! touch $INSTALL_PATH 2>/dev/null || ! chmod +x $INSTALL_PATH 2>/dev/null || ! rm -f $INSTALL_PATH 2>/dev/null); then
+  if (! mkdir -p "$INSTALL_DIR" 2>/dev/null || ! touch "$INSTALL_PATH" 2>/dev/null || ! chmod +x "$INSTALL_PATH" 2>/dev/null || ! rm -f "$INSTALL_PATH" 2>/dev/null); then
     if command_exists sudo; then
       # check if sudo requires a password
       if ! sudo -nl >/dev/null 2>&1; then
@@ -96,7 +100,7 @@ if {{ .ExistsCheck }}; then
     fi
 
     # Now that we're sudo, try again
-    $sh_c "mkdir -p $INSTALL_DIR"
+    $sh_c "mkdir -p $INSTALL_DIR_ARG"
   fi
 
   if  ! check_noexec; then
@@ -104,7 +108,7 @@ if {{ .ExistsCheck }}; then
     exit 1
   fi
 
-  $sh_c "rm -f $INSTALL_PATH 2>/dev/null || true"
+  $sh_c "rm -f $INSTALL_PATH_ARG 2>/dev/null || true"
   inject
 fi
 

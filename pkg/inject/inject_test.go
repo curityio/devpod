@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/log"
+	"github.com/curityio/devpod/pkg/shelltest"
 	"gotest.tools/assert"
 )
 
@@ -57,6 +59,39 @@ func TestInjectInstallsMissingAgent(t *testing.T) {
 	assert.Equal(t, requests[0].PreviousVersion, "")
 }
 
+func TestInjectQuotesAgentPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("inject.sh needs a POSIX shell")
+	}
+
+	parent := t.TempDir()
+	agentDir := filepath.Join(parent, shelltest.Awkward)
+	agentPath := filepath.Join(agentDir, "dev pod $1")
+
+	requests, err := injectFakeAgent(agentPath, "v2.0.0")
+	assert.NilError(t, err)
+	assert.Equal(t, len(requests), 1)
+
+	installed, err := os.ReadFile(agentPath)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, installed, fakeAgent("v2.0.0"))
+
+	// the install created nothing besides the agent, such as files named after part of the path
+	entries, err := os.ReadDir(parent)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 1)
+	assert.Equal(t, entries[0].Name(), shelltest.Awkward)
+	entries, err = os.ReadDir(agentDir)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 1)
+	assert.Equal(t, entries[0].Name(), "dev pod $1")
+
+	// the installed agent is found and runs
+	requests, err = injectFakeAgent(agentPath, "v2.0.0")
+	assert.NilError(t, err)
+	assert.Equal(t, len(requests), 0)
+}
+
 // injectFakeAgent runs inject.sh locally to install a fake agent of the given version at agentPath.
 func injectFakeAgent(agentPath, version string) ([]BinaryRequest, error) {
 	var requests []BinaryRequest
@@ -75,7 +110,7 @@ func injectFakeAgent(agentPath, version string) ([]BinaryRequest, error) {
 		},
 		&Params{
 			AgentRemotePath: agentPath,
-			ExistsCheck:     fmt.Sprintf(`[ "$(%s version 2>/dev/null || echo 'false')" != "%s" ]`, agentPath, version),
+			ExistsCheck:     fmt.Sprintf(`[ "$(%s version 2>/dev/null || echo 'false')" != %s ]`, shellescape.Quote(agentPath), shellescape.Quote(version)),
 			ShouldChmodPath: true,
 		},
 		nil,

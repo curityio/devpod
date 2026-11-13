@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/config"
 	copy2 "github.com/curityio/devpod/pkg/copy"
@@ -108,7 +109,7 @@ func (o *VsCodeServer) InstallExtensions() error {
 	// download extensions
 	for _, extension := range o.extensions {
 		o.log.Info("Install extension " + extension + "...")
-		runCommand := fmt.Sprintf("%s serve-local --accept-server-license-terms --install-extension '%s'", binPath, extension)
+		runCommand := installExtensionCommand(binPath, extension)
 		args := []string{}
 		if o.userName != "" {
 			args = append(args, "su", o.userName, "-c", runCommand)
@@ -472,4 +473,9 @@ func prepareServerLocation(userName string, create bool, flavor Flavor) (string,
 	}
 
 	return folder, nil
+}
+
+// installExtensionCommand is the shell command that makes the server at binPath install extension.
+func installExtensionCommand(binPath, extension string) string {
+	return shellescape.QuoteCommand([]string{binPath, "serve-local", "--accept-server-license-terms", "--install-extension", extension})
 }

@@ -20,6 +20,10 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Fixed
 
+- Installing the agent works with an agent path that contains a space, quotes, `$` or a backtick, and no longer
+  lets the shell expand them: the install script shell-quotes the path, including in the commands it runs with
+  `sudo` or `su`. The same goes for the workspace folder given to Jupyter Notebook, the extensions installed into
+  VS Code Server and OpenVSCode Server, and OpenVSCode Server's host and port, which DevPod put in single quotes.
 - A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
   keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
   directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs
