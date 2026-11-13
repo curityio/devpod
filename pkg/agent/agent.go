@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/compress"
 	"github.com/curityio/devpod/pkg/log"
@@ -306,7 +307,7 @@ func Tunnel(
 	}
 
 	// build command
-	command := fmt.Sprintf("'%s' helper ssh-server --stdio", ContainerDevPodHelperLocation)
+	command := shellescape.QuoteCommand([]string{ContainerDevPodHelperLocation, "helper", "ssh-server", "--stdio"})
 	if log.GetLevel() == logrus.DebugLevel {
 		command += " --debug"
 	}

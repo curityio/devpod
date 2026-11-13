@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	devpodcommand "github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/log"
 
 	devssh "github.com/curityio/devpod/pkg/ssh"
@@ -33,10 +34,7 @@ func IsGpgTunnelRunning(
 	writer := log.ErrorStreamOnly().Writer(logrus.InfoLevel, false)
 	defer writer.Close()
 
-	command := "gpg -K"
-	if user != "" && user != "root" {
-		command = fmt.Sprintf("su -c \"%s\" '%s'", command, user)
-	}
+	command := devpodcommand.AsUser(user, "gpg -K")
 
 	// capture the output, if it's empty it means we don't have gpg-forwarding
 	var out bytes.Buffer
