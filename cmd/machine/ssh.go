@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/flags"
 	devagent "github.com/curityio/devpod/pkg/agent"
 	"github.com/curityio/devpod/pkg/client"
@@ -73,7 +74,7 @@ func (cmd *SSHCmd) Run(ctx context.Context, args []string) error {
 		cmd.Command,
 		cmd.AgentForwarding,
 		func(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-			command := fmt.Sprintf("'%s' helper ssh-server --stdio", machineClient.AgentPath())
+			command := shellescape.QuoteCommand([]string{machineClient.AgentPath(), "helper", "ssh-server", "--stdio"})
 			if cmd.Debug {
 				command += " --debug"
 			}

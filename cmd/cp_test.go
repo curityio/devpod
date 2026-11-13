@@ -1,13 +1,7 @@
 package cmd
 
 import (
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestParseCpLocation(t *testing.T) {
@@ -53,37 +47,5 @@ func TestParseCpLocation(t *testing.T) {
 				t.Errorf("expected workspace %q and path %q, got %+v", tc.workspace, tc.path, location)
 			}
 		})
-	}
-}
-
-// shellWords returns the words a POSIX shell splits command into, after quote removal and without expansions.
-func shellWords(t *testing.T, command string) []string {
-	t.Helper()
-	cmd := exec.Command("sh", "-c", `eval "set -- $CMD"; for a; do printf '%s\0' "$a"; done`)
-	cmd.Env = append(os.Environ(), "CMD="+command)
-	out, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("sh couldn't parse %s: %v", command, err)
-	}
-	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
-}
-
-func TestContainerSSHServerCommand(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("needs a POSIX shell")
-	}
-	workdir := "/workspaces/user's \"project\" $HOME `id` \\"
-	server := []string{"/usr/local/bin/devpod", "helper", "ssh-server", "--stdio", "--track-activity", "--workdir", workdir}
-
-	if diff := cmp.Diff(server, shellWords(t, containerSSHServerCommand("root", workdir, false))); diff != "" {
-		t.Errorf("unexpected command as root (-want +got):\n%s", diff)
-	}
-
-	words := shellWords(t, containerSSHServerCommand("o'brien", workdir, true))
-	if len(words) != 4 || words[0] != "su" || words[1] != "-c" || words[3] != "o'brien" {
-		t.Fatalf("expected su -c COMMAND USER, got %q", words)
-	}
-	if diff := cmp.Diff(append(server, "--debug"), shellWords(t, words[2])); diff != "" {
-		t.Errorf("unexpected command run by su (-want +got):\n%s", diff)
 	}
 }

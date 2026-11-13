@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alessio/shellescape"
 	"github.com/curityio/devpod/cmd/completion"
 	"github.com/curityio/devpod/cmd/flags"
 	"github.com/curityio/devpod/cmd/machine"
 	"github.com/curityio/devpod/pkg/agent"
 	client2 "github.com/curityio/devpod/pkg/client"
+	"github.com/curityio/devpod/pkg/command"
 	"github.com/curityio/devpod/pkg/config"
 	"github.com/curityio/devpod/pkg/gpg"
 	"github.com/curityio/devpod/pkg/log"
@@ -390,17 +392,10 @@ func (cmd *SSHCmd) startTunnel(ctx context.Context, devPodConfig *config.Config,
 	}
 
 	log.Debugf("Run outer container tunnel")
-	command := fmt.Sprintf("'%s' helper ssh-server --track-activity --stdio --workdir '%s'", agent.ContainerDevPodHelperLocation, workdir)
 	if cmd.ReuseSSHAuthSock != "" {
 		log.Debug("Reusing SSH_AUTH_SOCK")
-		command += fmt.Sprintf(" --reuse-ssh-auth-sock=%s", cmd.ReuseSSHAuthSock)
 	}
-	if cmd.Debug {
-		command += " --debug"
-	}
-	if cmd.User != "" && cmd.User != "root" {
-		command = fmt.Sprintf("su -c \"%s\" '%s'", command, cmd.User)
-	}
+	command := sshServerCommand(cmd.User, workdir, cmd.ReuseSSHAuthSock, cmd.Debug)
 
 	envVars, err := cmd.retrieveEnVars()
 	if err != nil {
@@ -491,31 +486,13 @@ func (cmd *SSHCmd) setupGPGAgent(
 	cmd.ReverseForwardPorts = append(cmd.ReverseForwardPorts, gpgExtraSocketPath)
 
 	// Now we forward the agent socket to the remote, and setup remote gpg to use it
-	forwardAgent := []string{
-		agent.ContainerDevPodHelperLocation,
-		"agent",
-		"workspace",
-		"setup-gpg",
-		"--ownertrust",
+	command := gpgSetupCommand(
+		cmd.User,
 		ownerTrustArgument,
-		"--socketpath",
 		gpgExtraSocketPath,
-	}
-
-	if log.GetLevel() == logrus.DebugLevel {
-		forwardAgent = append(forwardAgent, "--debug")
-	}
-
-	if len(gitGpgKey) > 0 {
-		gitKey := strings.TrimSpace(string(gitGpgKey))
-		forwardAgent = append(forwardAgent, "--gitkey")
-		forwardAgent = append(forwardAgent, fmt.Sprintf("'%s'", gitKey))
-	}
-
-	command := strings.Join(forwardAgent, " ")
-	if cmd.User != "" && cmd.User != "root" {
-		command = fmt.Sprintf("su -c \"%s\" '%s'", command, cmd.User)
-	}
+		strings.TrimSpace(string(gitGpgKey)),
+		log.GetLevel() == logrus.DebugLevel,
+	)
 
 	log.Debugf(
 		"[GPG] start reverse forward of gpg-agent socket %s, keeping connection open",
@@ -534,6 +511,43 @@ func (cmd *SSHCmd) setupGPGAgent(
 	}
 
 	return nil
+}
+
+// sshServerCommand returns the shell command that starts the container's SSH server for devpod ssh as user, in
+// workdir.
+func sshServerCommand(user, workdir, reuseSSHAuthSock string, debug bool) string {
+	args := []string{agent.ContainerDevPodHelperLocation, "helper", "ssh-server", "--track-activity", "--stdio", "--workdir", workdir}
+	if reuseSSHAuthSock != "" {
+		args = append(args, "--reuse-ssh-auth-sock="+reuseSSHAuthSock)
+	}
+	if debug {
+		args = append(args, "--debug")
+	}
+
+	return command.AsUser(user, shellescape.QuoteCommand(args))
+}
+
+// gpgSetupCommand returns the shell command that sets up the container's gpg as user to use the forwarded gpg-agent
+// socket at socketPath, and gitKey to sign git commits, if it's not empty.
+func gpgSetupCommand(user, ownerTrust, socketPath, gitKey string, debug bool) string {
+	args := []string{
+		agent.ContainerDevPodHelperLocation,
+		"agent",
+		"workspace",
+		"setup-gpg",
+		"--ownertrust",
+		ownerTrust,
+		"--socketpath",
+		socketPath,
+	}
+	if debug {
+		args = append(args, "--debug")
+	}
+	if gitKey != "" {
+		args = append(args, "--gitkey", gitKey)
+	}
+
+	return command.AsUser(user, shellescape.QuoteCommand(args))
 }
 
 func startSSHKeepAlive(ctx context.Context, client *ssh.Client, interval time.Duration, log log.Logger) {

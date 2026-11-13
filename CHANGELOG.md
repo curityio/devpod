@@ -24,6 +24,11 @@ Add new entries to the top of the "Unreleased" section.
   lets the shell expand them: the install script shell-quotes the path, including in the commands it runs with
   `sudo` or `su`. The same goes for the workspace folder given to Jupyter Notebook, the extensions installed into
   VS Code Server and OpenVSCode Server, and OpenVSCode Server's host and port, which DevPod put in single quotes.
+- `devpod ssh --workdir` works with a directory whose name contains an apostrophe, and no longer lets the
+  container's shell expand `$`, backticks and `\` in it when connecting as a user other than root. The same
+  goes for the user name, the gpg-agent forwarding's socket path and git signing key, `--reuse-ssh-auth-sock`,
+  the user the credentials server runs for, and the context name in `devpod logs`: DevPod shell-quotes them
+  instead of wrapping them in single or double quotes.
 - A relative symlink created over SFTP in a workspace, such as with `sftp WORKSPACE.devpod` or an IDE's SFTP sync,
   keeps its relative target. The SSH server in workspaces made it absolute (relative to the user's home
   directory), because it served SFTP with a working directory, which also applied to symlink targets. It now runs
