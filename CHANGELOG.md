@@ -7,6 +7,8 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+## v0.11.0 (2026-11-16)
+
 ### Added
 
 - `devpod cp` copies files and directories to or from a workspace, such as `devpod cp ./temp/ my-workspace:/opt/`
