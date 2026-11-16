@@ -1,18 +1,11 @@
-use crate::ui_messages::{
-    send_ui_message, OpenWorkspaceMsg, ShowToastMsg, ToastStatus, UiMessage,
-};
+use crate::ui_messages::{send_ui_message, OpenWorkspaceMsg, UiMessage};
 use crate::AppState;
-use log::{error, info, warn};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::path::Path;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_deep_link::DeepLinkExt;
 use thiserror::Error;
 use url::Url;
-
-// Should match the one from "tauri.config.json" and "Info.plist"
-const APP_IDENTIFIER: &str = "io.curity.devpod";
-const APP_URL_SCHEME: &str = "devpod";
 
 pub struct CustomProtocol;
 
@@ -88,126 +81,101 @@ impl OpenHandler {
 }
 
 impl CustomProtocol {
-    pub fn init() -> Self {
-        tauri_plugin_deep_link::prepare(APP_IDENTIFIER);
-        Self {}
-    }
+    /// Handles the `devpod://` URLs the app is opened with. Must run in the app's setup hook, after the deep-link
+    /// plugin was initialized.
+    ///
+    /// On macOS the URLs come from the system (`RunEvent::Opened`). On Windows and Linux opening a URL starts a new
+    /// instance with the URL as its only argument: the single-instance plugin forwards it to the running instance,
+    /// and the deep-link plugin reads it from the arguments when there is no running instance.
+    pub fn setup(app: AppHandle) {
+        let deep_link = app.deep_link();
 
-    pub fn forward_deep_link() {
-        #[cfg(target_os = "linux")]
-        {
-            use std::{
-                fs::{remove_file},
-                io::{ErrorKind, Write},
-                os::unix::net::{UnixStream}
-            };
-
-            let addr = format!("/tmp/{}-deep-link.sock", APP_IDENTIFIER);
-
-            match UnixStream::connect(&addr) {
-                Ok(mut stream) => {
-                    if let Err(io_err) = stream.write_all(std::env::args().nth(1).unwrap_or_default().as_bytes())
-                    {
-                        log::error!(
-                            "Error sending message to primary instance: {}",
-                            io_err.to_string()
-                        );
-                    };
-                }
-                Err(err) => {
-                    log::error!("Error creating socket listener: {}", err.to_string());
-                    if err.kind() == ErrorKind::ConnectionRefused {
-                        let _ = remove_file(&addr);
-                    }
-                }
-            };
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::io::Write;
-            use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-
-            if let Ok(mut conn) = LocalSocketStream::connect(APP_IDENTIFIER) {
-                if let Err(io_err) = conn.write_all(std::env::args().nth(1).unwrap_or_default().as_bytes())
-                {
-                    log::error!(
-                        "Error sending message to primary instance: {}",
-                        io_err.to_string()
-                    );
-                };
-                let _ = conn.write_all(b"\n");
-            }
-        }
-
-    }
-
-    pub fn setup(&self, app: AppHandle) {
         let app_handle = app.clone();
-
-        let result = tauri_plugin_deep_link::register(APP_URL_SCHEME, move |url_scheme| {
-            tauri::async_runtime::block_on(async {
-                info!("App opened with URL: {:?}", url_scheme.to_string());
-
-                let request = UrlParser::parse(&url_scheme.to_string());
-                let app_state = app_handle.state::<AppState>();
-                if let Err(err) = request {
-                    warn!("Failed to broadcast custom protocol message: {:?}", err);
-                    return;
-                }
-                let request = request.unwrap();
-
-                match request.host.as_str() {
-                    "open" => {
-                        let msg = CustomProtocol::parse(&request);
-                        OpenHandler::handle(msg, app_state).await
-                    }
-                    _ => {}
-                }
-            })
+        deep_link.on_open_url(move |event| {
+            for url in event.urls() {
+                Self::handle_url(&app_handle, &url);
+            }
         });
 
-        #[cfg(target_os = "linux")]
-        {
-            match result {
-                Ok(..) => {}
-                Err(error) => {
-                    let mut is_flatpak = false;
-
-                    match env::var("FLATPAK_ID") {
-                        Ok(_) => is_flatpak = true,
-                        Err(_) => is_flatpak = false,
-                    }
-
-                    if !is_flatpak {
-                        let msg = "Either update-desktop-database or xdg-mime are missing. Please make sure they are available on your system";
-                        log::warn!("Custom protocol setup failed; {}: {}", msg, error);
-
-                        tauri::async_runtime::block_on(async {
-                            let app_state = app.state::<AppState>();
-                            let show_toast_msg = ShowToastMsg::new(
-                                "Custom protocol handling needs to be configured".to_string(),
-                                msg.to_string(),
-                                ToastStatus::Warning,
-                            );
-                            if let Err(err) = app_state
-                                .ui_messages
-                                .send(UiMessage::ShowToast(show_toast_msg))
-                                .await
-                            {
-                                log::error!(
-                                    "Failed to broadcast show toast message: {:?}, {}",
-                                    err.0,
-                                    err
-                                );
-                            };
-                        })
-                    }
+        // The URL the app was started with was received before the handler above was registered
+        match deep_link.get_current() {
+            Ok(Some(urls)) => {
+                for url in urls {
+                    Self::handle_url(&app, &url);
                 }
-            };
+            }
+            Ok(None) => {}
+            Err(err) => warn!("Failed to get the URL the app was opened with: {}", err),
         }
 
-        let _ = result;
+        // The installers register the URL scheme, but an AppImage or an app that wasn't installed doesn't
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        if let Err(error) = deep_link.register_all() {
+            Self::handle_register_error(&app, error);
+        }
+    }
+
+    fn handle_url(app: &AppHandle, url: &Url) {
+        tauri::async_runtime::block_on(async {
+            info!("App opened with URL: {:?}", url.to_string());
+
+            let request = UrlParser::parse(url.as_str());
+            let app_state = app.state::<AppState>();
+            if let Err(err) = request {
+                warn!("Failed to broadcast custom protocol message: {:?}", err);
+                return;
+            }
+            let request = request.unwrap();
+
+            match request.host.as_str() {
+                "open" => {
+                    let msg = CustomProtocol::parse(&request);
+                    OpenHandler::handle(msg, app_state).await
+                }
+                _ => {}
+            }
+        })
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    fn handle_register_error(app: &AppHandle, error: tauri_plugin_deep_link::Error) {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = app;
+            warn!("Custom protocol setup failed: {}", error);
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            use crate::ui_messages::{ShowToastMsg, ToastStatus};
+
+            if std::env::var("FLATPAK_ID").is_ok() {
+                return;
+            }
+
+            let msg = "Either update-desktop-database or xdg-mime are missing. Please make sure they are available on your system";
+            warn!("Custom protocol setup failed; {}: {}", msg, error);
+
+            tauri::async_runtime::block_on(async {
+                let app_state = app.state::<AppState>();
+                let show_toast_msg = ShowToastMsg::new(
+                    "Custom protocol handling needs to be configured".to_string(),
+                    msg.to_string(),
+                    ToastStatus::Warning,
+                );
+                if let Err(err) = app_state
+                    .ui_messages
+                    .send(UiMessage::ShowToast(show_toast_msg))
+                    .await
+                {
+                    log::error!(
+                        "Failed to broadcast show toast message: {:?}, {}",
+                        err.0,
+                        err
+                    );
+                };
+            })
+        }
     }
 
     fn parse<'a, Msg>(request: &'a Request) -> Result<Msg, ParseError>

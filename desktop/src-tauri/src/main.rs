@@ -65,8 +65,6 @@ fn main() -> anyhow::Result<()> {
     // Before the stores are opened and the webview is created
     let identifier_migration = identifier_migration::migrate_app_dirs(&ctx.config().identifier);
 
-    CustomProtocol::forward_deep_link();
-
     let (tx, rx) = mpsc::channel::<UiMessage>(10);
 
     let mut app_builder = tauri::Builder::default();
@@ -94,6 +92,7 @@ fn main() -> anyhow::Result<()> {
             resources_handles: Arc::new(Mutex::new(vec![])),
         })
         .plugin(logging::build_plugin())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -123,8 +122,7 @@ fn main() -> anyhow::Result<()> {
 
             action_logs::setup(&app.handle())?;
 
-            let custom_protocol = CustomProtocol::init();
-            custom_protocol.setup(app.handle().clone());
+            CustomProtocol::setup(app.handle().clone());
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

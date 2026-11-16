@@ -7,6 +7,13 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Changed
+
+- The desktop app handles `devpod://` links with Tauri 2's deep-link plugin instead of a Tauri 1 plugin, and builds
+  with the latest Rust again (Rust 1.100 couldn't compile the old plugin, or the Wayland clipboard library an older
+  `arboard` used). The Linux packages and the Windows installer now register the `devpod://` scheme, and on Windows
+  and Linux a link that starts DevPod Desktop is no longer ignored.
+
 ## v0.11.0 (2026-11-16)
 
 ### Added

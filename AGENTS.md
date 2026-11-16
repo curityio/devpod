@@ -103,8 +103,6 @@ cd src-tauri && cargo +stable check
     only builds the CLI and runs the unit tests on Windows.
 - **Desktop quirks:**
   - The default `cargo` may be too old for the v4 `Cargo.lock`; use `cargo +stable`.
-  - Rust 1.100 and newer can't compile the desktop app's dependencies (see `TODO.md`); the release workflow pins
-    1.99.1, so use `cargo +1.99.1` if your stable is newer.
   - `cargo check` needs `desktop/dist/` and the sidecar `desktop/src-tauri/bin/devpod-cli-<target-triple>` to
     exist; empty placeholders are enough (both are gitignored).
 

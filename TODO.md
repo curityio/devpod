@@ -36,18 +36,6 @@ in `curityio/devpod`. Copy the relevant information into our docs (or recreate t
 - [ ] `docs/pages/troubleshooting/ide-troubleshooting.mdx`: issue [#1187](https://github.com/loft-sh/devpod/issues/1187) (NeoVim `$TERM` workaround)
 - [ ] `docs/pages/troubleshooting/linux-troubleshooting.mdx`: issue [#1045](https://github.com/loft-sh/devpod/issues/1045) (SSH connection string too long)
 
-## Build the desktop app with the latest Rust
-
-Rust 1.100 can't compile two of the desktop app's dependencies, so `.github/workflows/release.yaml` pins Rust
-1.99.1:
-
-- [ ] `objc2` 0.4 (macOS), from `tauri-plugin-deep-link` 0.1, a Tauri 1 plugin. Replace it with Tauri 2's
-  `tauri-plugin-deep-link` 2.
-- [ ] `wl-clipboard-rs` 0.8 (Linux), from `arboard` 3.4 through `tauri-plugin-clipboard-manager`. Update them
-  to versions that use a newer `wl-clipboard-rs`.
-
-Then go back to `dtolnay/rust-toolchain@stable` and remove the note about the pin from `AGENTS.md`.
-
 ## Sign the release binaries
 
 `.github/workflows/release.yaml` builds unsigned installers and binaries. macOS Gatekeeper blocks the app until the user
