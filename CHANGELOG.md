@@ -7,6 +7,11 @@ Add new entries to the top of the "Unreleased" section.
 
 ## Unreleased
 
+### Added
+
+- Links to the [documentation](https://devpod.curityio.net/) show a preview image when shared in Slack or on social
+  media: every page sets `og:image` and `twitter:image` to an image with the DevPod and Curity logos.
+
 ### Changed
 
 - The desktop app handles `devpod://` links with Tauri 2's deep-link plugin instead of a Tauri 1 plugin, and builds
