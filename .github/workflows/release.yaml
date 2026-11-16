@@ -138,10 +138,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
 
+      # Rust 1.100 can't compile objc2 0.4 (from tauri-plugin-deep-link 0.1) and wl-clipboard-rs 0.8 (from arboard)
       - name: Rust setup
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         if: matrix.settings.cli_only == false
         with:
+          toolchain: 1.99.1
           targets: ${{ matrix.settings.target }}
 
       - name: Rust cache
