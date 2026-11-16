@@ -68,6 +68,11 @@
   "version": "../package.json",
   "identifier": "io.curity.devpod",
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["devpod"]
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMxRjc1MjVDQUM2MjU1NEUKUldST1ZXS3NYRkwzd1VaY1FrRXBVdHBoWGhPbWlHWmtjbWFORzlIM1VtU3czWnh3TFVxaE1HNFIK",
       "windows": {
