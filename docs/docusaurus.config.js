@@ -9,6 +9,8 @@ module.exports = {
   organizationName: "curityio", // Usually your GitHub org/user name.
   projectName: "devpod", // Usually your repo name.
   themeConfig: {
+    // Sets og:image and twitter:image on every page, for link previews in Slack and social media.
+    image: "/media/og-image.png",
     colorMode: {
       defaultMode: "light",
       disableSwitch: false,
