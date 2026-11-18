@@ -117,18 +117,9 @@ func (k *KubernetesDriver) runContainer(
 		}
 	}
 
-	// read pod template
-	pod := &corev1.Pod{
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyNever,
-		},
-	}
-	if len(k.options.PodManifestTemplate) > 0 {
-		k.Log.Debugf("trying to get pod template manifest from %s", k.options.PodManifestTemplate)
-		pod, err = getPodTemplate(k.options.PodManifestTemplate)
-		if err != nil {
-			return err
-		}
+	pod, err := k.getPodTemplate()
+	if err != nil {
+		return err
 	}
 
 	// get init containers
@@ -189,6 +180,10 @@ func (k *KubernetesDriver) runContainer(
 	nodeSelector, err := getNodeSelector(pod, k.options.NodeSelector)
 	if err != nil {
 		return err
+	}
+	// run the pod on a node of the architecture its image was built for
+	if arch := k.podArchitecture(ctx, pod, nodeSelector); arch != "" {
+		nodeSelector[corev1.LabelArchStable] = arch
 	}
 
 	// parse resources
@@ -431,6 +426,20 @@ func getLabels(pod *corev1.Pod, rawLabels string) (map[string]string, error) {
 	}
 
 	return labels, nil
+}
+
+// getPodTemplate returns the POD_MANIFEST_TEMPLATE option's pod, or an empty pod if it isn't set.
+func (k *KubernetesDriver) getPodTemplate() (*corev1.Pod, error) {
+	if len(k.options.PodManifestTemplate) == 0 {
+		return &corev1.Pod{
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyNever,
+			},
+		}, nil
+	}
+
+	k.Log.Debugf("trying to get pod template manifest from %s", k.options.PodManifestTemplate)
+	return getPodTemplate(k.options.PodManifestTemplate)
 }
 
 func getNodeSelector(pod *corev1.Pod, rawNodeSelector string) (map[string]string, error) {
