@@ -20,8 +20,7 @@ Add new entries to the top of the "Unreleased" section.
   commits that the remote branch lacks while it has new ones, and no file git doesn't track where the remote branch
   adds one. Otherwise it keeps the checkout and warns why, pointing to `git pull` in the workspace or `--reset`.
   Until now it never fetched, and built from the commit the workspace was created with. A workspace created from
-  a commit or a tag stays at it. When `--git-clone-recursive-submodules` is passed too, the submodules follow, unless
-  one of them holds work.
+  a commit or a tag stays at it. The submodules of the checkout follow, each unless it holds work.
 - On Kubernetes (and other drivers that copy folders into the container instead of mounting them),
   `devpod up --recreate` copies the `bind` mounts of `devcontainer.json` again, so that a file that changed on the
   host, such as a credentials file after a new login, reaches the container. A file the container changed after

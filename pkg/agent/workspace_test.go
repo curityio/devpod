@@ -188,3 +188,47 @@ func TestUpdateRepositoryForWorkspaceOfTag(t *testing.T) {
 	// nothing the user can do about it
 	assert.Assert(t, !strings.Contains(logs, "--reset"))
 }
+
+func TestUpdateRepositoryForWorkspaceRecoversSubmodules(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t, nil)
+	// git doesn't clone a submodule from a local path by default
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "protocol.file.allow")
+	t.Setenv("GIT_CONFIG_VALUE_0", "always")
+	library := filepath.Join(filepath.Dir(remote), "library")
+	testGit(t, filepath.Dir(remote), "init", "-q", "-b", "main", library)
+	commitTestFile(t, library, "README.md", "library\n")
+	testGit(t, remote, "submodule", "--quiet", "add", library, "lib")
+	testGit(t, remote, "commit", "-q", "-m", "add submodule")
+	testGit(t, checkout, "pull", "-q", "--recurse-submodules")
+	testGit(t, checkout, "submodule", "--quiet", "update", "--init")
+	source := &provider2.WorkspaceSource{GitRepository: remote}
+
+	// the remote records a new commit of the library
+	commitTestFile(t, library, "new.txt", "new\n")
+	testGit(t, filepath.Join(remote, "lib"), "pull", "-q", "origin", "main")
+	testGit(t, remote, "commit", "-q", "-a", "-m", "move lib")
+	// the checkout got it, but updating the submodule failed
+	testGit(t, checkout, "pull", "-q", "--no-recurse-submodules")
+	assert.Assert(t, testGit(t, filepath.Join(checkout, "lib"), "rev-parse", "HEAD") != testGit(t, library, "rev-parse", "HEAD"))
+	// and the remote has another commit since
+	commitTestFile(t, remote, "later.txt", "later\n")
+
+	logs := updateRepository(context.Background(), source, checkout)
+
+	assert.Assert(t, cmp.Contains(logs, "Updated the submodules of the workspace's checkout: lib"))
+	assert.Assert(t, cmp.Contains(logs, "Updated the workspace's checkout from commit"))
+	assert.Equal(t, testGit(t, checkout, "rev-parse", "HEAD"), testGit(t, remote, "rev-parse", "HEAD"))
+	assert.Equal(t, testGit(t, filepath.Join(checkout, "lib"), "rev-parse", "HEAD"), testGit(t, library, "rev-parse", "HEAD"))
+	assert.Equal(t, testGit(t, checkout, "status", "--porcelain"), "")
+
+	// work in the submodule is kept, and said to be
+	testGit(t, filepath.Join(checkout, "lib"), "checkout", "-q", "-b", "work")
+	commitTestFile(t, filepath.Join(checkout, "lib"), "work.txt", "work\n")
+	work := testGit(t, filepath.Join(checkout, "lib"), "rev-parse", "HEAD")
+
+	logs = updateRepository(context.Background(), source, checkout)
+
+	assert.Assert(t, cmp.Contains(logs, "Submodule lib of the workspace's checkout was not updated because it has a branch checked out"))
+	assert.Equal(t, testGit(t, filepath.Join(checkout, "lib"), "rev-parse", "HEAD"), work)
+}

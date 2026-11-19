@@ -261,8 +261,9 @@ func aheadBehind(run func(args ...string) (string, error), head, target string) 
 // changedFiles returns the tracked files that differ from HEAD, in the index or the work tree,
 // and separately the deleted files below the paths of removedOnPurpose, which are not changes.
 func changedFiles(run func(args ...string) (string, error), removedOnPurpose []string) (changed []string, removed []removedFiles, err error) {
-	// a setting of the repository must not hide the changes in a submodule
-	out, err := run("diff", "--name-status", "--no-renames", "--ignore-submodules=none", "-z", "HEAD")
+	// A setting of the repository must not hide the changes in a submodule. Files git doesn't track
+	// are no changes in a submodule either.
+	out, err := run("diff", "--name-status", "--no-renames", "--ignore-submodules=untracked", "-z", "HEAD")
 	if err != nil {
 		return nil, nil, err
 	}

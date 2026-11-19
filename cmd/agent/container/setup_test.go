@@ -171,8 +171,10 @@ func TestRefreshBuildInfo(t *testing.T) {
 	assert.Equal(t, readFile(t, filepath.Join(buildInfoDir, "feature-b", "install.sh")), "new")
 	_, err = os.Stat(filepath.Join(buildInfoDir, "feature-a"))
 	assert.Assert(t, os.IsNotExist(err))
-	_, err = os.Stat(buildInfoDir + ".new")
-	assert.Assert(t, os.IsNotExist(err))
+	// nothing is left next to it
+	entries, err := os.ReadDir(filepath.Dir(buildInfoDir))
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 2)
 	// nothing else of the workspace folder is touched
 	assert.Equal(t, readFile(t, filepath.Join(workspaceMount.Target, ".devcontainer", "Dockerfile")), "FROM mine")
 }
@@ -182,14 +184,48 @@ func TestRefreshBuildInfoKeepsOldFilesOnError(t *testing.T) {
 	// the host has no build folder
 	buildInfoDir := filepath.Join(workspaceMount.Target, config.DevPodContextFeatureFolder)
 	writeFile(t, filepath.Join(buildInfoDir, "Dockerfile-with-features"), "FROM old")
+	// a folder of the user that has the name the new files once were copied to
+	userFolder := buildInfoDir + ".new"
+	writeFile(t, filepath.Join(userFolder, "file"), "mine")
 
 	err := refreshBuildInfo(context.Background(), client, workspaceMount, buildInfoDir, log.Discard)
 
 	assert.ErrorContains(t, err, "stream build folder")
 	assert.ErrorContains(t, err, config.DevPodContextFeatureFolder)
 	assert.Equal(t, readFile(t, filepath.Join(buildInfoDir, "Dockerfile-with-features")), "FROM old")
-	_, err = os.Stat(buildInfoDir + ".new")
-	assert.Assert(t, os.IsNotExist(err))
+	assert.Equal(t, readFile(t, filepath.Join(userFolder, "file")), "mine")
+	entries, err := os.ReadDir(workspaceMount.Target)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 2)
+}
+
+func TestRefreshBuildInfoBehindLink(t *testing.T) {
+	workspaceMount, _, client := newHost(t)
+	buildFolder := filepath.Join(".devcontainer", config.DevPodContextFeatureFolder)
+	writeFile(t, filepath.Join(workspaceMount.Source, buildFolder, "Dockerfile-with-features"), "FROM new")
+	// the .devcontainer of the workspace folder in the container is a link out of it
+	outside := t.TempDir()
+	writeFile(t, filepath.Join(outside, config.DevPodContextFeatureFolder, "file"), "outside")
+	assert.NilError(t, os.Symlink(outside, filepath.Join(workspaceMount.Target, ".devcontainer")))
+	buildInfoDir := filepath.Join(workspaceMount.Target, buildFolder)
+
+	err := refreshBuildInfo(context.Background(), client, workspaceMount, buildInfoDir, log.Discard)
+
+	assert.ErrorContains(t, err, "leads out of the workspace folder")
+	assert.Equal(t, readFile(t, filepath.Join(outside, config.DevPodContextFeatureFolder, "file")), "outside")
+	entries, err := os.ReadDir(outside)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 1)
+
+	// a link that stays in the workspace folder is fine
+	assert.NilError(t, os.Remove(filepath.Join(workspaceMount.Target, ".devcontainer")))
+	writeFile(t, filepath.Join(workspaceMount.Target, "config", "file"), "mine")
+	assert.NilError(t, os.Symlink("config", filepath.Join(workspaceMount.Target, ".devcontainer")))
+
+	err = refreshBuildInfo(context.Background(), client, workspaceMount, buildInfoDir, log.Discard)
+
+	assert.NilError(t, err)
+	assert.Equal(t, readFile(t, filepath.Join(workspaceMount.Target, "config", config.DevPodContextFeatureFolder, "Dockerfile-with-features")), "FROM new")
 }
 
 func TestRefreshBuildInfoOutsideWorkspaceFolder(t *testing.T) {

@@ -292,3 +292,40 @@ func TestExtractSkip(t *testing.T) {
 	_, err := os.Stat(filepath.Join(target, "skipped"))
 	assert.Assert(t, os.IsNotExist(err))
 }
+
+func TestExtractKeepNewerDoesNotExtractThroughLinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs a privilege on Windows")
+	}
+	source := t.TempDir()
+	target := t.TempDir()
+	elsewhere := t.TempDir()
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	for _, file := range []string{"config/token", "config/sub/file", "config/added", "deep/config/token", "plain/token"} {
+		writeFileAt(t, filepath.Join(source, filepath.FromSlash(file)), "host", time.Now())
+	}
+	// the container replaced folders with links to files it keeps somewhere else
+	writeFileAt(t, filepath.Join(elsewhere, "token"), "container", lastCopy)
+	writeFileAt(t, filepath.Join(elsewhere, "sub", "file"), "container", lastCopy)
+	assert.NilError(t, os.Symlink(elsewhere, filepath.Join(target, "config")))
+	assert.NilError(t, os.MkdirAll(filepath.Join(target, "deep"), 0o755))
+	assert.NilError(t, os.Symlink(elsewhere, filepath.Join(target, "deep", "config")))
+	writeFileAt(t, filepath.Join(target, "plain", "token"), "old", lastCopy)
+
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+
+	assert.Equal(t, readFile(t, filepath.Join(elsewhere, "token")), "container")
+	assert.Equal(t, readFile(t, filepath.Join(elsewhere, "sub", "file")), "container")
+	_, err := os.Stat(filepath.Join(elsewhere, "added"))
+	assert.Assert(t, os.IsNotExist(err))
+	entries, err := os.ReadDir(elsewhere)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 2)
+	// the links stay, and the rest is extracted
+	for _, link := range []string{"config", "deep/config"} {
+		stat, err := os.Lstat(filepath.Join(target, filepath.FromSlash(link)))
+		assert.NilError(t, err)
+		assert.Assert(t, stat.Mode()&os.ModeSymlink != 0, link)
+	}
+	assert.Equal(t, readFile(t, filepath.Join(target, "plain", "token")), "host")
+}

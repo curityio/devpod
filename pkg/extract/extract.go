@@ -20,6 +20,9 @@ type Options struct {
 	KeepNewer   bool
 	Skip        func(name string) bool
 
+	// folders holds the folders of the destination that were checked to be no links
+	folders map[string]bool
+
 	Perm *os.FileMode
 	UID  *int
 	GID  *int
@@ -36,7 +39,9 @@ func StripLevels(levels int) Option {
 // KeepNewer makes Extract keep a file, symlink or hard link that already exists and was modified
 // after the one in the archive, instead of replacing it. A file it does replace is only replaced
 // once it is written completely, so that an extraction that is interrupted doesn't leave a part
-// of a file that looks newer the next time, and it keeps its owner.
+// of a file that looks newer the next time, and it keeps its owner. Where the destination has a
+// link in place of a folder of the archive, the link is kept and nothing is extracted through it:
+// what is behind it is not what was extracted there before.
 func KeepNewer() Option {
 	return func(o *Options) {
 		o.KeepNewer = true
@@ -117,6 +122,9 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	outFileName := path.Join(destFolder, relativePath)
 	baseName := path.Dir(outFileName)
 	if options.Skip != nil && options.Skip(filepath.Clean(outFileName)) {
+		return true, nil
+	}
+	if options.KeepNewer && throughLink(destFolder, outFileName, options) {
 		return true, nil
 	}
 
@@ -244,6 +252,37 @@ func replaceFile(name string, content io.Reader, header *tar.Header, existing os
 		return perrors.Wrapf(err, "replace %s", name)
 	}
 	return nil
+}
+
+// throughLink returns whether a folder on the way from destFolder to name is something else than
+// a folder, as a link is.
+func throughLink(destFolder, name string, options *Options) bool {
+	root := filepath.Clean(destFolder)
+	rel, err := filepath.Rel(root, filepath.Clean(name))
+	if err != nil || !filepath.IsLocal(rel) {
+		return true
+	}
+	if options.folders == nil {
+		options.folders = map[string]bool{}
+	}
+
+	folder := root
+	parts := strings.Split(rel, string(filepath.Separator))
+	for _, part := range parts[:len(parts)-1] {
+		folder = filepath.Join(folder, part)
+		if options.folders[folder] {
+			continue
+		}
+		stat, err := os.Lstat(folder)
+		if os.IsNotExist(err) {
+			// nothing below it exists either, and Extract creates folders
+			return false
+		} else if err != nil || !stat.IsDir() {
+			return true
+		}
+		options.folders[folder] = true
+	}
+	return false
 }
 
 // keepExisting returns whether existing, which is where an entry of the archive goes, is kept: it

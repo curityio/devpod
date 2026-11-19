@@ -359,6 +359,11 @@ func refreshBuildInfo(ctx context.Context, client tunnel.TunnelClient, workspace
 		return fmt.Errorf("build context %s is not in the workspace folder %s", filepath.Dir(buildInfoDir), workspaceMount.Target)
 	}
 
+	err = buildContextInWorkspaceFolder(workspaceMount.Target, buildInfoDir)
+	if err != nil {
+		return err
+	}
+
 	stream, err := client.StreamMount(ctx, &tunnel.StreamMountRequest{
 		Mount:   workspaceMount.String(),
 		SubPath: filepath.ToSlash(subPath),
@@ -368,10 +373,12 @@ func refreshBuildInfo(ctx context.Context, client tunnel.TunnelClient, workspace
 	}
 
 	// the old files stay if the new ones don't arrive
-	newDir := buildInfoDir + ".new"
-	_ = os.RemoveAll(newDir)
+	newDir, err := os.MkdirTemp(filepath.Dir(buildInfoDir), config.DevPodContextFeatureFolder+"-*")
+	if err != nil {
+		return err
+	}
 	defer os.RemoveAll(newDir)
-	err = os.MkdirAll(newDir, 0o755)
+	err = os.Chmod(newDir, 0o755)
 	if err != nil {
 		return err
 	}
@@ -385,6 +392,26 @@ func refreshBuildInfo(ctx context.Context, client tunnel.TunnelClient, workspace
 		return err
 	}
 	return os.Rename(newDir, buildInfoDir)
+}
+
+// buildContextInWorkspaceFolder returns an error unless the folder of buildInfoDir really is in the workspace
+// folder: the workspace folder is the user's, and a link in it could lead the setup, which runs as root, to
+// replace a folder somewhere else.
+func buildContextInWorkspaceFolder(workspaceFolder, buildInfoDir string) error {
+	buildContext := filepath.Dir(buildInfoDir)
+	realWorkspaceFolder, err := filepath.EvalSymlinks(workspaceFolder)
+	if err != nil {
+		return fmt.Errorf("resolve workspace folder: %w", err)
+	}
+	realBuildContext, err := filepath.EvalSymlinks(buildContext)
+	if err != nil {
+		return fmt.Errorf("resolve build context: %w", err)
+	}
+	rel, err := filepath.Rel(realWorkspaceFolder, realBuildContext)
+	if err != nil || !filepath.IsLocal(rel) {
+		return fmt.Errorf("build context %s leads out of the workspace folder %s", buildContext, workspaceFolder)
+	}
+	return nil
 }
 
 func dockerlessBuild(
