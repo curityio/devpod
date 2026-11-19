@@ -141,6 +141,11 @@ A naive approach would be to delete and recreate a workspace after each `devcont
 This will apply **ALL** new configurations including Dockerfile changes as well as new mounts, new features or any other configuration that is not included in the above command. DevPod will only replace the existing running container if the command has succeeded, so if there is a mistake in the new configuration, the existing workspace should not be impacted.
 The Desktop app equivalent for this is the 'Rebuild' button.
 
+For a workspace of a git repository, `--recreate` fetches the branch first and fast-forwards the workspace's checkout
+when nothing in it can be lost, so a change you pushed from elsewhere is applied too. On Kubernetes, where the
+workspace folder in the pod is a copy, a change made in the workspace has to be pushed before it is applied. See
+[Recreating a workspace](./create-a-workspace.mdx#recreating-a-workspace).
+
 A typical session when working on the configuration:
 ```
 devpod up my-workspace --recreate     # apply the change

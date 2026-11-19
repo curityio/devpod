@@ -28,6 +28,8 @@ func NewStreamReader(stream tunnel.Tunnel_StreamWorkspaceClient, log log.Logger)
 				return
 			} else if err != nil {
 				log.Debugf("Error receiving from stream: %v", err)
+				// the reader gets the error rather than an end of file
+				_ = writer.CloseWithError(err)
 				return
 			}
 		}

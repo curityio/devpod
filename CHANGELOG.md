@@ -14,10 +14,31 @@ Add new entries to the top of the "Unreleased" section.
 
 ### Changed
 
+- `devpod up --recreate` of a workspace created from a git repository brings the workspace's checkout up to date
+  first, so that a `devcontainer.json` or `Dockerfile` change that was pushed is applied. It fetches the checked out
+  branch and fast-forwards to it when nothing can be lost: no changes to tracked files that are not committed, and
+  no commits that the remote branch lacks while it has new ones. Otherwise it keeps the checkout and warns why,
+  pointing to `git pull` in the workspace or `--reset`. Until now it never fetched, and built from the commit the
+  workspace was created with. A workspace created from a commit stays at it.
+- On Kubernetes (and other drivers that copy folders into the container instead of mounting them),
+  `devpod up --recreate` copies the `bind` mounts of `devcontainer.json` again, so that a file that changed on the
+  host, such as a credentials file after a new login, reaches the container. A file the container changed after
+  the host's is kept, as are files only the container has. Until now a mount was only copied when it was created,
+  or with `--reset`. The workspace folder is still only replaced by `--reset`.
 - The desktop app handles `devpod://` links with Tauri 2's deep-link plugin instead of a Tauri 1 plugin, and builds
   with the latest Rust again (Rust 1.100 couldn't compile the old plugin, or the Wayland clipboard library an older
   `arboard` used). The Linux packages and the Windows installer now register the `devpod://` scheme, and on Windows
   and Linux a link that starts DevPod Desktop is no longer ignored.
+
+### Fixed
+
+- On Kubernetes, `devpod up --recreate` builds the image with the `Dockerfile` and features of the
+  `devcontainer.json` it read. It built with those of the workspace's first build, which the pod's volume keeps, or
+  of a build that failed, so a `Dockerfile` change was only applied by `--reset`. For a git repository, DevPod
+  warns when the workspace folder in the pod is at another commit than the checkout `devcontainer.json` was read
+  from, since the files a `Dockerfile` copies come from the pod's copy.
+- `devpod up --reset` of a Kubernetes workspace no longer fails with `file exists` when the workspace folder or a
+  mounted folder has a symlink: a link that is already in the pod is replaced.
 
 ## v0.11.0 (2026-11-16)
 

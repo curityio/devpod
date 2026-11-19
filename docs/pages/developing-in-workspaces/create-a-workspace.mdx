@@ -240,11 +240,57 @@ Run the following command to rebuild an existing workspace:
 devpod up my-workspace --recreate
 ```
 
+### A workspace of a git repository
+
+Recreating first brings the workspace's checkout of the repository up to date with its remote branch, so that a
+`devcontainer.json` or `Dockerfile` change that was pushed is applied. DevPod fetches the branch that is checked out
+and fast-forwards to it, like `git pull --ff-only`, but only when nothing in the checkout can be lost. It leaves the
+checkout as it is, and warns why, when:
+
+- tracked files have changes that are not committed,
+- the branch and its remote branch have diverged: the branch has commits that were not pushed, and the remote
+  branch has new commits,
+- no branch is checked out, or the branch has no upstream branch,
+- the remote can't be reached.
+
+Commits that were not pushed don't stop the update as long as the remote branch has nothing new, and neither do
+files git doesn't track. A workspace created from a commit (`@sha256:...`) stays at that commit.
+
+When the checkout was not updated, the workspace is recreated with the files it has. Run `git pull` in the
+workspace and recreate it again, or [reset](#resetting-a-workspace) the workspace.
+
+### On Kubernetes
+
+A dev container on Docker mounts folders of the machine it runs on. A pod can't mount folders of your computer, so
+DevPod copies them into the pod's volume: the workspace folder, and the folders of the `bind` mounts of
+`devcontainer.json`. Recreating a workspace does this with the copies:
+
+- **Bind mounts** are copied again, so that what changed on your computer reaches the container, for example a
+  credentials file after you logged in again. A file that was changed in the container after the one on your
+  computer is kept, for example a token the container renewed, and so are files that only the container has.
+  DevPod sends the whole folders each time, so large ones make recreating slower.
+- **Volume mounts** keep their content.
+- **The workspace folder** in the pod is not changed, because it holds your work. For a git repository there are
+  then two checkouts: the one on your computer that DevPod reads `devcontainer.json` from, which recreating
+  updates as described above, and the copy in the pod. The image is built in the pod with the `Dockerfile` and
+  features that belong to that `devcontainer.json`, but the files the `Dockerfile` copies into the image (`COPY`,
+  `ADD`) are those of the pod's copy. DevPod warns when the two checkouts are at different commits. To have the
+  same commit in both, push the commits of the workspace, run `git pull` in the workspace, and recreate it.
+  A change to `devcontainer.json` made in the workspace is only applied once it is pushed.
+
+A workspace of a local folder is not uploaded again when it is recreated: `devcontainer.json` and the `Dockerfile`
+are read from the folder on your computer, and the workspace folder in the pod keeps its files. Resetting the
+workspace uploads the folder again.
+
 ## Resetting a workspace
 
-Some scenarios require pulling in the latest changes from a git repository or re-uploading your local folder. If instead of recreating the devcontainer you need to completely restart your workspace from a clean slate, use `Reset` over `Recreate`.
+Some scenarios require replacing the workspace's files with the latest ones of a git repository, or re-uploading your local folder. If instead of recreating the devcontainer you need to completely restart your workspace from a clean slate, use `Reset` over `Recreate`.
 
-** When recreating a workspace, no changes will be preserved! **
+**When resetting a workspace, no changes will be preserved!** DevPod removes the checkout of a git repository and
+clones it again, so commits that were not pushed and changes that were not committed are lost.
+
+On Kubernetes, the new clone (or your local folder) and the bind mounts are copied over the files in the pod's
+volume. This replaces the files, but files that only the volume has stay there, and volume mounts keep their content.
 
 ### Via DevPod Desktop Application
 

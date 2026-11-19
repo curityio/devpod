@@ -16,6 +16,7 @@ import (
 
 type Options struct {
 	StripLevels int
+	KeepNewer   bool
 
 	Perm *os.FileMode
 	UID  *int
@@ -27,6 +28,14 @@ type Option func(o *Options)
 func StripLevels(levels int) Option {
 	return func(o *Options) {
 		o.StripLevels = levels
+	}
+}
+
+// KeepNewer makes Extract keep a file, symlink or hard link that already exists and was modified
+// after the one in the archive, instead of replacing it.
+func KeepNewer() Option {
+	return func(o *Options) {
+		o.KeepNewer = true
 	}
 }
 
@@ -118,15 +127,21 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 		}
 
 		return true, nil
-	} else if header.Typeflag == tar.TypeSymlink {
-		err := os.Symlink(header.Linkname, outFileName)
+	}
+
+	if options.KeepNewer && isNewer(outFileName, header.FileInfo().ModTime()) {
+		return true, nil
+	}
+
+	if header.Typeflag == tar.TypeSymlink {
+		err := replaceExisting(outFileName, func() error { return os.Symlink(header.Linkname, outFileName) })
 		if err != nil {
 			return false, err
 		}
 
 		return true, nil
 	} else if header.Typeflag == tar.TypeLink {
-		err := os.Link(header.Linkname, outFileName)
+		err := replaceExisting(outFileName, func() error { return os.Link(header.Linkname, outFileName) })
 		if err != nil {
 			return false, err
 		}
@@ -162,6 +177,26 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	_ = os.Chtimes(outFileName, time.Now(), header.FileInfo().ModTime())
 
 	return true, nil
+}
+
+// isNewer returns whether name exists, is not a directory, and was modified after modTime.
+func isNewer(name string, modTime time.Time) bool {
+	existing, err := os.Lstat(name)
+	return err == nil && !existing.IsDir() && existing.ModTime().After(modTime)
+}
+
+// replaceExisting runs create, which creates a link at name, and if something that is not a
+// directory with files is already there, removes that and runs create again: unlike a file, a
+// link can't be written over.
+func replaceExisting(name string, create func() error) error {
+	err := create()
+	if err == nil || !os.IsExist(err) {
+		return err
+	}
+	if removeErr := os.Remove(name); removeErr != nil {
+		return err
+	}
+	return create()
 }
 
 func getRelativeFromFullPath(fullpath string, prefix string) string {

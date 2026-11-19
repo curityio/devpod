@@ -276,7 +276,15 @@ func prepareWorkspace(ctx context.Context, workspaceInfo *provider2.AgentWorkspa
 		}
 
 		if workspaceInfo.CLIOptions.Recreate && !workspaceInfo.CLIOptions.Reset && exists {
-			log.Info("Rebuilding without resetting a git based workspace, keeping old content folder")
+			// the checkout may hold work that was not pushed, so it is only updated when that loses nothing
+			log.Info("Recreating a git based workspace without resetting it, keeping its content folder")
+			agent.UpdateRepositoryForWorkspace(ctx,
+				&workspaceInfo.Workspace.Source,
+				workspaceInfo.ContentFolder,
+				helper,
+				workspaceInfo.CLIOptions,
+				log,
+			)
 			return nil
 		}
 

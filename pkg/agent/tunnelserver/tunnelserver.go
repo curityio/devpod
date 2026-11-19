@@ -354,8 +354,16 @@ func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tu
 
 	// The ignore files only apply to the workspace folder, other bind mounts
 	// are streamed whole
+	source := mount.Source
 	opts := extract.TarOptions{}
-	if t.workspaceMount != nil && mount.String() == t.workspaceMount.String() {
+	if message.SubPath != "" {
+		var err error
+		source, err = t.buildFolder(mount, message.SubPath)
+		if err != nil {
+			return err
+		}
+		t.log.Debugf("Stream build folder %s", source)
+	} else if t.workspaceMount != nil && mount.String() == t.workspaceMount.String() {
 		var cleanup func()
 		opts, cleanup = t.workspaceTarOptions(stream.Context(), mount.Source)
 		defer cleanup()
@@ -364,13 +372,52 @@ func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tu
 	}
 
 	buf := bufio.NewWriterSize(NewStreamWriter(stream, t.log), 10*1024)
-	err := extract.WriteTarWithOptions(buf, mount.Source, opts)
+	err := extract.WriteTarWithOptions(buf, source, opts)
 	if err != nil {
 		return err
 	}
 
 	// make sure buffer is flushed
 	return buf.Flush()
+}
+
+// buildFolder returns the folder that subPath names in the workspace mount, if it is a folder
+// DevPod wrote the files of an image build to. That folder is always streamed whole as part of
+// the workspace mount, so streaming it alone gives out nothing the mount doesn't. Any other
+// folder could hold files the ignore file excludes.
+func (t *tunnelServer) buildFolder(mount *config.Mount, subPath string) (string, error) {
+	if t.workspaceMount == nil || mount.String() != t.workspaceMount.String() {
+		return "", fmt.Errorf("folder %s of mount %s is not allowed to download, it is not the workspace mount", subPath, mount.String())
+	}
+
+	local := filepath.FromSlash(subPath)
+	if !filepath.IsLocal(local) || filepath.Base(local) != config.DevPodContextFeatureFolder {
+		return "", fmt.Errorf("folder %s of the workspace mount is not allowed to download", subPath)
+	}
+
+	folder := filepath.Join(mount.Source, local)
+	stat, err := os.Lstat(folder)
+	if err != nil {
+		return "", fmt.Errorf("build folder %s: %w", subPath, err)
+	} else if !stat.IsDir() {
+		return "", fmt.Errorf("build folder %s is not a folder", subPath)
+	}
+
+	// a symlink on the way must not lead out of the workspace folder
+	resolvedSource, err := filepath.EvalSymlinks(mount.Source)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace folder: %w", err)
+	}
+	resolvedFolder, err := filepath.EvalSymlinks(folder)
+	if err != nil {
+		return "", fmt.Errorf("resolve build folder %s: %w", subPath, err)
+	}
+	rel, err := filepath.Rel(resolvedSource, resolvedFolder)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("build folder %s is outside of the workspace folder", subPath)
+	}
+
+	return folder, nil
 }
 
 // ignoreFileName is the name of the file listing the paths not to stream.

@@ -210,3 +210,88 @@ func TestStreamMount_UnknownMountIsRejected(t *testing.T) {
 	)
 	assert.ErrorContains(t, err, "is not allowed")
 }
+
+func streamBuildFolder(server *tunnelServer, mount *config.Mount, subPath string) ([]string, error) {
+	stream := &mockStreamMountServer{}
+	err := server.StreamMount(&tunnel.StreamMountRequest{Mount: mount.String(), SubPath: subPath}, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := []string{}
+	reader := tar.NewReader(&stream.content)
+	for {
+		hdr, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		entries = append(entries, hdr.Name)
+	}
+	sort.Strings(entries)
+
+	return entries, nil
+}
+
+func TestStreamMount_BuildFolder(t *testing.T) {
+	setupInfo := newSetupInfo(t)
+	workspaceMount := config.GetWorkspaceMount(setupInfo)
+	buildFolder := ".devcontainer/" + config.DevPodContextFeatureFolder
+	writeFiles(t, workspaceMount.Source,
+		".devcontainer/Dockerfile",
+		buildFolder+"/Dockerfile-with-features",
+		buildFolder+"/feature/install.sh",
+	)
+	// the ignore file doesn't apply to the build folder
+	assert.NilError(t, os.WriteFile(
+		filepath.Join(workspaceMount.Source, ignoreFileName), []byte("**/*.sh\n"), 0o600))
+	server := newSetupServer(setupInfo, log.Discard)
+
+	entries, err := streamBuildFolder(server, workspaceMount, buildFolder)
+
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []string{"Dockerfile-with-features", "feature/install.sh"}, entries)
+}
+
+func TestStreamMount_OnlyBuildFolderOfWorkspaceMount(t *testing.T) {
+	setupInfo := newSetupInfo(t)
+	workspaceMount := config.GetWorkspaceMount(setupInfo)
+	otherMount := setupInfo.MergedConfig.Mounts[0]
+	writeFiles(t, workspaceMount.Source, config.DevPodContextFeatureFolder+"/Dockerfile")
+	writeFiles(t, otherMount.Source, config.DevPodContextFeatureFolder+"/Dockerfile")
+	outside := t.TempDir()
+	writeFiles(t, outside, config.DevPodContextFeatureFolder+"/secret")
+	if err := os.Symlink(outside, filepath.Join(workspaceMount.Source, "link")); err != nil {
+		t.Skipf("can't create a symlink: %v", err)
+	}
+	server := newSetupServer(setupInfo, log.Discard)
+
+	for name, test := range map[string]struct {
+		mount   *config.Mount
+		subPath string
+		err     string
+	}{
+		// the ignore file excludes it from the workspace mount
+		"ignored folder":       {workspaceMount, "web/node_modules", "not allowed"},
+		"other folder":         {workspaceMount, "src", "not allowed"},
+		"outside":              {workspaceMount, "../" + config.DevPodContextFeatureFolder, "not allowed"},
+		"absolute":             {workspaceMount, filepath.Join(outside, config.DevPodContextFeatureFolder), "not allowed"},
+		"through a symlink":    {workspaceMount, "link/" + config.DevPodContextFeatureFolder, "outside of the workspace folder"},
+		"missing":              {workspaceMount, "missing/" + config.DevPodContextFeatureFolder, "build folder"},
+		"of another mount":     {otherMount, config.DevPodContextFeatureFolder, "not the workspace mount"},
+		"of an unknown mount":  {&config.Mount{Type: "bind", Source: outside, Target: "/outside"}, config.DevPodContextFeatureFolder, "not allowed"},
+		"file instead of dir":  {workspaceMount, config.DevPodContextFeatureFolder + "/Dockerfile/" + config.DevPodContextFeatureFolder, "build folder"},
+		"workspace mount root": {workspaceMount, ".", "not allowed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := streamBuildFolder(server, test.mount, test.subPath)
+			assert.ErrorContains(t, err, test.err)
+		})
+	}
+
+	// and the allowed one, as a check of the test itself
+	entries, err := streamBuildFolder(server, workspaceMount, config.DevPodContextFeatureFolder)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []string{"Dockerfile"}, entries)
+}
