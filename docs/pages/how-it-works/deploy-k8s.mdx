@@ -82,19 +82,24 @@ devpod provider set-options kubernetes -o CREATE_NAMESPACE=false -o KUBERNETES_N
 
 ### Architecture
 
-DevPod builds the workspace's image for the architecture of the nodes its pod can be scheduled on: nodes that are
-ready and not cordoned, match the pod's node selector (`NODE_SELECTOR` and the `POD_MANIFEST_TEMPLATE`'s) and
+DevPod looks for a prebuilt image of the workspace for the architecture of the nodes its pod can be scheduled on:
+nodes that are ready and not cordoned, match the pod's node selector (`NODE_SELECTOR` and the `POD_MANIFEST_TEMPLATE`'s) and
 required node affinity, and have no `NoSchedule` or `NoExecute` taint the pod doesn't tolerate. If the pod template
-names a node with `spec.nodeName`, it's that node's architecture. It then pins the pod to that architecture with a
-`kubernetes.io/arch` node selector, also when the workspace restarts. If those nodes have different architectures, or
+names a node with `spec.nodeName`, it's that node's architecture. If those nodes have different architectures, or
 you can't list the cluster's nodes, choose one, either with `ARCHITECTURE` or with a node selector, which also
-restricts the nodes (not both with different architectures). To change the architecture of an existing workspace,
-rebuild it with `devpod up --recreate`:
+restricts the nodes (not both with different architectures):
 
 ```bash
 devpod provider set-options kubernetes -o ARCHITECTURE=amd64
 devpod provider set-options kubernetes -o NODE_SELECTOR=kubernetes.io/arch=arm64
 ```
+
+A workspace stays on nodes of one architecture. Its pod gets a `kubernetes.io/arch` node selector for the
+architecture of the prebuilt image DevPod found for it, or else for `ARCHITECTURE`, unless you set that node selector
+yourself. Without either, the pod runs on any node it can be scheduled on, where DevPod builds the image, and the
+workspace keeps the architecture of that node. DevPod keeps the architecture with the workspace, on its persistent
+volume claim, so a restart doesn't move the workspace to a node of another architecture, whatever the nodes and
+options are then. To change the architecture of an existing workspace, rebuild it with `devpod up --recreate`.
 
 ### Stopped and dead pods
 

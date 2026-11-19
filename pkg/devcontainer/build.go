@@ -265,14 +265,8 @@ func (r *runner) buildImage(
 			return nil, fmt.Errorf("cannot build devcontainer because driver is non-docker and dockerless fallback is disabled")
 		}
 
-		result, err := dockerlessFallback(r.LocalWorkspaceFolder, substitutionContext.ContainerWorkspaceFolder, parsedConfig, buildInfo, extendedBuildInfo, dockerfileContent, options)
-		if err != nil {
-			return nil, err
-		}
-
-		// the image is built in the container, so the driver must run it on a node of the architecture it's built for
-		result.Architecture = targetArch
-		return result, nil
+		// the image is built in the container, for the architecture of the node it runs on
+		return dockerlessFallback(r.LocalWorkspaceFolder, substitutionContext.ContainerWorkspaceFolder, parsedConfig, buildInfo, extendedBuildInfo, dockerfileContent, options)
 	}
 
 	return dockerDriver.BuildDevContainer(ctx, prebuildHash, parsedConfig, extendedBuildInfo, dockerfilePath, dockerfileContent, r.LocalWorkspaceFolder, options)

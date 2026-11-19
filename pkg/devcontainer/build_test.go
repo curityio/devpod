@@ -59,14 +59,9 @@ func TestRunOptionsArchitecture(t *testing.T) {
 		ImageMetadata: &config.ImageMetadataConfig{},
 		ImageName:     "registry.example.com/ws:prebuild",
 		Architecture:  "arm64",
-		Dockerless:    &config.BuildInfoDockerless{},
 	}
 
 	options, err := r.getRunOptions(mergedConfig, substitutionContext, buildInfo)
-	assert.NilError(t, err)
-	assert.Equal(t, options.Architecture, "arm64")
-
-	options, err = r.getDockerlessRunOptions(mergedConfig, substitutionContext, buildInfo)
 	assert.NilError(t, err)
 	assert.Equal(t, options.Architecture, "arm64")
 }

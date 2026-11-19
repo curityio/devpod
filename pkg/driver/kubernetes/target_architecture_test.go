@@ -60,12 +60,7 @@ func nodesDriver(t *testing.T, nodes ...corev1.Node) (*KubernetesDriver, func() 
 		if path == nodesPath {
 			return http.StatusOK, corev1.NodeList{Items: nodes}
 		}
-		for _, node := range nodes {
-			if path == nodesPath+"/"+node.Name {
-				return http.StatusOK, node
-			}
-		}
-		return http.StatusNotFound, kerrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, strings.TrimPrefix(path, nodesPath+"/")).ErrStatus
+		return http.StatusNotFound, nil
 	})
 }
 
@@ -115,6 +110,27 @@ func TestTargetArchitecture(t *testing.T) {
 			want:  "amd64",
 		},
 		{
+			// the scheduler treats a cordoned node as tainted, and this pod tolerates every taint
+			name:     "counts cordoned nodes the pod template tolerates",
+			nodes:    []corev1.Node{testNode("old-0", "arm64", cordoned), workspace},
+			template: "spec:\n  tolerations:\n  - operator: Exists\n",
+			wantErr:  "amd64 (workspace-0), arm64 (old-0)",
+		},
+		{
+			name: "ignores nodes that don't tell their architecture",
+			nodes: []corev1.Node{testNode("new-0", "", func(n *corev1.Node) {
+				delete(n.Labels, corev1.LabelArchStable)
+			}), workspace},
+			want: "amd64",
+		},
+		{
+			name: "uses the architecture the kubelet reports for a node without the architecture label",
+			nodes: []corev1.Node{testNode("new-0", "arm64", func(n *corev1.Node) {
+				delete(n.Labels, corev1.LabelArchStable)
+			})},
+			want: "arm64",
+		},
+		{
 			name:         "ignores nodes the NODE_SELECTOR option doesn't match",
 			nodes:        []corev1.Node{testNode("arm-0", "arm64"), workspace},
 			nodeSelector: "agentpool=workspace",
@@ -152,7 +168,7 @@ func TestTargetArchitecture(t *testing.T) {
 			name:     "node the pod template names doesn't exist",
 			nodes:    []corev1.Node{workspace},
 			template: "spec:\n  nodeName: gone-0\n",
-			wantErr:  "get node 'gone-0' of the pod template",
+			wantErr:  "find the node of the pod template: node 'gone-0' doesn't exist",
 		},
 		{
 			name:         "uses the node selector's architecture",
@@ -217,82 +233,84 @@ func TestTargetArchitectureConflict(t *testing.T) {
 	assert.ErrorContains(t, err, "the node selector kubernetes.io/arch=arm64 conflicts with the ARCHITECTURE provider option amd64")
 }
 
+func TestTargetArchitectureUnknown(t *testing.T) {
+	driver, _ := nodesDriver(t, testNode("workspace-0", "amd64"))
+	driver.options.Architecture = "x86_64"
+	_, err := driver.TargetArchitecture(context.Background(), "ws")
+	assert.ErrorContains(t, err, "the ARCHITECTURE provider option x86_64 isn't an architecture of Kubernetes nodes")
+
+	driver.options.Architecture = ""
+	driver.options.NodeSelector = corev1.LabelArchStable + "=aarch64"
+	_, err = driver.TargetArchitecture(context.Background(), "ws")
+	assert.ErrorContains(t, err, "the node selector kubernetes.io/arch=aarch64 doesn't name an architecture of Kubernetes nodes")
+}
+
 func TestPodArchitecture(t *testing.T) {
-	mixed := []corev1.Node{testNode("arm-0", "arm64"), testNode("workspace-0", "amd64")}
 	armSelector := map[string]string{corev1.LabelArchStable: "arm64"}
 
 	tests := []struct {
-		name         string
-		nodes        []corev1.Node
-		architecture string
-		nodeSelector map[string]string
-		imageArch    string
-		want         string
-		wantErr      string
+		name          string
+		architecture  string
+		nodeSelector  map[string]string
+		workspaceArch string
+		want          string
+		wantErr       string
 	}{
 		{
-			name:      "pins to the image's architecture",
-			nodes:     []corev1.Node{testNode("arm-0", "arm64")},
-			imageArch: "amd64",
-			want:      "amd64",
+			name:          "pins to the workspace's architecture",
+			workspaceArch: "amd64",
+			want:          "amd64",
 		},
 		{
 			// the image of a workspace built before ARCHITECTURE changed only runs on its own architecture
-			name:         "pins to the image's architecture over the ARCHITECTURE option",
-			nodes:        mixed,
-			architecture: "arm64",
-			imageArch:    "amd64",
-			want:         "amd64",
+			name:          "pins to the workspace's architecture over the ARCHITECTURE option",
+			architecture:  "arm64",
+			workspaceArch: "amd64",
+			want:          "amd64",
 		},
 		{
 			name:         "pins to the ARCHITECTURE option",
-			nodes:        mixed,
 			architecture: "amd64",
 			want:         "amd64",
 		},
 		{
-			name:  "pins to the detected architecture",
-			nodes: []corev1.Node{testNode("system-0", "arm64", tainted(criticalAddonsOnly)), testNode("workspace-0", "amd64")},
-			want:  "amd64",
+			// the pod can run on any node, and the workspace keeps the architecture of the one it runs on
+			name: "doesn't pin when the architecture isn't known",
+			want: "",
 		},
 		{
-			name:  "doesn't pin when the architecture can't be detected",
-			nodes: mixed,
-			want:  "",
-		},
-		{
-			name:         "keeps the user's node selector",
-			nodes:        mixed,
-			nodeSelector: armSelector,
-			imageArch:    "arm64",
-			want:         "",
+			name:          "keeps the user's node selector",
+			nodeSelector:  armSelector,
+			workspaceArch: "arm64",
+			want:          "",
 		},
 		{
 			name:         "node selector conflicts with the ARCHITECTURE option",
-			nodes:        mixed,
 			architecture: "amd64",
 			nodeSelector: armSelector,
 			wantErr:      "conflicts with the ARCHITECTURE provider option amd64",
 		},
 		{
-			name:         "node selector conflicts with the image's architecture",
-			nodes:        mixed,
-			nodeSelector: armSelector,
-			imageArch:    "amd64",
-			wantErr:      "the workspace's image was built for amd64, but the node selector kubernetes.io/arch=arm64",
+			name:          "node selector conflicts with the workspace's architecture",
+			nodeSelector:  armSelector,
+			workspaceArch: "amd64",
+			wantErr:       "the workspace was built for amd64, but the node selector kubernetes.io/arch=arm64",
+		},
+		{
+			name:         "ARCHITECTURE option that no node can have",
+			architecture: "x86_64",
+			wantErr:      "the ARCHITECTURE provider option x86_64 isn't an architecture of Kubernetes nodes",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			driver, _ := nodesDriver(t, tt.nodes...)
+			// podArchitecture must not need the nodes
+			driver, requests := nodesDriver(t)
 			driver.options.Architecture = tt.architecture
-			nodeSelector := tt.nodeSelector
-			if nodeSelector == nil {
-				nodeSelector = map[string]string{}
-			}
 
-			arch, err := driver.podArchitecture(context.Background(), &corev1.Pod{}, nodeSelector, tt.imageArch)
+			arch, err := driver.podArchitecture(tt.nodeSelector, tt.workspaceArch)
+			assert.Equal(t, len(requests()), 0)
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 				return

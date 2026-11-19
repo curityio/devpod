@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 )
@@ -173,6 +174,20 @@ func (r *Resource[T, PT]) Create(ctx context.Context, obj *T, opts metav1.Create
 		Resource(r.resource).
 		VersionedParams(&opts, ParameterCodec).
 		Body(PT(obj)).
+		Do(ctx).
+		Into(result)
+	return result, err
+}
+
+// Patch applies a patch of the given type to the named object and returns the server's representation of it.
+func (r *Resource[T, PT]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions) (*T, error) {
+	result := PT(new(T))
+	err := r.client.Patch(pt).
+		NamespaceIfScoped(r.namespace, r.namespace != "").
+		Resource(r.resource).
+		Name(name).
+		VersionedParams(&opts, ParameterCodec).
+		Body(data).
 		Do(ctx).
 		Into(result)
 	return result, err
