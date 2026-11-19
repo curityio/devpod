@@ -44,7 +44,8 @@ func KeepNewer() Option {
 }
 
 // Skip makes Extract leave out the entries of the archive for which skip returns true. It gets
-// the path an entry is extracted to, and is called before anything of the entry is created.
+// the path an entry is extracted to, with the separators of the operating system, and is called
+// before anything of the entry is created.
 func Skip(skip func(name string) bool) Option {
 	return func(o *Options) {
 		o.Skip = skip
@@ -115,7 +116,7 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	}
 	outFileName := path.Join(destFolder, relativePath)
 	baseName := path.Dir(outFileName)
-	if options.Skip != nil && options.Skip(outFileName) {
+	if options.Skip != nil && options.Skip(filepath.Clean(outFileName)) {
 		return true, nil
 	}
 

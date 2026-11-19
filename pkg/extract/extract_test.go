@@ -281,10 +281,10 @@ func TestExtractSkip(t *testing.T) {
 	writeFileAt(t, filepath.Join(source, "kept", "file"), "host", time.Now())
 	writeFileAt(t, filepath.Join(source, "skipped", "file"), "host", time.Now())
 	writeFileAt(t, filepath.Join(source, "skipped", "sub", "file"), "host", time.Now())
-	skipped := filepath.ToSlash(filepath.Join(target, "skipped"))
+	skipped := filepath.Join(target, "skipped")
 
 	assert.NilError(t, Extract(tarOf(t, source), target, Skip(func(name string) bool {
-		return name == skipped || strings.HasPrefix(name, skipped+"/")
+		return name == skipped || strings.HasPrefix(name, skipped+string(filepath.Separator))
 	})))
 
 	assert.Equal(t, readFile(t, filepath.Join(target, "kept", "file")), "host")
