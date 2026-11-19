@@ -312,13 +312,16 @@ func UpdateRepositoryForWorkspace(
 		return
 	}
 
+	// DevPod removed these from the checkout itself when it cloned the repository
+	removed := readIgnoredFiles(workspaceDir, log)
+	extraEnv := git.GetDefaultExtraEnv(options.StrictHostKeyChecking)
+
 	log.Infof("Fetch %s to update the workspace's checkout", source.GitRepository)
 	result, err := git.FastForward(ctx, workspaceDir, git.FastForwardOptions{
 		PR:       source.GitPRReference,
 		Helper:   helper,
-		ExtraEnv: git.GetDefaultExtraEnv(options.StrictHostKeyChecking),
-		// DevPod removed these from the checkout itself when it cloned the repository
-		Removed: readIgnoredFiles(workspaceDir, log),
+		ExtraEnv: extraEnv,
+		Removed:  removed,
 	})
 	if err != nil {
 		log.Warnf("The workspace's checkout was not updated: %v. %s", err, recreateKeepsCheckoutHint)
@@ -328,18 +331,38 @@ func UpdateRepositoryForWorkspace(
 	switch result.Status {
 	case git.FastForwardUpdated:
 		log.Donef("Updated the workspace's checkout from commit %s to %s", result.From, result.To)
-		if options.GitCloneRecursiveSubmodules {
-			err = git.UpdateSubmodules(ctx, workspaceDir, helper, git.GetDefaultExtraEnv(options.StrictHostKeyChecking))
-			if err != nil {
-				log.Warnf("The submodules of the workspace's checkout were not updated: %v", err)
-			}
-		}
 	case git.FastForwardSkipped:
 		log.Warnf("The workspace's checkout was not updated because %s. %s", result.Reason, recreateKeepsCheckoutHint)
+		return
 	case git.FastForwardNotApplicable:
 		log.Infof("The workspace's checkout was not updated because %s", result.Reason)
+		return
 	case git.FastForwardUpToDate:
 		log.Info("The workspace's checkout is up to date with its remote branch")
+	}
+
+	// also when the checkout was up to date: updating the submodules can have failed the last time
+	if options.GitCloneRecursiveSubmodules {
+		updateSubmodulesForWorkspace(ctx, workspaceDir, git.SubmodulesOptions{Helper: helper, ExtraEnv: extraEnv, Removed: removed}, log)
+	}
+}
+
+// updateSubmodulesForWorkspace brings the submodules of the workspace's checkout to the commits it records, when
+// that can't lose anything in them, and otherwise warns why it didn't.
+func updateSubmodulesForWorkspace(ctx context.Context, workspaceDir string, options git.SubmodulesOptions, log log.Logger) {
+	const hint = "To update them, run `git submodule update --init --recursive` in the workspace"
+	result, err := git.UpdateSubmodules(ctx, workspaceDir, options)
+	if err != nil {
+		log.Warnf("The submodules of the workspace's checkout were not updated: %v. %s", err, hint)
+		return
+	}
+
+	switch result.Status {
+	case git.SubmodulesUpdated:
+		log.Done("Updated the submodules of the workspace's checkout")
+	case git.SubmodulesSkipped:
+		log.Warnf("The submodules of the workspace's checkout were not updated because %s. %s", result.Reason, hint)
+	case git.SubmodulesUpToDate:
 	}
 }
 

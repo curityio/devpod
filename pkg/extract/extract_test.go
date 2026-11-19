@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -216,6 +217,78 @@ func TestExtractKeepNewerFileOverFolderFails(t *testing.T) {
 
 	assert.ErrorContains(t, err, "replace")
 	assert.Equal(t, readFile(t, filepath.Join(target, "data", "file")), "container")
-	_, err = os.Stat(filepath.Join(target, "data"+partialSuffix))
+	// and nothing is left of the file that was to replace it
+	entries, err := os.ReadDir(target)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 1)
+}
+
+func TestExtractKeepNewerWritesNoExistingFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs a privilege on Windows")
+	}
+	source := t.TempDir()
+	target := t.TempDir()
+	elsewhere := filepath.Join(t.TempDir(), "elsewhere")
+	writeFileAt(t, elsewhere, "elsewhere", time.Now())
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	writeFileAt(t, filepath.Join(source, "token"), "host", time.Now())
+	writeFileAt(t, filepath.Join(target, "token"), "old", lastCopy)
+	// files of the container with names a copy could go through
+	others := []string{"token.devpod-partial", ".token.devpod-", ".token.devpod-1", "token.tmp", "token~"}
+	for _, other := range others {
+		writeFileAt(t, filepath.Join(target, other), "container", time.Now())
+	}
+	assert.NilError(t, os.Symlink(elsewhere, filepath.Join(target, ".token.devpod-link")))
+
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+
+	assert.Equal(t, readFile(t, filepath.Join(target, "token")), "host")
+	for _, other := range others {
+		assert.Equal(t, readFile(t, filepath.Join(target, other)), "container", other)
+	}
+	assert.Equal(t, readFile(t, elsewhere), "elsewhere")
+	entries, err := os.ReadDir(target)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), len(others)+2)
+}
+
+func TestExtractKeepNewerFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no such permissions")
+	}
+	source := t.TempDir()
+	target := t.TempDir()
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	writeFileAt(t, filepath.Join(source, "script"), "host", time.Now())
+	assert.NilError(t, os.Chmod(filepath.Join(source, "script"), 0o755))
+	writeFileAt(t, filepath.Join(source, "new"), "host", time.Now())
+	writeFileAt(t, filepath.Join(target, "script"), "old", lastCopy)
+
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+
+	// as for a file that is written in place
+	for file, expected := range map[string]os.FileMode{"script": 0o755, "new": 0o644} {
+		stat, err := os.Stat(filepath.Join(target, file))
+		assert.NilError(t, err)
+		assert.Equal(t, stat.Mode().Perm(), expected, file)
+	}
+}
+
+func TestExtractSkip(t *testing.T) {
+	source := t.TempDir()
+	target := t.TempDir()
+	writeFileAt(t, filepath.Join(source, "kept", "file"), "host", time.Now())
+	writeFileAt(t, filepath.Join(source, "skipped", "file"), "host", time.Now())
+	writeFileAt(t, filepath.Join(source, "skipped", "sub", "file"), "host", time.Now())
+	skipped := filepath.ToSlash(filepath.Join(target, "skipped"))
+
+	assert.NilError(t, Extract(tarOf(t, source), target, Skip(func(name string) bool {
+		return name == skipped || strings.HasPrefix(name, skipped+"/")
+	})))
+
+	assert.Equal(t, readFile(t, filepath.Join(target, "kept", "file")), "host")
+	// not even its folders are created
+	_, err := os.Stat(filepath.Join(target, "skipped"))
 	assert.Assert(t, os.IsNotExist(err))
 }

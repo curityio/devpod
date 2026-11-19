@@ -137,7 +137,7 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 			case mountRefresh:
 				logger.Infof("Copy %s into DevContainer %s again, keeping the files that were changed there since", m.Source, m.Target)
 				// the container can do without the changes of the host, as it did until now
-				err = streamMount(ctx, m, tunnelClient, logger, extract.KeepNewer())
+				err = streamMount(ctx, m, tunnelClient, logger, extract.KeepNewer(), extract.Skip(inRepository(m.Target, logger)))
 				if err != nil {
 					logger.Warnf("Could not copy %s into DevContainer %s again, it keeps the files it has that were not copied yet: %v", m.Source, m.Target, err)
 				}
@@ -275,6 +275,33 @@ func copyOfMount(options provider2.CLIOptions, holdsWork, hasFiles bool) mountCo
 		return mountRefresh
 	default:
 		return mountKeep
+	}
+}
+
+// inRepository returns a function that says whether a path below target is in a git repository that was in
+// target before the function was first called for a path in that repository's folder. So what a mount has of a
+// repository is kept as it is while the mount is copied again, and a repository it doesn't have yet is copied.
+func inRepository(target string, log log.Logger) func(name string) bool {
+	target = filepath.Clean(target)
+	// whether a folder was a repository when a path in it was first seen
+	repositories := map[string]bool{}
+	return func(name string) bool {
+		for dir := filepath.Dir(filepath.Clean(name)); ; dir = filepath.Dir(dir) {
+			repository, seen := repositories[dir]
+			if !seen {
+				repository = isRepository(dir)
+				repositories[dir] = repository
+				if repository {
+					log.Infof("Keep %s as it is: it is a git repository, which may hold work", dir)
+				}
+			}
+			if repository {
+				return true
+			}
+			if dir == target || dir == filepath.Dir(dir) {
+				return false
+			}
+		}
 	}
 }
 

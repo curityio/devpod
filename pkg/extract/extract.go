@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 type Options struct {
 	StripLevels int
 	KeepNewer   bool
+	Skip        func(name string) bool
 
 	Perm *os.FileMode
 	UID  *int
@@ -38,6 +40,14 @@ func StripLevels(levels int) Option {
 func KeepNewer() Option {
 	return func(o *Options) {
 		o.KeepNewer = true
+	}
+}
+
+// Skip makes Extract leave out the entries of the archive for which skip returns true. It gets
+// the path an entry is extracted to, and is called before anything of the entry is created.
+func Skip(skip func(name string) bool) Option {
+	return func(o *Options) {
+		o.Skip = skip
 	}
 }
 
@@ -105,6 +115,9 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	}
 	outFileName := path.Join(destFolder, relativePath)
 	baseName := path.Dir(outFileName)
+	if options.Skip != nil && options.Skip(outFileName) {
+		return true, nil
+	}
 
 	dirPerm := os.ModePerm
 	if options.Perm != nil {
@@ -155,18 +168,22 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 		return true, nil
 	}
 
-	// Create / Override file
-	writeName := outFileName
 	if options.KeepNewer {
-		writeName = outFileName + partialSuffix
+		err := replaceFile(outFileName, tarReader, header, existing, options)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	}
-	outFile, err := os.OpenFile(writeName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
+
+	// Create / Override file
+	outFile, err := os.OpenFile(outFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
 	if err != nil {
 		// Try again after 5 seconds
 		time.Sleep(time.Second * 5)
-		outFile, err = os.OpenFile(writeName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
+		outFile, err = os.OpenFile(outFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
 		if err != nil {
-			return false, perrors.Wrapf(err, "create %s", writeName)
+			return false, perrors.Wrapf(err, "create %s", outFileName)
 		}
 	}
 	defer outFile.Close()
@@ -180,27 +197,53 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 
 	// Set permissions
 	if options.Perm == nil {
-		_ = os.Chmod(writeName, header.FileInfo().Mode()|0600)
+		_ = os.Chmod(outFileName, header.FileInfo().Mode()|0600)
 	}
 
 	// Set mod time from tar header
-	_ = os.Chtimes(writeName, time.Now(), header.FileInfo().ModTime())
-
-	if writeName != outFileName {
-		if existing != nil && existing.Mode().IsRegular() {
-			chownLike(writeName, existing)
-		}
-		if err := os.Rename(writeName, outFileName); err != nil {
-			_ = os.Remove(writeName)
-			return false, perrors.Wrapf(err, "replace %s", outFileName)
-		}
-	}
+	_ = os.Chtimes(outFileName, time.Now(), header.FileInfo().ModTime())
 
 	return true, nil
 }
 
-// partialSuffix ends the name of a file that is being written, before it replaces the file.
-const partialSuffix = ".devpod-partial"
+// replaceFile writes the file of the archive to a new file next to name, and renames that to
+// name once it is complete, so that name never is a part of the file. The new file has a name
+// that nothing else has and is created by this call, so nothing that is there is written to,
+// or written through if it is a link. It gets the owner of existing, the file it replaces.
+func replaceFile(name string, content io.Reader, header *tar.Header, existing os.FileInfo, options *Options) (err error) {
+	newFile, err := os.CreateTemp(filepath.Dir(name), "."+filepath.Base(name)+".devpod-*")
+	if err != nil {
+		return perrors.Wrapf(err, "create a file to replace %s", name)
+	}
+	defer func() {
+		_ = newFile.Close()
+		if err != nil {
+			_ = os.Remove(newFile.Name())
+		}
+	}()
+
+	if _, err := io.Copy(newFile, content); err != nil {
+		return perrors.Wrapf(err, "io copy tar reader %s", name)
+	}
+	if err := newFile.Close(); err != nil {
+		return perrors.Wrapf(err, "out file close %s", name)
+	}
+
+	perm := header.FileInfo().Mode().Perm() | 0600
+	if options.Perm != nil {
+		perm = *options.Perm
+	}
+	_ = os.Chmod(newFile.Name(), perm)
+	_ = os.Chtimes(newFile.Name(), time.Now(), header.FileInfo().ModTime())
+	if existing != nil && existing.Mode().IsRegular() {
+		chownLike(newFile.Name(), existing)
+	}
+
+	if err := os.Rename(newFile.Name(), name); err != nil {
+		return perrors.Wrapf(err, "replace %s", name)
+	}
+	return nil
+}
 
 // keepExisting returns whether existing, which is where an entry of the archive goes, is kept: it
 // was modified after the entry, or it is a file of the same time and size, which is taken to be

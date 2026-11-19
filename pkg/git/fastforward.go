@@ -75,7 +75,8 @@ func FastForward(ctx context.Context, dir string, options FastForwardOptions) (*
 		return gitCommandOutput(ctx, options.ExtraEnv, append(append([]string{}, baseArgs...), args...)...)
 	}
 	fetch := func(args ...string) error {
-		_, err := run(append([]string{"fetch", "--quiet"}, args...)...)
+		// the submodules are fetched when they are updated, and one may be removed from the work tree
+		_, err := run(append([]string{"fetch", "--quiet", "--no-recurse-submodules"}, args...)...)
 		return err
 	}
 	result := func(status FastForwardStatus, format string, args ...any) (*FastForwardResult, error) {
@@ -197,12 +198,14 @@ func removedBefore(dir string, removed []removedFiles) func() {
 	return func() {
 		for _, c := range cleanups {
 			if c.whole {
-				_ = os.RemoveAll(filepath.Join(dir, filepath.FromSlash(c.root)))
+				if name, ok := pathInCheckout(dir, c.root); ok {
+					_ = os.RemoveAll(name)
+				}
 				continue
 			}
 			for _, file := range c.files {
-				name := filepath.Join(dir, filepath.FromSlash(file))
-				if os.Remove(name) != nil {
+				name, ok := pathInCheckout(dir, file)
+				if !ok || os.Remove(name) != nil {
 					continue
 				}
 				// and the folders that were created for it, which fails for others
@@ -214,20 +217,24 @@ func removedBefore(dir string, removed []removedFiles) func() {
 	}
 }
 
-// UpdateSubmodules checks out the commits of the submodules that the checkout in dir records,
-// cloning the submodules it doesn't have yet.
-func UpdateSubmodules(ctx context.Context, dir, helper string, extraEnv []string) error {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return err
+// pathInCheckout returns the path of file, which is relative to the checkout in dir, if all
+// folders on the way to it are folders. The update can have replaced a folder with a symlink,
+// and what is behind a symlink is not the checkout's to remove.
+func pathInCheckout(dir, file string) (string, bool) {
+	local := filepath.FromSlash(file)
+	if !filepath.IsLocal(local) {
+		return "", false
 	}
-	args := []string{"-C", dir, "-c", "safe.directory=*"}
-	if helper != "" {
-		args = append(args, "-c", "credential.helper="+helper)
+	name := dir
+	parts := strings.Split(local, string(filepath.Separator))
+	for _, part := range parts[:len(parts)-1] {
+		name = filepath.Join(name, part)
+		stat, err := os.Lstat(name)
+		if err != nil || !stat.IsDir() {
+			return "", false
+		}
 	}
-	args = append(args, "submodule", "update", "--quiet", "--init", "--recursive")
-	_, err = gitCommandOutput(ctx, extraEnv, args...)
-	return err
+	return filepath.Join(name, parts[len(parts)-1]), true
 }
 
 // aheadBehind returns how many commits head has that target lacks, and the other way round.
@@ -260,15 +267,7 @@ func changedFiles(run func(args ...string) (string, error), removedOnPurpose []s
 		return nil, nil, err
 	}
 
-	roots := make([]string, 0, len(removedOnPurpose))
-	for _, p := range removedOnPurpose {
-		p = path.Clean(filepath.ToSlash(p))
-		if p == "." || p == ".." || strings.HasPrefix(p, "../") || path.IsAbs(p) {
-			continue
-		}
-		roots = append(roots, p)
-	}
-
+	roots := removedRoots(removedOnPurpose)
 	byRoot := map[string]int{}
 	// with -z the output is a status and a path, each ended by a NUL
 	fields := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
@@ -276,12 +275,7 @@ func changedFiles(run func(args ...string) (string, error), removedOnPurpose []s
 		status, file := fields[i], fields[i+1]
 		root := ""
 		if status == "D" {
-			for _, r := range roots {
-				if file == r || strings.HasPrefix(file, r+"/") {
-					root = r
-					break
-				}
-			}
+			root = rootOf(file, roots)
 		}
 		if root == "" {
 			changed = append(changed, file)
@@ -296,6 +290,30 @@ func changedFiles(run func(args ...string) (string, error), removedOnPurpose []s
 		removed[index].files = append(removed[index].files, file)
 	}
 	return changed, removed, nil
+}
+
+// removedRoots returns the paths that were removed on purpose as clean paths with slashes,
+// without those that are not below the checkout.
+func removedRoots(removedOnPurpose []string) []string {
+	roots := make([]string, 0, len(removedOnPurpose))
+	for _, p := range removedOnPurpose {
+		p = path.Clean(filepath.ToSlash(p))
+		if p == "." || p == ".." || strings.HasPrefix(p, "../") || path.IsAbs(p) {
+			continue
+		}
+		roots = append(roots, p)
+	}
+	return roots
+}
+
+// rootOf returns the root that file is, or is below, and an empty string if there is none.
+func rootOf(file string, roots []string) string {
+	for _, r := range roots {
+		if file == r || strings.HasPrefix(file, r+"/") {
+			return r
+		}
+	}
+	return ""
 }
 
 func abbreviate(run func(args ...string) (string, error), commit string) string {

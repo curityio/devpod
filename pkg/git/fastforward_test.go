@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -354,30 +355,72 @@ func TestFastForwardFailsOutsideRepository(t *testing.T) {
 	assert.ErrorContains(t, err, "git rev-parse")
 }
 
-func TestUpdateSubmodules(t *testing.T) {
+func TestFastForwardCleanupStaysInCheckout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs a privilege on Windows")
+	}
 	isolateGit(t)
-	// git doesn't clone a submodule from a local path by default
-	t.Setenv("GIT_CONFIG_COUNT", "1")
-	t.Setenv("GIT_CONFIG_KEY_0", "protocol.file.allow")
-	t.Setenv("GIT_CONFIG_VALUE_0", "always")
 	root := t.TempDir()
-	library := filepath.Join(root, "library")
 	remote := filepath.Join(root, "remote")
 	checkout := filepath.Join(root, "checkout")
-	newRepository(t, library)
+	outside := filepath.Join(root, "outside")
+	writeRepoFiles(t, outside, "file", "whole/file")
 	newRepository(t, remote)
+	writeRepoFiles(t, remote, "data/sub/file", "data/notes", "gone/whole/file")
+	commitAll(t, remote, "add data")
 	runGit(t, root, "clone", "-q", remote, checkout)
 
-	runGit(t, remote, "submodule", "--quiet", "add", library, "lib")
-	commitAll(t, remote, "add submodule")
+	// what .devpodignore removed, besides a file the user has again
+	assert.NilError(t, os.RemoveAll(filepath.Join(checkout, "data")))
+	assert.NilError(t, os.RemoveAll(filepath.Join(checkout, "gone")))
+	runGit(t, checkout, "checkout", "-q", "--", "data/notes")
 
-	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	// the remote branch replaces folders on the way to removed files with links out of the checkout
+	runGit(t, remote, "rm", "-q", "-r", "data/sub", "gone")
+	assert.NilError(t, os.Symlink(outside, filepath.Join(remote, "data", "sub")))
+	assert.NilError(t, os.Symlink(outside, filepath.Join(remote, "gone")))
+	commitAll(t, remote, "links")
+
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{Removed: []string{"data", "gone/whole"}})
 	assert.NilError(t, err)
 	assert.Equal(t, result.Status, FastForwardUpdated)
-	_, err = os.Stat(filepath.Join(checkout, "lib", "README.md"))
-	assert.Assert(t, os.IsNotExist(err))
 
-	assert.NilError(t, UpdateSubmodules(context.Background(), checkout, "", nil))
-	_, err = os.Stat(filepath.Join(checkout, "lib", "README.md"))
-	assert.NilError(t, err)
+	for _, file := range []string{"file", "whole/file"} {
+		_, err = os.Stat(filepath.Join(outside, filepath.FromSlash(file)))
+		assert.NilError(t, err, file)
+	}
+}
+
+func TestPathInCheckout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs a privilege on Windows")
+	}
+	dir := t.TempDir()
+	outside := t.TempDir()
+	writeRepoFiles(t, dir, "a/b/file", "top")
+	writeRepoFiles(t, outside, "file")
+	assert.NilError(t, os.Symlink(outside, filepath.Join(dir, "a", "link")))
+	assert.NilError(t, os.Symlink(outside, filepath.Join(dir, "toplink")))
+
+	for file, expected := range map[string]bool{
+		"top":         true,
+		"a/b/file":    true,
+		"a/b/missing": true,
+		// the link itself is the checkout's
+		"a/link":          true,
+		"toplink":         true,
+		"a/link/file":     false,
+		"toplink/file":    false,
+		"a/missing/file":  false,
+		"top/file":        false,
+		"../outside":      false,
+		"a/../../outside": false,
+		filepath.ToSlash(filepath.Join(outside, "file")): false,
+	} {
+		name, ok := pathInCheckout(dir, file)
+		assert.Equal(t, ok, expected, file)
+		if ok {
+			assert.Equal(t, name, filepath.Join(dir, filepath.FromSlash(file)), file)
+		}
+	}
 }

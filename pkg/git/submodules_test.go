@@ -1,0 +1,200 @@
+package git
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"gotest.tools/assert"
+	"gotest.tools/assert/cmp"
+)
+
+// newRemoteWithSubmodules creates a repository with the submodules at the given paths, which
+// are all of the same library repository, and a clone of it with its submodules.
+func newRemoteWithSubmodules(t *testing.T, paths ...string) (library, remote, checkout string) {
+	t.Helper()
+	isolateGit(t)
+	// git doesn't clone a submodule from a local path by default
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "protocol.file.allow")
+	t.Setenv("GIT_CONFIG_VALUE_0", "always")
+	root := t.TempDir()
+	library = filepath.Join(root, "library")
+	remote = filepath.Join(root, "remote")
+	checkout = filepath.Join(root, "checkout")
+	newRepository(t, library)
+	newRepository(t, remote)
+	for _, p := range paths {
+		runGit(t, remote, "submodule", "--quiet", "add", library, p)
+	}
+	if len(paths) > 0 {
+		commitAll(t, remote, "add submodules")
+	}
+	runGit(t, root, "clone", "-q", "--recurse-submodules", remote, checkout)
+	return library, remote, checkout
+}
+
+// moveSubmodule makes the remote record a new commit of the library for the submodule at path.
+func moveSubmodule(t *testing.T, library, remote, path string) string {
+	t.Helper()
+	writeRepoFiles(t, library, "new-"+filepath.Base(path)+".txt")
+	commitAll(t, library, "library commit")
+	runGit(t, filepath.Join(remote, filepath.FromSlash(path)), "pull", "-q", "origin", "main")
+	commitAll(t, remote, "move "+path)
+	return head(t, library)
+}
+
+func updateSubmodules(t *testing.T, checkout string, removed ...string) *SubmodulesResult {
+	t.Helper()
+	result, err := UpdateSubmodules(context.Background(), checkout, SubmodulesOptions{Removed: removed})
+	assert.NilError(t, err)
+	return result
+}
+
+func TestUpdateSubmodules(t *testing.T) {
+	library, remote, checkout := newRemoteWithSubmodules(t, "lib", "with space/lib (copy)")
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpToDate)
+
+	// the remote moves a submodule and adds another
+	commit := moveSubmodule(t, library, remote, "lib")
+	runGit(t, remote, "submodule", "--quiet", "add", library, "added")
+	commitAll(t, remote, "add submodule")
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpdated)
+	_, err = os.Stat(filepath.Join(checkout, "added", "README.md"))
+	assert.Assert(t, os.IsNotExist(err))
+
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpdated)
+
+	assert.Equal(t, head(t, filepath.Join(checkout, "lib")), commit)
+	_, err = os.Stat(filepath.Join(checkout, "added", "README.md"))
+	assert.NilError(t, err)
+	assert.Equal(t, gitOutput(t, checkout, "status", "--porcelain"), "")
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpToDate)
+}
+
+func TestUpdateSubmodulesAfterFailedUpdate(t *testing.T) {
+	library, remote, checkout := newRemoteWithSubmodules(t, "lib", "other")
+	commit := moveSubmodule(t, library, remote, "lib")
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpdated)
+	// the update of the submodules failed then: one stayed at its commit, and one is not there
+	runGit(t, checkout, "submodule", "--quiet", "deinit", "-f", "other")
+
+	// the next time the checkout has nothing new
+	result, err = FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpToDate)
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpdated)
+
+	assert.Equal(t, head(t, filepath.Join(checkout, "lib")), commit)
+	_, err = os.Stat(filepath.Join(checkout, "other", "README.md"))
+	assert.NilError(t, err)
+}
+
+func TestUpdateSubmodulesKeepsWork(t *testing.T) {
+	for name, test := range map[string]struct {
+		work   func(t *testing.T, submodule string)
+		reason string
+	}{
+		"commit on a branch": {
+			work: func(t *testing.T, submodule string) {
+				runGit(t, submodule, "checkout", "-q", "-b", "work")
+				writeRepoFiles(t, submodule, "work.txt")
+				commitAll(t, submodule, "work")
+			},
+			reason: "submodule lib has a branch checked out",
+		},
+		"change that is not committed": {
+			work: func(t *testing.T, submodule string) {
+				writeRepoFiles(t, submodule, "work.txt")
+				commitAll(t, submodule, "work")
+				assert.NilError(t, os.WriteFile(filepath.Join(submodule, "README.md"), []byte("work\n"), 0o644))
+			},
+			reason: "submodule lib has changes that are not committed",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, checkout := newRemoteWithSubmodules(t, "lib", "other")
+			submodule := filepath.Join(checkout, "lib")
+			test.work(t, submodule)
+			before := head(t, submodule)
+			runGit(t, checkout, "submodule", "--quiet", "deinit", "-f", "other")
+
+			// the checkout has nothing new, so it can't tell work from an update that failed
+			result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+			assert.NilError(t, err)
+			assert.Equal(t, result.Status, FastForwardUpToDate)
+			submodules := updateSubmodules(t, checkout)
+
+			assert.Equal(t, submodules.Status, SubmodulesSkipped)
+			assert.Assert(t, cmp.Contains(submodules.Reason, test.reason))
+			assert.Equal(t, head(t, submodule), before)
+			content, err := os.ReadFile(filepath.Join(submodule, "work.txt"))
+			assert.NilError(t, err)
+			assert.Equal(t, string(content), "work.txt\n")
+			// none is updated, so that the result is all or nothing
+			_, err = os.Stat(filepath.Join(checkout, "other", "README.md"))
+			assert.Assert(t, os.IsNotExist(err))
+		})
+	}
+}
+
+func TestFastForwardSkipsCheckoutWithChangedSubmodule(t *testing.T) {
+	library, remote, checkout := newRemoteWithSubmodules(t, "lib")
+	submodule := filepath.Join(checkout, "lib")
+	runGit(t, submodule, "checkout", "-q", "-b", "work")
+	writeRepoFiles(t, submodule, "work.txt")
+	commitAll(t, submodule, "work")
+	before := head(t, checkout)
+	moveSubmodule(t, library, remote, "lib")
+
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardSkipped)
+	assert.Assert(t, cmp.Contains(result.Reason, "e.g. to lib"))
+	assert.Equal(t, head(t, checkout), before)
+}
+
+func TestUpdateSubmodulesKeepsBranchAtRecordedCommit(t *testing.T) {
+	_, _, checkout := newRemoteWithSubmodules(t, "lib")
+	// a branch at the commit that is recorded is no difference
+	runGit(t, filepath.Join(checkout, "lib"), "checkout", "-q", "-b", "work")
+
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpToDate)
+	assert.Equal(t, gitOutput(t, filepath.Join(checkout, "lib"), "symbolic-ref", "--short", "HEAD"), "work")
+}
+
+func TestUpdateSubmodulesLeavesRemovedPaths(t *testing.T) {
+	library, remote, checkout := newRemoteWithSubmodules(t, "lib", "vendor/lib", "vendor/other")
+	// what .devpodignore does to a clone
+	removed := []string{"vendor/lib", "missing"}
+	assert.NilError(t, os.RemoveAll(filepath.Join(checkout, "vendor", "lib")))
+
+	// nothing to do for the submodules that are left
+	assert.Equal(t, updateSubmodules(t, checkout, removed...).Status, SubmodulesUpToDate)
+	_, err := os.Stat(filepath.Join(checkout, "vendor", "lib"))
+	assert.Assert(t, os.IsNotExist(err))
+
+	commit := moveSubmodule(t, library, remote, "vendor/other")
+	moveSubmodule(t, library, remote, "vendor/lib")
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{Removed: removed})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpdated)
+
+	assert.Equal(t, updateSubmodules(t, checkout, removed...).Status, SubmodulesUpdated)
+
+	assert.Equal(t, head(t, filepath.Join(checkout, "vendor", "other")), commit)
+	_, err = os.Stat(filepath.Join(checkout, "vendor", "lib", "README.md"))
+	assert.Assert(t, os.IsNotExist(err))
+}
+
+func TestUpdateSubmodulesWithoutSubmodules(t *testing.T) {
+	_, _, checkout := newRemoteWithSubmodules(t)
+
+	assert.Equal(t, updateSubmodules(t, checkout).Status, SubmodulesUpToDate)
+}

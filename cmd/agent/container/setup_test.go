@@ -272,3 +272,88 @@ func TestWarnIfWorkspaceFolderDiffers(t *testing.T) {
 	assert.Assert(t, cmp.Contains(warning, "git pull"))
 	assert.Assert(t, cmp.Contains(warning, "--reset"))
 }
+
+func TestStreamMountKeepsNestedRepositories(t *testing.T) {
+	_, mount, client := newHost(t)
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	// the host pulled a repository since the mount was copied, and cloned another
+	for _, file := range []string{
+		"notes.txt",
+		"projects/app/.git/HEAD",
+		"projects/app/.git/refs/heads/main",
+		"projects/app/src/main.go",
+		"projects/app/src/added.go",
+		"projects/new/.git/HEAD",
+		"projects/new/main.go",
+		"projects/plain/file",
+	} {
+		writeFile(t, filepath.Join(mount.Source, filepath.FromSlash(file)), "host")
+	}
+	// the container has the repository as it was copied, with work in it
+	for _, file := range []string{
+		"notes.txt",
+		"projects/app/.git/HEAD",
+		"projects/app/.git/refs/heads/main",
+		"projects/app/src/main.go",
+		"projects/plain/file",
+	} {
+		name := filepath.Join(mount.Target, filepath.FromSlash(file))
+		writeFile(t, name, "old")
+		assert.NilError(t, os.Chtimes(name, lastCopy, lastCopy))
+	}
+	writeFile(t, filepath.Join(mount.Target, "projects", "app", "src", "work.go"), "container")
+	logs := &bytes.Buffer{}
+	logger := log.NewStreamLogger(logs, logs, logrus.InfoLevel)
+
+	err := streamMount(context.Background(), mount, client, logger, extract.KeepNewer(), extract.Skip(inRepository(mount.Target, logger)))
+
+	assert.NilError(t, err)
+	for file, expected := range map[string]string{
+		"notes.txt":           "host",
+		"projects/plain/file": "host",
+		// no file of the repository is replaced, in .git or not
+		"projects/app/.git/HEAD":            "old",
+		"projects/app/.git/refs/heads/main": "old",
+		"projects/app/src/main.go":          "old",
+		"projects/app/src/work.go":          "container",
+		// a repository the container doesn't have is copied whole
+		"projects/new/.git/HEAD": "host",
+		"projects/new/main.go":   "host",
+	} {
+		assert.Equal(t, readFile(t, filepath.Join(mount.Target, filepath.FromSlash(file))), expected, file)
+	}
+	// and none is added
+	_, err = os.Stat(filepath.Join(mount.Target, "projects", "app", "src", "added.go"))
+	assert.Assert(t, os.IsNotExist(err))
+	assert.Equal(t, strings.Count(logs.String(), "it is a git repository"), 1)
+	assert.Assert(t, cmp.Contains(logs.String(), filepath.Join(mount.Target, "projects", "app")))
+}
+
+func TestInRepository(t *testing.T) {
+	target := t.TempDir()
+	writeFile(t, filepath.Join(target, "repo", ".git", "HEAD"), "")
+	writeFile(t, filepath.Join(target, "repo", "deep", "nested", ".git", "HEAD"), "")
+	skip := inRepository(target, log.Discard)
+
+	for name, expected := range map[string]bool{
+		"file":                        false,
+		"repo":                        false,
+		"repo/.git":                   true,
+		"repo/.git/HEAD":              true,
+		"repo/file":                   true,
+		"repo/deep/nested/file":       true,
+		"other/file":                  false,
+		"other/deep/file":             false,
+		"other/.git":                  false,
+		"other/.git/objects/pack/idx": false,
+	} {
+		assert.Equal(t, skip(filepath.Join(target, filepath.FromSlash(name))), expected, name)
+	}
+
+	// a repository that is created while the mount is copied is not one to keep
+	writeFile(t, filepath.Join(target, "other", ".git", "HEAD"), "")
+	assert.Assert(t, !skip(filepath.Join(target, "other", "later")))
+	// one that the function hasn't seen yet is
+	writeFile(t, filepath.Join(target, "unseen", ".git", "HEAD"), "")
+	assert.Assert(t, skip(filepath.Join(target, "unseen", "file")))
+}
