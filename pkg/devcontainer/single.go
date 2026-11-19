@@ -311,6 +311,7 @@ func (r *runner) getRunOptions(
 	return &driver.RunOptions{
 		UID:            uid,
 		Image:          buildInfo.ImageName,
+		Architecture:   buildInfo.Architecture,
 		User:           user,
 		Entrypoint:     entrypoint,
 		Cmd:            cmd,

@@ -13,11 +13,12 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
 
 type request struct {
-	method, path, query, body string
+	method, path, query, body, contentType string
 }
 
 // fakeAPIServer records requests and answers them with handler.
@@ -26,7 +27,7 @@ func fakeAPIServer(t *testing.T, handler func(r request) (int, any)) (*Clientset
 	var requests []request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		req := request{method: r.Method, path: r.URL.Path, query: r.URL.RawQuery, body: string(body)}
+		req := request{method: r.Method, path: r.URL.Path, query: r.URL.RawQuery, body: string(body), contentType: r.Header.Get("Content-Type")}
 		requests = append(requests, req)
 		status, response := handler(req)
 		w.Header().Set("Content-Type", "application/json")
@@ -133,6 +134,26 @@ func TestDelete(t *testing.T) {
 	var sent metav1.DeleteOptions
 	assert.NilError(t, json.Unmarshal([]byte(req.body), &sent))
 	assert.Equal(t, *sent.GracePeriodSeconds, int64(10))
+}
+
+func TestPatch(t *testing.T) {
+	client, requests := fakeAPIServer(t, func(r request) (int, any) {
+		return http.StatusOK, corev1.PersistentVolumeClaim{
+			TypeMeta:   metav1.TypeMeta{Kind: "PersistentVolumeClaim", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "ws", Namespace: "ns", Annotations: map[string]string{"a": "b"}},
+		}
+	})
+
+	patch := `{"metadata":{"annotations":{"a":"b"}}}`
+	pvc, err := client.CoreV1().PersistentVolumeClaims("ns").Patch(context.Background(), "ws", types.MergePatchType, []byte(patch), metav1.PatchOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, pvc.Annotations["a"], "b")
+
+	req := (*requests)[0]
+	assert.Equal(t, req.method, http.MethodPatch)
+	assert.Equal(t, req.path, "/api/v1/namespaces/ns/persistentvolumeclaims/ws")
+	assert.Equal(t, req.contentType, string(types.MergePatchType))
+	assert.Equal(t, req.body, patch)
 }
 
 func TestListNodes(t *testing.T) {

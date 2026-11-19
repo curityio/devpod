@@ -101,8 +101,17 @@ func (k *KubernetesDriver) StopDevContainer(ctx context.Context, workspaceId str
 
 	workspaceId = getID(workspaceId)
 
+	// The pod is the only one that tells the architecture of a workspace that doesn't have one yet, such as one an
+	// older DevPod created, so keep it with the workspace before the pod is gone.
+	_, containerInfo, err := k.getDevContainerPvc(ctx, workspaceId)
+	if err != nil {
+		k.Log.Debugf("Can't read the run options of workspace '%s': %v", workspaceId, err)
+	} else if containerInfo != nil && containerInfo.Options != nil {
+		k.recordArchitecture(ctx, workspaceId, containerInfo.Options)
+	}
+
 	// delete pod
-	err := k.waitPodDeleted(ctx, workspaceId)
+	err = k.waitPodDeleted(ctx, workspaceId)
 	if err != nil {
 		return perrors.Wrap(err, "delete pod")
 	}

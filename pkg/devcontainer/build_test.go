@@ -3,6 +3,7 @@ package devcontainer
 import (
 	"testing"
 
+	"github.com/curityio/devpod/pkg/devcontainer/config"
 	"gotest.tools/assert"
 )
 
@@ -47,4 +48,20 @@ func TestFallbackContainerContextAndDockerfile(t *testing.T) {
 		assert.Equal(t, outContext, testCase.expectedContext, testCase.name)
 		assert.Equal(t, outDockerfile, testCase.expectedDockerfile, testCase.name)
 	}
+}
+
+func TestRunOptionsArchitecture(t *testing.T) {
+	r := &runner{ID: "ws"}
+	mergedConfig := &config.MergedDevContainerConfig{}
+	substitutionContext := &config.SubstitutionContext{WorkspaceMount: "type=bind,source=/src,target=/workspaces/ws"}
+	buildInfo := &config.BuildInfo{
+		ImageDetails:  &config.ImageDetails{},
+		ImageMetadata: &config.ImageMetadataConfig{},
+		ImageName:     "registry.example.com/ws:prebuild",
+		Architecture:  "arm64",
+	}
+
+	options, err := r.getRunOptions(mergedConfig, substitutionContext, buildInfo)
+	assert.NilError(t, err)
+	assert.Equal(t, options.Architecture, "arm64")
 }

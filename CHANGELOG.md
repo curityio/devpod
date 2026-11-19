@@ -19,6 +19,26 @@ Add new entries to the top of the "Unreleased" section.
   `arboard` used). The Linux packages and the Windows installer now register the `devpod://` scheme, and on Windows
   and Linux a link that starts DevPod Desktop is no longer ignored.
 
+### Fixed
+
+- Without the `ARCHITECTURE` option, the kubernetes provider works out the architecture to build for from the nodes
+  the workspace pod can be scheduled on, instead of every node in the cluster. It skips nodes that are cordoned, not
+  ready, don't match the pod's node selector (`NODE_SELECTOR` and the pod template's) or required node affinity, or
+  have a `NoSchedule` or `NoExecute` taint the pod doesn't tolerate, such as a tainted system node pool, and uses the
+  node a pod template names with `spec.nodeName`. A cluster with
+  arm64 system nodes and amd64 workspace nodes no longer fails with "mixed architectures in the Kubernetes cluster".
+- The kubernetes provider keeps a workspace on nodes of one architecture, so that its pod isn't scheduled on a node
+  its image doesn't run on. The pod gets a `kubernetes.io/arch` node selector for the architecture of the prebuilt
+  image DevPod found for it, or else for the `ARCHITECTURE` option. Without either, the workspace keeps the
+  architecture of the node its pod first runs on. DevPod keeps the architecture with the workspace, on its persistent
+  volume claim, so a restart doesn't depend on the nodes or options at that time. A `kubernetes.io/arch` node selector
+  you set is kept, and is also the architecture DevPod builds for; it's an error if it differs from the `ARCHITECTURE`
+  option or from the workspace's architecture. A value of either that no node can have, such as `x86_64` instead of
+  `amd64`, is an error too, instead of a pod that is never scheduled.
+- `devpod up --recreate` of a kubernetes workspace replaces the image and run options kept on its persistent volume
+  claim. Stopping and starting the workspace afterwards used to bring back the container from before the recreate.
+  DevPod now needs the permission to patch persistent volume claims in the workspace's namespace.
+
 ## v0.11.0 (2026-11-16)
 
 ### Added

@@ -8,8 +8,10 @@ import (
 	"github.com/curityio/devpod/pkg/driver"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (k *KubernetesDriver) createPersistentVolumeClaim(
@@ -117,4 +119,40 @@ func (k *KubernetesDriver) getDevContainerInformation(
 	}
 
 	return string(containerInfo), nil
+}
+
+// updateDevContainerInfo replaces the run options kept on the workspace's persistent volume claim, which is where a
+// later start of the workspace reads them from, unless they are the same.
+func (k *KubernetesDriver) updateDevContainerInfo(ctx context.Context, pvc *corev1.PersistentVolumeClaim, options *driver.RunOptions) error {
+	containerInfo, err := k.getDevContainerInformation(pvc.Name, options)
+	if err != nil {
+		return err
+	} else if containerInfo == pvc.Annotations[DevPodInfoAnnotation] {
+		return nil
+	}
+
+	k.Log.Debugf("Update the run options on persistent volume claim '%s'", pvc.Name)
+	return k.setDevContainerInfo(ctx, pvc.Name, containerInfo)
+}
+
+// setDevContainerInfo patches the dev container info annotation alone, so that it doesn't conflict with the changes
+// Kubernetes makes to the persistent volume claim.
+func (k *KubernetesDriver) setDevContainerInfo(ctx context.Context, id, containerInfo string) error {
+	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"annotations": map[string]string{DevPodInfoAnnotation: containerInfo},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = k.client.Client().CoreV1().PersistentVolumeClaims(k.namespace).Patch(ctx, id, types.MergePatchType, patch, metav1.PatchOptions{})
+	if kerrors.IsForbidden(err) {
+		return fmt.Errorf("update persistent volume claim '%s': DevPod needs the permission to patch persistent volume claims in namespace '%s': %w", id, k.namespace, err)
+	} else if err != nil {
+		return fmt.Errorf("update persistent volume claim '%s': %w", id, err)
+	}
+
+	return nil
 }

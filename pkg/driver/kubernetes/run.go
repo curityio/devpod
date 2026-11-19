@@ -77,11 +77,21 @@ func (k *KubernetesDriver) RunDevContainer(
 		}
 
 		initialize = true
-	}
-
-	// reuse driver.RunOptions from existing workspace if none provided
-	if options == nil && containerInfo != nil && containerInfo.Options != nil {
+	} else if options == nil {
+		// reuse driver.RunOptions from existing workspace if none provided
 		options = containerInfo.Options
+		if options == nil {
+			return fmt.Errorf("persistent volume claim '%s' has no run options", workspaceId)
+		}
+		// find out the architecture of a workspace that doesn't have one from its pod, before the pod is replaced
+		k.recordArchitecture(ctx, workspaceId, options)
+	} else {
+		// The workspace is being recreated: its persistent volume claim stays, so replace the run options kept
+		// on it. Otherwise the next start would run the previous image, on that image's architecture.
+		err = k.updateDevContainerInfo(ctx, pvc, options)
+		if err != nil {
+			return err
+		}
 	}
 
 	// create dev container
@@ -90,6 +100,7 @@ func (k *KubernetesDriver) RunDevContainer(
 		return err
 	}
 
+	k.recordArchitecture(ctx, workspaceId, options)
 	return nil
 }
 
@@ -117,18 +128,9 @@ func (k *KubernetesDriver) runContainer(
 		}
 	}
 
-	// read pod template
-	pod := &corev1.Pod{
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyNever,
-		},
-	}
-	if len(k.options.PodManifestTemplate) > 0 {
-		k.Log.Debugf("trying to get pod template manifest from %s", k.options.PodManifestTemplate)
-		pod, err = getPodTemplate(k.options.PodManifestTemplate)
-		if err != nil {
-			return err
-		}
+	pod, err := k.getPodTemplate()
+	if err != nil {
+		return err
 	}
 
 	// get init containers
@@ -189,6 +191,13 @@ func (k *KubernetesDriver) runContainer(
 	nodeSelector, err := getNodeSelector(pod, k.options.NodeSelector)
 	if err != nil {
 		return err
+	}
+	// run the pod on a node of the workspace's architecture, which is the one its image was built for
+	arch, err := k.podArchitecture(nodeSelector, options.Architecture)
+	if err != nil {
+		return err
+	} else if arch != "" {
+		nodeSelector[corev1.LabelArchStable] = arch
 	}
 
 	// parse resources
@@ -433,6 +442,20 @@ func getLabels(pod *corev1.Pod, rawLabels string) (map[string]string, error) {
 	return labels, nil
 }
 
+// getPodTemplate returns the POD_MANIFEST_TEMPLATE option's pod, or an empty pod if it isn't set.
+func (k *KubernetesDriver) getPodTemplate() (*corev1.Pod, error) {
+	if len(k.options.PodManifestTemplate) == 0 {
+		return &corev1.Pod{
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyNever,
+			},
+		}, nil
+	}
+
+	k.Log.Debugf("trying to get pod template manifest from %s", k.options.PodManifestTemplate)
+	return getPodTemplate(k.options.PodManifestTemplate)
+}
+
 func getNodeSelector(pod *corev1.Pod, rawNodeSelector string) (map[string]string, error) {
 	nodeSelector := map[string]string{}
 	if pod.Spec.NodeSelector != nil {
@@ -466,12 +489,18 @@ func (k *KubernetesDriver) StartDevContainer(ctx context.Context, workspaceId st
 		return fmt.Errorf("persistent volume '%s' not found", workspaceId)
 	}
 
-	return k.runContainer(
+	err = k.runContainer(
 		ctx,
 		workspaceId,
 		containerInfo.Options,
 		false,
 	)
+	if err != nil {
+		return err
+	}
+
+	k.recordArchitecture(ctx, workspaceId, containerInfo.Options)
+	return nil
 }
 
 func getID(workspaceID string) string {
