@@ -382,9 +382,9 @@ func (t *tunnelServer) StreamMount(message *tunnel.StreamMountRequest, stream tu
 }
 
 // buildFolder returns the folder that subPath names in the workspace mount, if it is a folder
-// DevPod wrote the files of an image build to. That folder is always streamed whole as part of
-// the workspace mount, so streaming it alone gives out nothing the mount doesn't. Any other
-// folder could hold files the ignore file excludes.
+// DevPod writes the files of an image build to. That folder is streamed whole as part of the
+// workspace mount, whatever the ignore file says. Any other folder could hold files the ignore
+// file excludes.
 func (t *tunnelServer) buildFolder(mount *config.Mount, subPath string) (string, error) {
 	if t.workspaceMount == nil || mount.String() != t.workspaceMount.String() {
 		return "", fmt.Errorf("folder %s of mount %s is not allowed to download, it is not the workspace mount", subPath, mount.String())

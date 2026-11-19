@@ -16,15 +16,17 @@ Add new entries to the top of the "Unreleased" section.
 
 - `devpod up --recreate` of a workspace created from a git repository brings the workspace's checkout up to date
   first, so that a `devcontainer.json` or `Dockerfile` change that was pushed is applied. It fetches the checked out
-  branch and fast-forwards to it when nothing can be lost: no changes to tracked files that are not committed, and
-  no commits that the remote branch lacks while it has new ones. Otherwise it keeps the checkout and warns why,
-  pointing to `git pull` in the workspace or `--reset`. Until now it never fetched, and built from the commit the
-  workspace was created with. A workspace created from a commit stays at it.
+  branch and fast-forwards to it when nothing can be lost: no changes to tracked files that are not committed, no
+  commits that the remote branch lacks while it has new ones, and no file git doesn't track where the remote branch
+  adds one. Otherwise it keeps the checkout and warns why, pointing to `git pull` in the workspace or `--reset`.
+  Until now it never fetched, and built from the commit the workspace was created with. A workspace created from
+  a commit or a tag stays at it.
 - On Kubernetes (and other drivers that copy folders into the container instead of mounting them),
   `devpod up --recreate` copies the `bind` mounts of `devcontainer.json` again, so that a file that changed on the
   host, such as a credentials file after a new login, reaches the container. A file the container changed after
-  the host's is kept, as are files only the container has. Until now a mount was only copied when it was created,
-  or with `--reset`. The workspace folder is still only replaced by `--reset`.
+  the host's is kept, as are files only the container has, and a mounted folder that is a git repository is not
+  copied again. Until now a mount was only copied when it was created, or with `--reset`. The workspace folder is
+  still only replaced by `--reset`.
 - The desktop app handles `devpod://` links with Tauri 2's deep-link plugin instead of a Tauri 1 plugin, and builds
   with the latest Rust again (Rust 1.100 couldn't compile the old plugin, or the Wayland clipboard library an older
   `arboard` used). The Linux packages and the Windows installer now register the `devpod://` scheme, and on Windows

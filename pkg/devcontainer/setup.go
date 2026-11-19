@@ -161,6 +161,10 @@ func (r *runner) contentCommit(ctx context.Context) string {
 		return ""
 	}
 
+	// git also finds a repository in a parent folder
+	if !git.IsTopLevel(ctx, r.LocalWorkspaceFolder) {
+		return ""
+	}
 	commit, err := git.HeadCommit(ctx, r.LocalWorkspaceFolder)
 	if err != nil {
 		r.Log.Debugf("Can't tell the commit of %s: %v", r.LocalWorkspaceFolder, err)

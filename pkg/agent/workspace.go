@@ -312,16 +312,14 @@ func UpdateRepositoryForWorkspace(
 		return
 	}
 
-	// DevPod removed these from the checkout itself
-	ignored := readIgnoredFiles(workspaceDir, log)
+	log.Infof("Fetch %s to update the workspace's checkout", source.GitRepository)
 	result, err := git.FastForward(ctx, workspaceDir, git.FastForwardOptions{
 		PR:       source.GitPRReference,
 		Helper:   helper,
 		ExtraEnv: git.GetDefaultExtraEnv(options.StrictHostKeyChecking),
-		Removed:  ignored,
+		// DevPod removed these from the checkout itself when it cloned the repository
+		Removed: readIgnoredFiles(workspaceDir, log),
 	})
-	// FastForward checks ignored files out again, and the remote branch may ignore other files now
-	defer removeIgnoredFiles(workspaceDir, log)
 	if err != nil {
 		log.Warnf("The workspace's checkout was not updated: %v. %s", err, recreateKeepsCheckoutHint)
 		return
@@ -338,6 +336,8 @@ func UpdateRepositoryForWorkspace(
 		}
 	case git.FastForwardSkipped:
 		log.Warnf("The workspace's checkout was not updated because %s. %s", result.Reason, recreateKeepsCheckoutHint)
+	case git.FastForwardNotApplicable:
+		log.Infof("The workspace's checkout was not updated because %s", result.Reason)
 	case git.FastForwardUpToDate:
 		log.Info("The workspace's checkout is up to date with its remote branch")
 	}

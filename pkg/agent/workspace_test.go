@@ -139,8 +139,52 @@ func TestUpdateRepositoryForWorkspaceIgnoredFiles(t *testing.T) {
 
 	assert.Assert(t, cmp.Contains(logs, "Updated the workspace's checkout from commit"))
 	assert.Equal(t, testGit(t, checkout, "rev-parse", "HEAD"), testGit(t, remote, "rev-parse", "HEAD"))
-	for _, ignored := range []string{"data", "other"} {
-		_, err = os.Stat(filepath.Join(checkout, ignored))
-		assert.Assert(t, os.IsNotExist(err), ignored)
+	// the ignored files don't come back
+	_, err = os.Stat(filepath.Join(checkout, "data"))
+	assert.Assert(t, os.IsNotExist(err))
+	// only cloning removes files: the workspace may use those of a folder that is ignored later
+	_, err = os.Stat(filepath.Join(checkout, "other", "big.bin"))
+	assert.NilError(t, err)
+}
+
+func TestUpdateRepositoryForWorkspaceKeepsFilesInIgnoredPaths(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t, map[string]string{
+		".devpodignore": "data\nnode_modules\n",
+		"data/big.bin":  "old\n",
+	})
+	removeIgnoredFiles(checkout, log.Discard)
+	// what the user put there since
+	writeTestFile(t, checkout, "data/notes.txt", "mine\n")
+	writeTestFile(t, checkout, "node_modules/lib/index.js", "installed\n")
+
+	// whether there is nothing to update
+	logs := updateRepository(context.Background(), &provider2.WorkspaceSource{GitRepository: remote}, checkout)
+	assert.Assert(t, cmp.Contains(logs, "up to date"))
+	// or something
+	commitTestFile(t, remote, "data/big.bin", "new\n")
+	logs = updateRepository(context.Background(), &provider2.WorkspaceSource{GitRepository: remote}, checkout)
+	assert.Assert(t, cmp.Contains(logs, "Updated the workspace's checkout from commit"))
+
+	for file, expected := range map[string]string{
+		"data/notes.txt":            "mine\n",
+		"node_modules/lib/index.js": "installed\n",
+	} {
+		content, err := os.ReadFile(filepath.Join(checkout, filepath.FromSlash(file)))
+		assert.NilError(t, err)
+		assert.Equal(t, string(content), expected)
 	}
+	_, err := os.Stat(filepath.Join(checkout, "data", "big.bin"))
+	assert.Assert(t, os.IsNotExist(err))
+}
+
+func TestUpdateRepositoryForWorkspaceOfTag(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t, nil)
+	testGit(t, checkout, "checkout", "-q", "--detach")
+	commitTestFile(t, remote, "new.txt", "new\n")
+
+	logs := updateRepository(context.Background(), &provider2.WorkspaceSource{GitRepository: remote}, checkout)
+
+	assert.Assert(t, cmp.Contains(logs, "was not updated because it has no branch checked out"))
+	// nothing the user can do about it
+	assert.Assert(t, !strings.Contains(logs, "--reset"))
 }

@@ -26,7 +26,7 @@ import (
 )
 
 func TestCopyOfMount(t *testing.T) {
-	const workspace, other = true, false
+	const holdsWork, other = true, false
 	const hasFiles, empty = true, false
 	created := provider2.CLIOptions{}
 	recreated := provider2.CLIOptions{Recreate: true}
@@ -34,26 +34,37 @@ func TestCopyOfMount(t *testing.T) {
 	reset := provider2.CLIOptions{Recreate: true, Reset: true}
 
 	for _, test := range []struct {
-		name             string
-		options          provider2.CLIOptions
-		isWorkspaceMount bool
-		hasFiles         bool
-		expected         mountCopy
+		name      string
+		options   provider2.CLIOptions
+		holdsWork bool
+		hasFiles  bool
+		expected  mountCopy
 	}{
-		{"new workspace folder", created, workspace, empty, mountReplace},
+		{"new workspace folder", created, holdsWork, empty, mountReplace},
 		{"new mount", created, other, empty, mountReplace},
-		{"restarted workspace folder", created, workspace, hasFiles, mountKeep},
+		{"restarted workspace folder", created, holdsWork, hasFiles, mountKeep},
 		{"restarted mount", created, other, hasFiles, mountKeep},
-		{"recreated workspace folder keeps the user's work", recreated, workspace, hasFiles, mountKeep},
+		{"recreated workspace folder keeps the user's work", recreated, holdsWork, hasFiles, mountKeep},
 		{"recreated mount gets the host's changes", recreated, other, hasFiles, mountRefresh},
 		{"mount added to devcontainer.json", recreated, other, empty, mountReplace},
-		{"reset workspace folder", reset, workspace, hasFiles, mountReplace},
+		{"repository added to devcontainer.json", recreated, holdsWork, empty, mountReplace},
+		{"reset workspace folder", reset, holdsWork, hasFiles, mountReplace},
 		{"reset mount", reset, other, hasFiles, mountReplace},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, copyOfMount(test.options, test.isWorkspaceMount, test.hasFiles), test.expected)
+			assert.Equal(t, copyOfMount(test.options, test.holdsWork, test.hasFiles), test.expected)
 		})
 	}
+}
+
+func TestIsRepository(t *testing.T) {
+	dir := t.TempDir()
+	assert.Assert(t, !isRepository(dir))
+	assert.Assert(t, !isRepository(filepath.Join(dir, "missing")))
+
+	// a work tree has a file instead of the folder
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: /elsewhere\n"), 0o600))
+	assert.Assert(t, isRepository(dir))
 }
 
 func TestHasFiles(t *testing.T) {

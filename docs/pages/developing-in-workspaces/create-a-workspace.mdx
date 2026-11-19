@@ -250,11 +250,13 @@ checkout as it is, and warns why, when:
 - tracked files have changes that are not committed,
 - the branch and its remote branch have diverged: the branch has commits that were not pushed, and the remote
   branch has new commits,
-- no branch is checked out, or the branch has no upstream branch,
+- the remote branch adds a file that the checkout has as a file git doesn't track, also one git ignores,
 - the remote can't be reached.
 
 Commits that were not pushed don't stop the update as long as the remote branch has nothing new, and neither do
-files git doesn't track. A workspace created from a commit (`@sha256:...`) stays at that commit.
+other files git doesn't track. Files that a `.devpodignore` file removed when the repository was cloned stay
+removed. There is nothing to update, and no warning, when the workspace was created from a commit
+(`@sha256:...`) or a tag, or when the branch that is checked out has no upstream branch.
 
 When the checkout was not updated, the workspace is recreated with the files it has. Run `git pull` in the
 workspace and recreate it again, or [reset](#resetting-a-workspace) the workspace.
@@ -268,7 +270,9 @@ DevPod copies them into the pod's volume: the workspace folder, and the folders 
 - **Bind mounts** are copied again, so that what changed on your computer reaches the container, for example a
   credentials file after you logged in again. A file that was changed in the container after the one on your
   computer is kept, for example a token the container renewed, and so are files that only the container has.
-  DevPod sends the whole folders each time, so large ones make recreating slower.
+  A mounted folder that is a git repository is not copied again, as it may hold work like the workspace folder.
+  DevPod sends the whole folders each time, so large ones make recreating slower. If copying fails, for example
+  because the folder is gone from your computer, DevPod warns and the container keeps the files it has.
 - **Volume mounts** keep their content.
 - **The workspace folder** in the pod is not changed, because it holds your work. For a git repository there are
   then two checkouts: the one on your computer that DevPod reads `devcontainer.json` from, which recreating

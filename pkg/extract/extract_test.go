@@ -140,3 +140,82 @@ func TestExtractDoesNotReplaceFolderWithLink(t *testing.T) {
 	assert.ErrorContains(t, err, "exists")
 	assert.Equal(t, readFile(t, filepath.Join(target, "data", "file")), "container")
 }
+
+func TestExtractKeepNewerSkipsUnchangedFiles(t *testing.T) {
+	source := t.TempDir()
+	target := t.TempDir()
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	// the content tells the files apart here, a copy has the same
+	writeFileAt(t, filepath.Join(source, "same-time-and-size"), "host", lastCopy)
+	writeFileAt(t, filepath.Join(target, "same-time-and-size"), "copy", lastCopy)
+	writeFileAt(t, filepath.Join(source, "other-size"), "host", lastCopy)
+	writeFileAt(t, filepath.Join(target, "other-size"), "a copy", lastCopy)
+
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+
+	assert.Equal(t, readFile(t, filepath.Join(target, "same-time-and-size")), "copy")
+	assert.Equal(t, readFile(t, filepath.Join(target, "other-size")), "host")
+}
+
+func TestExtractKeepNewerInterrupted(t *testing.T) {
+	source := t.TempDir()
+	target := t.TempDir()
+	lastCopy := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	today := time.Now().Add(-time.Hour).Truncate(time.Second)
+	content := bytes.Repeat([]byte("host"), 64*1024)
+	writeFileAt(t, filepath.Join(source, "file"), string(content), today)
+	writeFileAt(t, filepath.Join(target, "file"), "old", lastCopy)
+
+	// the stream breaks in the middle of the file
+	archive := tarOf(t, source)
+	err := Extract(bytes.NewReader(archive.Bytes()[:len(content)/2]), target, KeepNewer())
+	assert.Assert(t, err != nil)
+	// the file is whole, and not newer than the host's
+	assert.Equal(t, readFile(t, filepath.Join(target, "file")), "old")
+	stat, err := os.Stat(filepath.Join(target, "file"))
+	assert.NilError(t, err)
+	assert.Assert(t, stat.ModTime().Equal(lastCopy), "%s", stat.ModTime())
+
+	// so the next time replaces it, and leaves nothing of the first
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+	assert.Equal(t, readFile(t, filepath.Join(target, "file")), string(content))
+	entries, err := os.ReadDir(target)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 1)
+}
+
+func TestExtractKeepNewerReplacesLinkWithFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs a privilege on Windows")
+	}
+	source := t.TempDir()
+	target := t.TempDir()
+	elsewhere := filepath.Join(t.TempDir(), "elsewhere")
+	writeFileAt(t, elsewhere, "elsewhere", time.Now())
+	assert.NilError(t, os.Symlink(elsewhere, filepath.Join(target, "file")))
+	// the host's file is newer than the link
+	writeFileAt(t, filepath.Join(source, "file"), "host", time.Now().Add(time.Hour))
+
+	assert.NilError(t, Extract(tarOf(t, source), target, KeepNewer()))
+
+	assert.Equal(t, readFile(t, filepath.Join(target, "file")), "host")
+	stat, err := os.Lstat(filepath.Join(target, "file"))
+	assert.NilError(t, err)
+	assert.Assert(t, stat.Mode().IsRegular())
+	// the file is not written through the link
+	assert.Equal(t, readFile(t, elsewhere), "elsewhere")
+}
+
+func TestExtractKeepNewerFileOverFolderFails(t *testing.T) {
+	source := t.TempDir()
+	target := t.TempDir()
+	writeFileAt(t, filepath.Join(source, "data"), "host", time.Now())
+	writeFileAt(t, filepath.Join(target, "data", "file"), "container", time.Now())
+
+	err := Extract(tarOf(t, source), target, KeepNewer())
+
+	assert.ErrorContains(t, err, "replace")
+	assert.Equal(t, readFile(t, filepath.Join(target, "data", "file")), "container")
+	_, err = os.Stat(filepath.Join(target, "data"+partialSuffix))
+	assert.Assert(t, os.IsNotExist(err))
+}

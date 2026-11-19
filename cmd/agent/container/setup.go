@@ -120,18 +120,27 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 		logger.Debug("Syncing mounts... ", mounts)
 		for i, m := range mounts {
 			// the first mount is the workspace folder
-			switch copyOfMount(workspaceInfo.CLIOptions, i == 0, hasFiles(m.Target)) {
+			holdsWork := i == 0 || isRepository(m.Target)
+			switch copyOfMount(workspaceInfo.CLIOptions, holdsWork, hasFiles(m.Target)) {
 			case mountKeep:
-				logger.Debug("Skip stream mount ", m.Target, " because it's not empty")
+				if i > 0 && holdsWork && workspaceInfo.CLIOptions.Recreate {
+					logger.Infof("Keep %s as it is: it is a git repository, which may hold work. Use --reset to copy %s over it", m.Target, m.Source)
+				} else {
+					logger.Debug("Skip stream mount ", m.Target, " because it's not empty")
+				}
 			case mountReplace:
 				logger.Infof("Copy %s into DevContainer %s", m.Source, m.Target)
 				err = streamMount(ctx, m, tunnelClient, logger)
+				if err != nil {
+					return err
+				}
 			case mountRefresh:
 				logger.Infof("Copy %s into DevContainer %s again, keeping the files that were changed there since", m.Source, m.Target)
+				// the container can do without the changes of the host, as it did until now
 				err = streamMount(ctx, m, tunnelClient, logger, extract.KeepNewer())
-			}
-			if err != nil {
-				return err
+				if err != nil {
+					logger.Warnf("Could not copy %s into DevContainer %s again, it keeps the files it has that were not copied yet: %v", m.Source, m.Target, err)
+				}
 			}
 		}
 
@@ -256,16 +265,23 @@ const (
 // copyOfMount returns what to do with a bind mount. A mount without files is new. A mount with files is only
 // copied again when the workspace is reset or recreated: a bind mount is meant to show the host's files, so
 // recreating brings in what changed on the host, but not over what the container changed later, e.g. a token
-// it renewed. The workspace folder holds the user's work, so only resetting replaces its files.
-func copyOfMount(options provider2.CLIOptions, isWorkspaceMount, hasFiles bool) mountCopy {
+// it renewed. A mount that holds work, as the workspace folder and other git repositories do, is only replaced
+// by resetting: git's own files can't be mixed file by file.
+func copyOfMount(options provider2.CLIOptions, holdsWork, hasFiles bool) mountCopy {
 	switch {
 	case options.Reset, !hasFiles:
 		return mountReplace
-	case options.Recreate && !isWorkspaceMount:
+	case options.Recreate && !holdsWork:
 		return mountRefresh
 	default:
 		return mountKeep
 	}
+}
+
+// isRepository returns whether dir is the top folder of a git repository or work tree.
+func isRepository(dir string) bool {
+	_, err := os.Lstat(filepath.Join(dir, ".git"))
+	return err == nil
 }
 
 // hasFiles returns whether dir is a folder with something in it.

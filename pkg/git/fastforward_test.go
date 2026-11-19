@@ -126,7 +126,7 @@ func TestFastForwardSkipsDetachedHead(t *testing.T) {
 
 	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
 	assert.NilError(t, err)
-	assert.Equal(t, result.Status, FastForwardSkipped)
+	assert.Equal(t, result.Status, FastForwardNotApplicable)
 	assert.Assert(t, cmp.Contains(result.Reason, "no branch"))
 }
 
@@ -136,7 +136,7 @@ func TestFastForwardSkipsBranchWithoutUpstream(t *testing.T) {
 
 	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
 	assert.NilError(t, err)
-	assert.Equal(t, result.Status, FastForwardSkipped)
+	assert.Equal(t, result.Status, FastForwardNotApplicable)
 	assert.Assert(t, cmp.Contains(result.Reason, "local-only has no upstream"))
 }
 
@@ -209,28 +209,112 @@ func TestFastForwardRemovedPaths(t *testing.T) {
 	remote := filepath.Join(root, "remote")
 	checkout := filepath.Join(root, "checkout")
 	newRepository(t, remote)
-	writeRepoFiles(t, remote, "data/big.bin", "data/sub/other.bin", "single.bin")
+	writeRepoFiles(t, remote, "data/big.bin", "data/sub/other.bin", "single.bin", "partly/removed.bin", "partly/deep/removed.bin", "partly/restored.bin")
 	commitAll(t, remote, "add data")
 	runGit(t, root, "clone", "-q", remote, checkout)
 
 	// what .devpodignore does to a clone
-	removed := []string{"data/", "./single.bin", "missing", "../outside"}
+	removed := []string{"data/", "./single.bin", "partly", "missing", "../outside"}
 	assert.NilError(t, os.RemoveAll(filepath.Join(checkout, "data")))
 	assert.NilError(t, os.Remove(filepath.Join(checkout, "single.bin")))
+	assert.NilError(t, os.RemoveAll(filepath.Join(checkout, "partly")))
+	// and what the user put there since
+	writeRepoFiles(t, checkout, "partly/notes.txt")
+	runGit(t, checkout, "checkout", "-q", "--", "partly/restored.bin")
 
-	// the remote changes a removed file, which git refuses to merge into a work tree without it
-	assert.NilError(t, os.WriteFile(filepath.Join(remote, "data", "big.bin"), []byte("new\n"), 0o644))
+	// the remote changes removed files, which git creates again, and adds files next to them
+	for _, file := range []string{"data/big.bin", "single.bin", "partly/removed.bin", "partly/deep/removed.bin", "partly/restored.bin"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(remote, filepath.FromSlash(file)), []byte("new\n"), 0o644))
+	}
+	writeRepoFiles(t, remote, "data/added.bin", "partly/added.bin")
 	commitAll(t, remote, "change data")
 
 	result, err := FastForward(context.Background(), checkout, FastForwardOptions{Removed: removed})
 	assert.NilError(t, err)
 	assert.Equal(t, result.Status, FastForwardUpdated)
 	assert.Equal(t, head(t, checkout), head(t, remote))
-	// the removed paths are checked out again, for the caller to remove
-	content, err := os.ReadFile(filepath.Join(checkout, "data", "big.bin"))
+
+	// what was removed stays removed
+	for _, gone := range []string{"data", "single.bin", "partly/removed.bin", "partly/deep"} {
+		_, err = os.Stat(filepath.Join(checkout, filepath.FromSlash(gone)))
+		assert.Assert(t, os.IsNotExist(err), gone)
+	}
+	// what was there stays, with the remote's changes
+	for file, expected := range map[string]string{
+		"partly/notes.txt":    "partly/notes.txt\n",
+		"partly/restored.bin": "new\n",
+		"partly/added.bin":    "partly/added.bin\n",
+	} {
+		content, err := os.ReadFile(filepath.Join(checkout, filepath.FromSlash(file)))
+		assert.NilError(t, err)
+		assert.Equal(t, string(content), expected, file)
+	}
+}
+
+func TestFastForwardKeepsIgnoredFiles(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t)
+	writeRepoFiles(t, remote, ".gitignore")
+	assert.NilError(t, os.WriteFile(filepath.Join(remote, ".gitignore"), []byte("local.env\n"), 0o644))
+	commitAll(t, remote, "ignore local.env")
+	runGit(t, checkout, "pull", "-q")
+	before := head(t, checkout)
+	assert.NilError(t, os.WriteFile(filepath.Join(checkout, "local.env"), []byte("mine\n"), 0o644))
+
+	// the remote branch starts to track the file, which git merge replaces by default
+	assert.NilError(t, os.WriteFile(filepath.Join(remote, "local.env"), []byte("theirs\n"), 0o644))
+	runGit(t, remote, "add", "-f", "local.env")
+	commitAll(t, remote, "track local.env")
+
+	_, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.ErrorContains(t, err, "git merge")
+	assert.Equal(t, head(t, checkout), before)
+	content, err := os.ReadFile(filepath.Join(checkout, "local.env"))
 	assert.NilError(t, err)
-	assert.Equal(t, string(content), "new\n")
-	assert.Equal(t, gitOutput(t, checkout, "status", "--porcelain"), "")
+	assert.Equal(t, string(content), "mine\n")
+}
+
+func TestFastForwardLeavesParentRepositoryAlone(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t)
+	writeRepoFiles(t, remote, "remote.txt")
+	commitAll(t, remote, "remote commit")
+	before := head(t, checkout)
+	// a folder that lost its .git, in a repository that is behind its remote branch
+	content := filepath.Join(checkout, "agent", "content")
+	assert.NilError(t, os.MkdirAll(content, 0o755))
+
+	result, err := FastForward(context.Background(), content, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardNotApplicable)
+	assert.Assert(t, cmp.Contains(result.Reason, "not the top folder"))
+	assert.Equal(t, head(t, checkout), before)
+}
+
+func TestFastForwardOnlyFetchesTheBranch(t *testing.T) {
+	remote, checkout := newRemoteAndCheckout(t)
+	writeRepoFiles(t, remote, "remote.txt")
+	commitAll(t, remote, "remote commit")
+	runGit(t, remote, "branch", "other")
+
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpdated)
+	// git status in the workspace compares to the fetched commit
+	assert.Equal(t, gitOutput(t, checkout, "rev-parse", "origin/main"), head(t, remote))
+	assert.Equal(t, gitOutput(t, checkout, "branch", "-r", "--list", "origin/other"), "")
+}
+
+func TestFastForwardLocalUpstream(t *testing.T) {
+	_, checkout := newRemoteAndCheckout(t)
+	runGit(t, checkout, "checkout", "-q", "-b", "feature", "--track", "main")
+	runGit(t, checkout, "checkout", "-q", "main")
+	writeRepoFiles(t, checkout, "main.txt")
+	commitAll(t, checkout, "commit on main")
+	runGit(t, checkout, "checkout", "-q", "feature")
+
+	result, err := FastForward(context.Background(), checkout, FastForwardOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, result.Status, FastForwardUpdated)
+	assert.Equal(t, head(t, checkout), gitOutput(t, checkout, "rev-parse", "main"))
 }
 
 func TestFastForwardRemovedPathsDoNotHideOtherChanges(t *testing.T) {

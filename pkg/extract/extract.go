@@ -32,7 +32,9 @@ func StripLevels(levels int) Option {
 }
 
 // KeepNewer makes Extract keep a file, symlink or hard link that already exists and was modified
-// after the one in the archive, instead of replacing it.
+// after the one in the archive, instead of replacing it. A file it does replace is only replaced
+// once it is written completely, so that an extraction that is interrupted doesn't leave a part
+// of a file that looks newer the next time, and it keeps its owner.
 func KeepNewer() Option {
 	return func(o *Options) {
 		o.KeepNewer = true
@@ -129,8 +131,12 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 		return true, nil
 	}
 
-	if options.KeepNewer && isNewer(outFileName, header.FileInfo().ModTime()) {
-		return true, nil
+	var existing os.FileInfo
+	if options.KeepNewer {
+		existing, _ = os.Lstat(outFileName)
+		if existing != nil && keepExisting(existing, header) {
+			return true, nil
+		}
 	}
 
 	if header.Typeflag == tar.TypeSymlink {
@@ -150,13 +156,17 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	}
 
 	// Create / Override file
-	outFile, err := os.OpenFile(outFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
+	writeName := outFileName
+	if options.KeepNewer {
+		writeName = outFileName + partialSuffix
+	}
+	outFile, err := os.OpenFile(writeName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
 	if err != nil {
 		// Try again after 5 seconds
 		time.Sleep(time.Second * 5)
-		outFile, err = os.OpenFile(outFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
+		outFile, err = os.OpenFile(writeName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, filePerm)
 		if err != nil {
-			return false, perrors.Wrapf(err, "create %s", outFileName)
+			return false, perrors.Wrapf(err, "create %s", writeName)
 		}
 	}
 	defer outFile.Close()
@@ -170,19 +180,41 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 
 	// Set permissions
 	if options.Perm == nil {
-		_ = os.Chmod(outFileName, header.FileInfo().Mode()|0600)
+		_ = os.Chmod(writeName, header.FileInfo().Mode()|0600)
 	}
 
 	// Set mod time from tar header
-	_ = os.Chtimes(outFileName, time.Now(), header.FileInfo().ModTime())
+	_ = os.Chtimes(writeName, time.Now(), header.FileInfo().ModTime())
+
+	if writeName != outFileName {
+		if existing != nil && existing.Mode().IsRegular() {
+			chownLike(writeName, existing)
+		}
+		if err := os.Rename(writeName, outFileName); err != nil {
+			_ = os.Remove(writeName)
+			return false, perrors.Wrapf(err, "replace %s", outFileName)
+		}
+	}
 
 	return true, nil
 }
 
-// isNewer returns whether name exists, is not a directory, and was modified after modTime.
-func isNewer(name string, modTime time.Time) bool {
-	existing, err := os.Lstat(name)
-	return err == nil && !existing.IsDir() && existing.ModTime().After(modTime)
+// partialSuffix ends the name of a file that is being written, before it replaces the file.
+const partialSuffix = ".devpod-partial"
+
+// keepExisting returns whether existing, which is where an entry of the archive goes, is kept: it
+// was modified after the entry, or it is a file of the same time and size, which is taken to be
+// the same file. A directory is never kept, so that a file can't replace it.
+func keepExisting(existing os.FileInfo, header *tar.Header) bool {
+	if existing.IsDir() {
+		return false
+	}
+	modTime := header.FileInfo().ModTime()
+	if existing.ModTime().After(modTime) {
+		return true
+	}
+	return header.FileInfo().Mode().IsRegular() && existing.Mode().IsRegular() &&
+		existing.ModTime().Equal(modTime) && existing.Size() == header.Size
 }
 
 // replaceExisting runs create, which creates a link at name, and if something that is not a
