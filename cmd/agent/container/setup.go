@@ -118,26 +118,39 @@ func (cmd *SetupContainerCmd) Run(ctx context.Context) error {
 	if cmd.StreamMounts {
 		mounts := config.GetMounts(setupInfo)
 		logger.Debug("Syncing mounts... ", mounts)
-		for _, m := range mounts {
-			// If we are resetting the workspace and it's sources, always re stream the mounts
-			if !workspaceInfo.CLIOptions.Reset {
-				files, err := os.ReadDir(m.Target)
-				if err == nil && len(files) > 0 {
+		for i, m := range mounts {
+			// the first mount is the workspace folder
+			holdsWork := i == 0 || isRepository(m.Target)
+			switch copyOfMount(workspaceInfo.CLIOptions, holdsWork, hasFiles(m.Target)) {
+			case mountKeep:
+				if i > 0 && holdsWork && workspaceInfo.CLIOptions.Recreate {
+					logger.Infof("Keep %s as it is: it is a git repository, which may hold work. Use --reset to copy %s over it", m.Target, m.Source)
+				} else {
 					logger.Debug("Skip stream mount ", m.Target, " because it's not empty")
-					continue
+				}
+			case mountReplace:
+				logger.Infof("Copy %s into DevContainer %s", m.Source, m.Target)
+				err = streamMount(ctx, m, tunnelClient, logger)
+				if err != nil {
+					return err
+				}
+			case mountRefresh:
+				logger.Infof("Copy %s into DevContainer %s again, keeping the files that were changed there since", m.Source, m.Target)
+				// the container can do without the changes of the host, as it did until now
+				err = streamMount(ctx, m, tunnelClient, logger, extract.KeepNewer(), extract.Skip(inRepository(m.Target, logger)))
+				if err != nil {
+					logger.Warnf("Could not copy %s into DevContainer %s again, it keeps the files it has that were not copied yet: %v", m.Source, m.Target, err)
 				}
 			}
+		}
 
-			// stream mount
-			err = streamMount(ctx, workspaceInfo, m, tunnelClient, logger)
-			if err != nil {
-				return err
-			}
+		if workspaceInfo.CLIOptions.Recreate && !workspaceInfo.CLIOptions.Reset {
+			warnIfWorkspaceFolderDiffers(workspaceInfo.ContentCommit, config.GetWorkspaceMount(setupInfo).Target, logger)
 		}
 	}
 
 	// do dockerless build
-	err = dockerlessBuild(ctx, setupInfo, &workspaceInfo.Dockerless, tunnelClient, cmd.Debug, logger)
+	err = dockerlessBuild(ctx, setupInfo, workspaceInfo, tunnelClient, cmd.Debug, logger)
 	if err != nil {
 		return fmt.Errorf("dockerless build: %w", err)
 	}
@@ -235,14 +248,181 @@ func fillContainerEnv(setupInfo *config.Result) error {
 	return nil
 }
 
+// mountCopy says what the setup does with a bind mount of a container that has copies of the host's folders,
+// rather than the folders themselves.
+type mountCopy int
+
+const (
+	// mountKeep leaves the files in the container as they are.
+	mountKeep mountCopy = iota
+	// mountReplace copies the host's files over those in the container.
+	mountReplace
+	// mountRefresh copies the host's files over those in the container, except over the files that were
+	// changed in the container after the host's.
+	mountRefresh
+)
+
+// copyOfMount returns what to do with a bind mount. A mount without files is new. A mount with files is only
+// copied again when the workspace is reset or recreated: a bind mount is meant to show the host's files, so
+// recreating brings in what changed on the host, but not over what the container changed later, e.g. a token
+// it renewed. A mount that holds work, as the workspace folder and other git repositories do, is only replaced
+// by resetting: git's own files can't be mixed file by file.
+func copyOfMount(options provider2.CLIOptions, holdsWork, hasFiles bool) mountCopy {
+	switch {
+	case options.Reset, !hasFiles:
+		return mountReplace
+	case options.Recreate && !holdsWork:
+		return mountRefresh
+	default:
+		return mountKeep
+	}
+}
+
+// inRepository returns a function that says whether a path below target is in a git repository that was in
+// target before the function was first called for a path in that repository's folder. So what a mount has of a
+// repository is kept as it is while the mount is copied again, and a repository it doesn't have yet is copied.
+func inRepository(target string, log log.Logger) func(name string) bool {
+	target = filepath.Clean(target)
+	// whether a folder was a repository when a path in it was first seen
+	repositories := map[string]bool{}
+	return func(name string) bool {
+		for dir := filepath.Dir(filepath.Clean(name)); ; dir = filepath.Dir(dir) {
+			repository, seen := repositories[dir]
+			if !seen {
+				repository = isRepository(dir)
+				repositories[dir] = repository
+				if repository {
+					log.Infof("Keep %s as it is: it is a git repository, which may hold work", dir)
+				}
+			}
+			if repository {
+				return true
+			}
+			if dir == target || dir == filepath.Dir(dir) {
+				return false
+			}
+		}
+	}
+}
+
+// isRepository returns whether dir is the top folder of a git repository or work tree.
+func isRepository(dir string) bool {
+	_, err := os.Lstat(filepath.Join(dir, ".git"))
+	return err == nil
+}
+
+// hasFiles returns whether dir is a folder with something in it.
+func hasFiles(dir string) bool {
+	files, err := os.ReadDir(dir)
+	return err == nil && len(files) > 0
+}
+
+// warnIfWorkspaceFolderDiffers warns if the repository in the workspace folder of the container is at another
+// commit than contentCommit, the one of the checkout that devcontainer.json was read from. Recreating updates
+// that checkout but leaves the copy in the container alone, and an image built in the container takes the files
+// it copies from there.
+func warnIfWorkspaceFolderDiffers(contentCommit, workspaceFolder string, log log.Logger) {
+	if contentCommit == "" {
+		return
+	}
+	// git may not be installed here, e.g. before the image is built
+	folderCommit := git.ReadHeadCommit(workspaceFolder)
+	if folderCommit == "" {
+		log.Debugf("Can't tell the commit of %s to compare it to %s", workspaceFolder, contentCommit)
+		return
+	} else if folderCommit == contentCommit {
+		return
+	}
+
+	log.Warnf("The workspace folder in the container is at commit %s, but devcontainer.json was read from commit %s, "+
+		"where DevPod's checkout of the repository on your machine is. Recreating doesn't change the folder in the container, "+
+		"which may hold work that was not pushed, so an image built now takes its files from there. "+
+		"To have the same commit in both, push what the workspace has and run `git pull` in it, then recreate it again, "+
+		"or use --reset to copy a new clone over the folder",
+		shortCommit(folderCommit), shortCommit(contentCommit))
+}
+
+func shortCommit(commit string) string {
+	if len(commit) > 8 {
+		return commit[:8]
+	}
+	return commit
+}
+
+// refreshBuildInfo replaces the files of the image build in buildInfoDir with those the host has now. The host
+// writes them into the build context when it reads devcontainer.json, and they reach the container with the
+// workspace folder, which is only copied once. Without this, a recreated container builds with the Dockerfile
+// of its first build, or of a build that failed.
+func refreshBuildInfo(ctx context.Context, client tunnel.TunnelClient, workspaceMount *config.Mount, buildInfoDir string, log log.Logger) error {
+	subPath, err := filepath.Rel(workspaceMount.Target, buildInfoDir)
+	if err != nil || !filepath.IsLocal(subPath) {
+		return fmt.Errorf("build context %s is not in the workspace folder %s", filepath.Dir(buildInfoDir), workspaceMount.Target)
+	}
+
+	err = buildContextInWorkspaceFolder(workspaceMount.Target, buildInfoDir)
+	if err != nil {
+		return err
+	}
+
+	stream, err := client.StreamMount(ctx, &tunnel.StreamMountRequest{
+		Mount:   workspaceMount.String(),
+		SubPath: filepath.ToSlash(subPath),
+	})
+	if err != nil {
+		return fmt.Errorf("init stream build folder: %w", err)
+	}
+
+	// the old files stay if the new ones don't arrive
+	newDir, err := os.MkdirTemp(filepath.Dir(buildInfoDir), config.DevPodContextFeatureFolder+"-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(newDir)
+	err = os.Chmod(newDir, 0o755)
+	if err != nil {
+		return err
+	}
+	err = extract.Extract(tunnelserver.NewStreamReader(stream, log), newDir)
+	if err != nil {
+		return fmt.Errorf("stream build folder: %w", err)
+	}
+
+	err = os.RemoveAll(buildInfoDir)
+	if err != nil {
+		return err
+	}
+	return os.Rename(newDir, buildInfoDir)
+}
+
+// buildContextInWorkspaceFolder returns an error unless the folder of buildInfoDir really is in the workspace
+// folder: the workspace folder is the user's, and a link in it could lead the setup, which runs as root, to
+// replace a folder somewhere else.
+func buildContextInWorkspaceFolder(workspaceFolder, buildInfoDir string) error {
+	buildContext := filepath.Dir(buildInfoDir)
+	realWorkspaceFolder, err := filepath.EvalSymlinks(workspaceFolder)
+	if err != nil {
+		return fmt.Errorf("resolve workspace folder: %w", err)
+	}
+	realBuildContext, err := filepath.EvalSymlinks(buildContext)
+	if err != nil {
+		return fmt.Errorf("resolve build context: %w", err)
+	}
+	rel, err := filepath.Rel(realWorkspaceFolder, realBuildContext)
+	if err != nil || !filepath.IsLocal(rel) {
+		return fmt.Errorf("build context %s leads out of the workspace folder %s", buildContext, workspaceFolder)
+	}
+	return nil
+}
+
 func dockerlessBuild(
 	ctx context.Context,
 	setupInfo *config.Result,
-	dockerlessOptions *provider2.ProviderDockerlessOptions,
+	workspaceInfo *provider2.ContainerWorkspaceInfo,
 	client tunnel.TunnelClient,
 	debug bool,
 	log log.Logger,
 ) error {
+	dockerlessOptions := &workspaceInfo.Dockerless
 	if os.Getenv("DOCKERLESS") != "true" {
 		return nil
 	}
@@ -262,6 +442,14 @@ func dockerlessBuild(
 	// check if build info is there
 	fallbackDir := filepath.Join(config.DevPodDockerlessBuildInfoFolder, config.DevPodContextFeatureFolder)
 	buildInfoDir := filepath.Join(buildContext, config.DevPodContextFeatureFolder)
+	// when resetting, the build info came with the workspace folder
+	if workspaceInfo.CLIOptions.Recreate && !workspaceInfo.CLIOptions.Reset {
+		log.Debugf("Get the build files for %s from the host", buildInfoDir)
+		err = refreshBuildInfo(ctx, client, config.GetWorkspaceMount(setupInfo), buildInfoDir, log)
+		if err != nil {
+			log.Warnf("Could not get the build files that match devcontainer.json, building with those of the last build: %v", err)
+		}
+	}
 	_, err = os.Stat(buildInfoDir)
 	if err != nil {
 		// try to rename from fallback dir
@@ -607,16 +795,15 @@ func configureSystemGitCredentials(ctx context.Context, cancel context.CancelFun
 	return cleanup, nil
 }
 
-func streamMount(ctx context.Context, workspaceInfo *provider2.ContainerWorkspaceInfo, m *config.Mount, tunnelClient tunnel.TunnelClient, logger log.Logger) error {
+func streamMount(ctx context.Context, m *config.Mount, tunnelClient tunnel.TunnelClient, logger log.Logger, options ...extract.Option) error {
 	// stream mount
-	logger.Infof("Copy %s into DevContainer %s", m.Source, m.Target)
 	stream, err := tunnelClient.StreamMount(ctx, &tunnel.StreamMountRequest{Mount: m.String()})
 	if err != nil {
 		return fmt.Errorf("init stream mount %s: %w", m.String(), err)
 	}
 
 	// target folder
-	err = extract.Extract(tunnelserver.NewStreamReader(stream, logger), m.Target)
+	err = extract.Extract(tunnelserver.NewStreamReader(stream, logger), m.Target, options...)
 	if err != nil {
 		return fmt.Errorf("stream mount %s: %w", m.String(), err)
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,11 @@ import (
 
 type Options struct {
 	StripLevels int
+	KeepNewer   bool
+	Skip        func(name string) bool
+
+	// folders holds the folders of the destination that were checked to be no links
+	folders map[string]bool
 
 	Perm *os.FileMode
 	UID  *int
@@ -27,6 +33,27 @@ type Option func(o *Options)
 func StripLevels(levels int) Option {
 	return func(o *Options) {
 		o.StripLevels = levels
+	}
+}
+
+// KeepNewer makes Extract keep a file, symlink or hard link that already exists and was modified
+// after the one in the archive, instead of replacing it. A file it does replace is only replaced
+// once it is written completely, so that an extraction that is interrupted doesn't leave a part
+// of a file that looks newer the next time, and it keeps its owner. Where the destination has a
+// link in place of a folder of the archive, the link is kept and nothing is extracted through it:
+// what is behind it is not what was extracted there before.
+func KeepNewer() Option {
+	return func(o *Options) {
+		o.KeepNewer = true
+	}
+}
+
+// Skip makes Extract leave out the entries of the archive for which skip returns true. It gets
+// the path an entry is extracted to, with the separators of the operating system, and is called
+// before anything of the entry is created.
+func Skip(skip func(name string) bool) Option {
+	return func(o *Options) {
+		o.Skip = skip
 	}
 }
 
@@ -94,6 +121,12 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	}
 	outFileName := path.Join(destFolder, relativePath)
 	baseName := path.Dir(outFileName)
+	if options.Skip != nil && options.Skip(filepath.Clean(outFileName)) {
+		return true, nil
+	}
+	if options.KeepNewer && throughLink(destFolder, outFileName, options) {
+		return true, nil
+	}
 
 	dirPerm := os.ModePerm
 	if options.Perm != nil {
@@ -118,19 +151,37 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 		}
 
 		return true, nil
-	} else if header.Typeflag == tar.TypeSymlink {
-		err := os.Symlink(header.Linkname, outFileName)
+	}
+
+	var existing os.FileInfo
+	if options.KeepNewer {
+		existing, _ = os.Lstat(outFileName)
+		if existing != nil && keepExisting(existing, header) {
+			return true, nil
+		}
+	}
+
+	if header.Typeflag == tar.TypeSymlink {
+		err := replaceExisting(outFileName, func() error { return os.Symlink(header.Linkname, outFileName) })
 		if err != nil {
 			return false, err
 		}
 
 		return true, nil
 	} else if header.Typeflag == tar.TypeLink {
-		err := os.Link(header.Linkname, outFileName)
+		err := replaceExisting(outFileName, func() error { return os.Link(header.Linkname, outFileName) })
 		if err != nil {
 			return false, err
 		}
 
+		return true, nil
+	}
+
+	if options.KeepNewer {
+		err := replaceFile(outFileName, tarReader, header, existing, options)
+		if err != nil {
+			return false, err
+		}
 		return true, nil
 	}
 
@@ -162,6 +213,105 @@ func extractNext(tarReader *tar.Reader, destFolder string, options *Options) (bo
 	_ = os.Chtimes(outFileName, time.Now(), header.FileInfo().ModTime())
 
 	return true, nil
+}
+
+// replaceFile writes the file of the archive to a new file next to name, and renames that to
+// name once it is complete, so that name never is a part of the file. The new file has a name
+// that nothing else has and is created by this call, so nothing that is there is written to,
+// or written through if it is a link. It gets the owner of existing, the file it replaces.
+func replaceFile(name string, content io.Reader, header *tar.Header, existing os.FileInfo, options *Options) (err error) {
+	newFile, err := os.CreateTemp(filepath.Dir(name), "."+filepath.Base(name)+".devpod-*")
+	if err != nil {
+		return perrors.Wrapf(err, "create a file to replace %s", name)
+	}
+	defer func() {
+		_ = newFile.Close()
+		if err != nil {
+			_ = os.Remove(newFile.Name())
+		}
+	}()
+
+	if _, err := io.Copy(newFile, content); err != nil {
+		return perrors.Wrapf(err, "io copy tar reader %s", name)
+	}
+	if err := newFile.Close(); err != nil {
+		return perrors.Wrapf(err, "out file close %s", name)
+	}
+
+	perm := header.FileInfo().Mode().Perm() | 0600
+	if options.Perm != nil {
+		perm = *options.Perm
+	}
+	_ = os.Chmod(newFile.Name(), perm)
+	_ = os.Chtimes(newFile.Name(), time.Now(), header.FileInfo().ModTime())
+	if existing != nil && existing.Mode().IsRegular() {
+		chownLike(newFile.Name(), existing)
+	}
+
+	if err := os.Rename(newFile.Name(), name); err != nil {
+		return perrors.Wrapf(err, "replace %s", name)
+	}
+	return nil
+}
+
+// throughLink returns whether a folder on the way from destFolder to name is something else than
+// a folder, as a link is.
+func throughLink(destFolder, name string, options *Options) bool {
+	root := filepath.Clean(destFolder)
+	rel, err := filepath.Rel(root, filepath.Clean(name))
+	if err != nil || !filepath.IsLocal(rel) {
+		return true
+	}
+	if options.folders == nil {
+		options.folders = map[string]bool{}
+	}
+
+	folder := root
+	parts := strings.Split(rel, string(filepath.Separator))
+	for _, part := range parts[:len(parts)-1] {
+		folder = filepath.Join(folder, part)
+		if options.folders[folder] {
+			continue
+		}
+		stat, err := os.Lstat(folder)
+		if os.IsNotExist(err) {
+			// nothing below it exists either, and Extract creates folders
+			return false
+		} else if err != nil || !stat.IsDir() {
+			return true
+		}
+		options.folders[folder] = true
+	}
+	return false
+}
+
+// keepExisting returns whether existing, which is where an entry of the archive goes, is kept: it
+// was modified after the entry, or it is a file of the same time and size, which is taken to be
+// the same file. A directory is never kept, so that a file can't replace it.
+func keepExisting(existing os.FileInfo, header *tar.Header) bool {
+	if existing.IsDir() {
+		return false
+	}
+	modTime := header.FileInfo().ModTime()
+	if existing.ModTime().After(modTime) {
+		return true
+	}
+	return header.FileInfo().Mode().IsRegular() && existing.Mode().IsRegular() &&
+		existing.ModTime().Equal(modTime) && existing.Size() == header.Size
+}
+
+// replaceExisting runs create, which creates a link at name, and if something that is not a
+// directory with files is already there, removes that and runs create again: unlike a file, a
+// link can't be written over.
+func replaceExisting(name string, create func() error) error {
+	err := create()
+	if err == nil || !os.IsExist(err) {
+		return err
+	}
+	if removeErr := os.Remove(name); removeErr != nil {
+		return err
+	}
+	return create()
 }
 
 func getRelativeFromFullPath(fullpath string, prefix string) string {

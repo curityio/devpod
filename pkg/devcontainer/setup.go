@@ -17,6 +17,7 @@ import (
 	"github.com/curityio/devpod/pkg/devcontainer/config"
 	"github.com/curityio/devpod/pkg/devcontainer/sshtunnel"
 	"github.com/curityio/devpod/pkg/driver"
+	"github.com/curityio/devpod/pkg/git"
 	"github.com/curityio/devpod/pkg/ide"
 	provider2 "github.com/curityio/devpod/pkg/provider"
 	"github.com/pkg/errors"
@@ -62,6 +63,9 @@ func (r *runner) setupContainer(
 		return nil, err
 	}
 
+	// check if docker driver
+	_, isDockerDriver := r.Driver.(driver.DockerDriver)
+
 	workspaceConfig := &provider2.ContainerWorkspaceInfo{
 		IDE:              r.WorkspaceConfig.Workspace.IDE,
 		CLIOptions:       r.WorkspaceConfig.CLIOptions,
@@ -70,6 +74,9 @@ func (r *runner) setupContainer(
 		Source:           r.WorkspaceConfig.Workspace.Source,
 		Agent:            r.WorkspaceConfig.Agent,
 		ContentFolder:    r.WorkspaceConfig.ContentFolder,
+	}
+	if !isDockerDriver {
+		workspaceConfig.ContentCommit = r.contentCommit(ctx)
 	}
 	// compress container workspace info
 	workspaceConfigRaw, err := json.Marshal(workspaceConfig)
@@ -80,9 +87,6 @@ func (r *runner) setupContainer(
 	if err != nil {
 		return nil, err
 	}
-
-	// check if docker driver
-	_, isDockerDriver := r.Driver.(driver.DockerDriver)
 
 	// setup container
 	r.Log.Infof("Setup container...")
@@ -148,4 +152,23 @@ func (r *runner) setupContainer(
 func getRelativeDevContainerJson(origin, localWorkspaceFolder string) string {
 	relativePath := strings.TrimPrefix(filepath.ToSlash(origin), filepath.ToSlash(localWorkspaceFolder))
 	return strings.TrimPrefix(relativePath, "/")
+}
+
+// contentCommit returns the commit that the content folder of a git repository has checked out, or an empty
+// string if the workspace is no git repository or git can't tell.
+func (r *runner) contentCommit(ctx context.Context) string {
+	if r.WorkspaceConfig.Workspace.Source.GitRepository == "" {
+		return ""
+	}
+
+	// git also finds a repository in a parent folder
+	if !git.IsTopLevel(ctx, r.LocalWorkspaceFolder) {
+		return ""
+	}
+	commit, err := git.HeadCommit(ctx, r.LocalWorkspaceFolder)
+	if err != nil {
+		r.Log.Debugf("Can't tell the commit of %s: %v", r.LocalWorkspaceFolder, err)
+		return ""
+	}
+	return commit
 }

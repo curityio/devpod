@@ -288,23 +288,137 @@ func CloneRepositoryForWorkspace(
 
 	log.Done("Successfully cloned repository")
 
-	// Get .devpodignore files to exclude
-	f, err := os.Open(filepath.Join(workspaceDir, ".devpodignore"))
+	removeIgnoredFiles(workspaceDir, log)
+	return nil
+}
+
+// UpdateRepositoryForWorkspace brings the checkout of a workspace that is recreated up to date with its remote
+// branch, when that can't lose anything in it: it fetches the branch and fast-forwards the checkout if it has no
+// changes to tracked files and no commit the remote branch lacks. Otherwise the checkout stays as it is and a
+// warning says why. It never fails, as recreating a workspace also has to work without the remote.
+func UpdateRepositoryForWorkspace(
+	ctx context.Context,
+	source *provider2.WorkspaceSource,
+	workspaceDir, helper string,
+	options provider2.CLIOptions,
+	log log.Logger,
+) {
+	if source.GitCommit != "" {
+		log.Infof("The workspace uses commit %s, keeping its checkout", source.GitCommit)
+		return
+	}
+	if !command.Exists("git") {
+		log.Warn("The workspace's checkout was not updated because git is not installed. " + recreateKeepsCheckoutHint)
+		return
+	}
+
+	// DevPod removed these from the checkout itself when it cloned the repository
+	removed := readIgnoredFiles(workspaceDir, log)
+	extraEnv := git.GetDefaultExtraEnv(options.StrictHostKeyChecking)
+
+	submodules := git.SubmodulesOptions{
+		Init:     options.GitCloneRecursiveSubmodules,
+		Helper:   helper,
+		ExtraEnv: extraEnv,
+		Removed:  removed,
+	}
+	// A submodule that is not at the commit recorded for it counts as a change of the checkout. If that is
+	// because updating the submodules failed the last time, the checkout would never be updated again.
+	updateSubmodulesForWorkspace(ctx, workspaceDir, submodules, false, log)
+
+	log.Infof("Fetch %s to update the workspace's checkout", source.GitRepository)
+	result, err := git.FastForward(ctx, workspaceDir, git.FastForwardOptions{
+		PR:       source.GitPRReference,
+		Helper:   helper,
+		ExtraEnv: extraEnv,
+		Removed:  removed,
+	})
+	if err != nil {
+		log.Warnf("The workspace's checkout was not updated: %v. %s", err, recreateKeepsCheckoutHint)
+		return
+	}
+
+	switch result.Status {
+	case git.FastForwardUpdated:
+		log.Donef("Updated the workspace's checkout from commit %s to %s", result.From, result.To)
+	case git.FastForwardSkipped:
+		log.Warnf("The workspace's checkout was not updated because %s. %s", result.Reason, recreateKeepsCheckoutHint)
+		return
+	case git.FastForwardNotApplicable:
+		log.Infof("The workspace's checkout was not updated because %s", result.Reason)
+	case git.FastForwardUpToDate:
+		log.Info("The workspace's checkout is up to date with its remote branch")
+	}
+
+	// the submodules that the new commit records, and a warning about those that stay behind
+	updateSubmodulesForWorkspace(ctx, workspaceDir, submodules, true, log)
+}
+
+// updateSubmodulesForWorkspace brings the submodules of the workspace's checkout to the commits it records for
+// them, where that can't lose anything in them. It warns about those it leaves behind if warn is set.
+func updateSubmodulesForWorkspace(ctx context.Context, workspaceDir string, options git.SubmodulesOptions, warn bool, log log.Logger) {
+	// most repositories have no submodules
+	if _, err := os.Stat(filepath.Join(workspaceDir, ".gitmodules")); err != nil {
+		return
+	}
+
+	const hint = "To update it, run `git submodule update --init --recursive` in the workspace"
+	result, err := git.UpdateSubmodules(ctx, workspaceDir, options)
+	if err != nil {
+		if warn {
+			log.Warnf("The submodules of the workspace's checkout were not updated: %v", err)
+		} else {
+			log.Debugf("The submodules of the workspace's checkout were not updated: %v", err)
+		}
+		return
+	}
+
+	if len(result.Updated) > 0 {
+		log.Donef("Updated the submodules of the workspace's checkout: %s", strings.Join(result.Updated, ", "))
+	}
+	for _, skipped := range result.Skipped {
+		if warn {
+			log.Warnf("Submodule %s of the workspace's checkout was not updated because %s. %s", skipped.Path, skipped.Reason, hint)
+		} else {
+			log.Debugf("Submodule %s of the workspace's checkout was not updated because %s", skipped.Path, skipped.Reason)
+		}
+	}
+}
+
+// recreateKeepsCheckoutHint says what happens to a checkout that was not updated, and what to do about it.
+const recreateKeepsCheckoutHint = "The workspace is recreated with the files it has. " +
+	"To update them, run `git pull` in the workspace and recreate it again, " +
+	"or use --reset to replace them with a new clone, which discards what was not pushed"
+
+// ignoreFileName is the name of the file listing the paths DevPod removes from a cloned repository.
+const ignoreFileName = ".devpodignore"
+
+// readIgnoredFiles returns the paths the ignore file of the checkout in workspaceDir lists.
+func readIgnoredFiles(workspaceDir string, log log.Logger) []string {
+	f, err := os.Open(filepath.Join(workspaceDir, ignoreFileName))
 	if err != nil {
 		return nil
 	}
+	defer f.Close()
+
 	excludes, err := ignorefile.ReadAll(f)
 	if err != nil {
-		log.Warn(".devpodignore file is invalid : ", err)
+		log.Warn(ignoreFileName+" file is invalid : ", err)
 		return nil
 	}
-	// Remove files from workspace content folder
-	for _, exclude := range excludes {
-		os.RemoveAll(filepath.Join(workspaceDir, exclude))
-	}
-	log.Debug("Ignore files from .devpodignore ", excludes)
+	return excludes
+}
 
-	return nil
+// removeIgnoredFiles removes the paths the ignore file lists from the checkout in workspaceDir.
+func removeIgnoredFiles(workspaceDir string, log log.Logger) {
+	excludes := readIgnoredFiles(workspaceDir, log)
+	if len(excludes) == 0 {
+		return
+	}
+	for _, exclude := range excludes {
+		_ = os.RemoveAll(filepath.Join(workspaceDir, exclude))
+	}
+	log.Debug("Ignore files from "+ignoreFileName+" ", excludes)
 }
 
 func getGitOptions(options provider2.CLIOptions) []git.Option {

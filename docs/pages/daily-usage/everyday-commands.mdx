@@ -35,8 +35,8 @@ Other providers, such as `kubernetes` or `ssh`, are added the same way. See
 | List my workspaces | `devpod list` |
 | See whether a workspace is running | `devpod status my-workspace` |
 | See the status of all workspaces | `devpod status --all` |
-| Apply changes to `devcontainer.json` | `devpod up my-workspace --recreate` |
-| Start from a clean slate (also re-clones the source) | `devpod up my-workspace --reset` |
+| Apply changes to `devcontainer.json` (pulls a git repository's branch first, if that loses nothing) | `devpod up my-workspace --recreate` |
+| Start from a clean slate (re-clones the source, losing what was not pushed) | `devpod up my-workspace --reset` |
 | Stop a workspace, keeping its state | `devpod stop my-workspace` |
 | Delete a workspace and its state | `devpod delete my-workspace` |
 | Read the workspace's logs | `devpod logs my-workspace` |
@@ -66,6 +66,12 @@ devpod stop my-repo
 # Done with it for good
 devpod delete my-repo
 ```
+
+`--recreate` keeps the workspace's files. For a git repository it fetches the branch and fast-forwards the
+checkout when it has no changes that are not committed and has not diverged from the remote branch, and otherwise
+warns that it kept the checkout as it is. On Kubernetes it also copies the `bind` mounts of `devcontainer.json`
+again, keeping files the container changed later. See
+[Recreating a workspace](../developing-in-workspaces/create-a-workspace.mdx#recreating-a-workspace) for the details.
 
 The workspace is named after the repository or folder. Use `devpod list` to see the names, and
 `devpod up --id <name>` to choose one, for example to have several workspaces of the same repository.

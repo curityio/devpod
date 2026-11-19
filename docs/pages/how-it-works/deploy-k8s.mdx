@@ -92,6 +92,18 @@ devpod status my-workspace
 devpod up my-workspace
 ```
 
+### Recreating a workspace
+
+The pod has copies of the workspace folder and of the folders that `devcontainer.json` mounts from your computer,
+on its persistent volume claim. `devpod up --recreate` keeps the workspace folder, copies the mounted folders
+again without replacing files the container changed later, and builds the image with the current `Dockerfile`.
+`devpod up --reset` replaces the files of all of them. See
+[Recreating a workspace](../developing-in-workspaces/create-a-workspace.mdx#on-kubernetes).
+
+```bash
+devpod up my-workspace --recreate
+```
+
 ### Building images without Docker
 
 Kubernetes workspaces build their dev container in the pod, without a docker daemon, with the image

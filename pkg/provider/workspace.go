@@ -147,6 +147,11 @@ type ContainerWorkspaceInfo struct {
 	// ContentFolder holds the folder where the content is stored
 	ContentFolder string `json:"contentFolder,omitempty"`
 
+	// ContentCommit is the commit the content folder had checked out when the devcontainer.json was read from
+	// it. It is only set for a git repository whose content folder is copied into the container rather than
+	// mounted, where the copy in the container can be at another commit.
+	ContentCommit string `json:"contentCommit,omitempty"`
+
 	// Agent holds the agent info
 	Agent ProviderAgentConfig `json:"agent,omitempty"`
 }

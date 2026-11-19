@@ -25,6 +25,10 @@ service Tunnel {
 
 message StreamMountRequest {
   string mount = 1;
+  // sub_path is the folder of the mount to stream instead of the whole mount,
+  // relative to the mount's source. Only the folder DevPod writes the files of
+  // an image build to can be streamed like this, and only of the workspace mount.
+  string sub_path = 2;
 }
 
 message StopForwardPortRequest {
