@@ -253,10 +253,11 @@ func (r *runner) getDockerlessRunOptions(
 
 	// build run options
 	return &driver.RunOptions{
-		UID:        uid,
-		Image:      image,
-		User:       "root",
-		Entrypoint: "/.dockerless/dockerless",
+		UID:          uid,
+		Image:        image,
+		Architecture: buildInfo.Architecture,
+		User:         "root",
+		Entrypoint:   "/.dockerless/dockerless",
 		Cmd: []string{
 			"start",
 			"--wait",
@@ -311,6 +312,7 @@ func (r *runner) getRunOptions(
 	return &driver.RunOptions{
 		UID:            uid,
 		Image:          buildInfo.ImageName,
+		Architecture:   buildInfo.Architecture,
 		User:           user,
 		Entrypoint:     entrypoint,
 		Cmd:            cmd,

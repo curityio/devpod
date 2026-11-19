@@ -182,7 +182,10 @@ func (k *KubernetesDriver) runContainer(
 		return err
 	}
 	// run the pod on a node of the architecture its image was built for
-	if arch := k.podArchitecture(ctx, pod, nodeSelector); arch != "" {
+	arch, err := k.podArchitecture(ctx, pod, nodeSelector, options.Architecture)
+	if err != nil {
+		return err
+	} else if arch != "" {
 		nodeSelector[corev1.LabelArchStable] = arch
 	}
 

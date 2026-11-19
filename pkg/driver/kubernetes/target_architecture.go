@@ -14,13 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-// TargetArchitecture returns the architecture to build the workspace's image for: the ARCHITECTURE option, the
-// kubernetes.io/arch node selector, or else the architecture of the nodes the workspace pod can be scheduled on.
+// TargetArchitecture returns the architecture to build the workspace's image for: the one chosen with the
+// ARCHITECTURE option or a kubernetes.io/arch node selector, or else the architecture of the nodes the workspace pod
+// can be scheduled on.
 func (k *KubernetesDriver) TargetArchitecture(ctx context.Context, workspaceId string) (string, error) {
-	if k.options.Architecture != "" {
-		return k.options.Architecture, nil
-	}
-
 	k.Log.Debugf("Getting target architecture for workspace '%s'", workspaceId)
 	defer k.Log.Debugf("Done getting target architecture for workspace '%s'", workspaceId)
 
@@ -32,8 +29,11 @@ func (k *KubernetesDriver) TargetArchitecture(ctx context.Context, workspaceId s
 	if err != nil {
 		return "", err
 	}
-	if arch := nodeSelector[corev1.LabelArchStable]; arch != "" {
-		return arch, nil
+	chosen, err := k.chosenArchitecture(nodeSelector)
+	if err != nil {
+		return "", err
+	} else if chosen != "" {
+		return chosen, nil
 	}
 
 	arch, err := k.schedulableArchitecture(ctx, pod, nodeSelector)
@@ -46,27 +46,55 @@ func (k *KubernetesDriver) TargetArchitecture(ctx context.Context, workspaceId s
 	return arch, nil
 }
 
-// podArchitecture returns the architecture to pin the workspace pod to, or "" to not pin it: the ARCHITECTURE option,
-// or the architecture of the nodes the pod can be scheduled on. Unlike TargetArchitecture, it doesn't fail when that
-// can't be found out, as a workspace that wasn't built may use an image for several architectures.
-func (k *KubernetesDriver) podArchitecture(ctx context.Context, pod *corev1.Pod, nodeSelector map[string]string) string {
-	if selected := nodeSelector[corev1.LabelArchStable]; selected != "" {
-		if k.options.Architecture != "" && k.options.Architecture != selected {
-			k.Log.Warnf("The node selector %s=%s doesn't match the ARCHITECTURE provider option %s", corev1.LabelArchStable, selected, k.options.Architecture)
-		}
-		return ""
+// chosenArchitecture returns the architecture chosen with a kubernetes.io/arch node selector or the ARCHITECTURE
+// option, or "" if there is none. It fails if they differ, as the image would be built for one and run on the other.
+func (k *KubernetesDriver) chosenArchitecture(nodeSelector map[string]string) (string, error) {
+	selected := nodeSelector[corev1.LabelArchStable]
+	if selected != "" && k.options.Architecture != "" && selected != k.options.Architecture {
+		return "", fmt.Errorf("the node selector %s=%s conflicts with the ARCHITECTURE provider option %s, please remove one of them", corev1.LabelArchStable, selected, k.options.Architecture)
 	}
-	if k.options.Architecture != "" {
-		return k.options.Architecture
+	if selected != "" {
+		return selected, nil
+	}
+
+	return k.options.Architecture, nil
+}
+
+// podArchitecture returns the architecture to pin the workspace pod to with a kubernetes.io/arch node selector, or ""
+// to not pin it: the architecture the image was built for (imageArch, if known), else the one chosen with the
+// ARCHITECTURE option, else the architecture of the nodes the pod can be scheduled on. A kubernetes.io/arch node
+// selector is kept, as long as it matches the image. Unlike TargetArchitecture, it doesn't fail when the nodes'
+// architecture can't be found out, as a workspace that wasn't built may use an image for several architectures.
+func (k *KubernetesDriver) podArchitecture(ctx context.Context, pod *corev1.Pod, nodeSelector map[string]string, imageArch string) (string, error) {
+	chosen, err := k.chosenArchitecture(nodeSelector)
+	if err != nil {
+		return "", err
+	}
+
+	if selected := nodeSelector[corev1.LabelArchStable]; selected != "" {
+		if imageArch != "" && imageArch != selected {
+			return "", fmt.Errorf("the workspace's image was built for %s, but the node selector %s=%s runs it on %s nodes. Rebuild the workspace with `devpod up --recreate`", imageArch, corev1.LabelArchStable, selected, selected)
+		}
+		return "", nil
+	}
+
+	if imageArch != "" {
+		if chosen != "" && chosen != imageArch {
+			k.Log.Warnf("The workspace's image was built for %s, not for the ARCHITECTURE provider option %s, so it keeps running on %s nodes. Rebuild the workspace with `devpod up --recreate` to use %s", imageArch, chosen, imageArch, chosen)
+		}
+		return imageArch, nil
+	}
+	if chosen != "" {
+		return chosen, nil
 	}
 
 	arch, err := k.schedulableArchitecture(ctx, pod, nodeSelector)
 	if err != nil {
 		k.Log.Debugf("Not pinning the workspace pod to an architecture: %v", err)
-		return ""
+		return "", nil
 	}
 
-	return arch
+	return arch, nil
 }
 
 // schedulableArchitecture returns the architecture of the nodes that the pod, with the given node selector, can be

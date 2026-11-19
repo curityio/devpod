@@ -24,6 +24,9 @@ type BuildInfo struct {
 	RegistryCache string
 	Tags          []string
 
+	// Architecture is the CPU architecture the image is built for, or empty if unknown
+	Architecture string
+
 	Dockerless *BuildInfoDockerless
 }
 

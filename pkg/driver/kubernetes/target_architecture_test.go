@@ -208,16 +208,42 @@ func TestTargetArchitectureForbidden(t *testing.T) {
 	assert.ErrorContains(t, err, "ARCHITECTURE provider option")
 }
 
+func TestTargetArchitectureConflict(t *testing.T) {
+	driver, _ := nodesDriver(t, testNode("arm-0", "arm64"))
+	driver.options.Architecture = "amd64"
+	driver.options.NodeSelector = corev1.LabelArchStable + "=arm64"
+
+	_, err := driver.TargetArchitecture(context.Background(), "ws")
+	assert.ErrorContains(t, err, "the node selector kubernetes.io/arch=arm64 conflicts with the ARCHITECTURE provider option amd64")
+}
+
 func TestPodArchitecture(t *testing.T) {
 	mixed := []corev1.Node{testNode("arm-0", "arm64"), testNode("workspace-0", "amd64")}
+	armSelector := map[string]string{corev1.LabelArchStable: "arm64"}
 
 	tests := []struct {
 		name         string
 		nodes        []corev1.Node
 		architecture string
 		nodeSelector map[string]string
+		imageArch    string
 		want         string
+		wantErr      string
 	}{
+		{
+			name:      "pins to the image's architecture",
+			nodes:     []corev1.Node{testNode("arm-0", "arm64")},
+			imageArch: "amd64",
+			want:      "amd64",
+		},
+		{
+			// the image of a workspace built before ARCHITECTURE changed only runs on its own architecture
+			name:         "pins to the image's architecture over the ARCHITECTURE option",
+			nodes:        mixed,
+			architecture: "arm64",
+			imageArch:    "amd64",
+			want:         "amd64",
+		},
 		{
 			name:         "pins to the ARCHITECTURE option",
 			nodes:        mixed,
@@ -237,9 +263,23 @@ func TestPodArchitecture(t *testing.T) {
 		{
 			name:         "keeps the user's node selector",
 			nodes:        mixed,
-			architecture: "amd64",
-			nodeSelector: map[string]string{corev1.LabelArchStable: "arm64"},
+			nodeSelector: armSelector,
+			imageArch:    "arm64",
 			want:         "",
+		},
+		{
+			name:         "node selector conflicts with the ARCHITECTURE option",
+			nodes:        mixed,
+			architecture: "amd64",
+			nodeSelector: armSelector,
+			wantErr:      "conflicts with the ARCHITECTURE provider option amd64",
+		},
+		{
+			name:         "node selector conflicts with the image's architecture",
+			nodes:        mixed,
+			nodeSelector: armSelector,
+			imageArch:    "amd64",
+			wantErr:      "the workspace's image was built for amd64, but the node selector kubernetes.io/arch=arm64",
 		},
 	}
 
@@ -252,7 +292,12 @@ func TestPodArchitecture(t *testing.T) {
 				nodeSelector = map[string]string{}
 			}
 
-			arch := driver.podArchitecture(context.Background(), &corev1.Pod{}, nodeSelector)
+			arch, err := driver.podArchitecture(context.Background(), &corev1.Pod{}, nodeSelector, tt.imageArch)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			assert.NilError(t, err)
 			assert.Equal(t, arch, tt.want)
 		})
 	}

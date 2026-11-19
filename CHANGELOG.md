@@ -27,9 +27,10 @@ Add new entries to the top of the "Unreleased" section.
   have a `NoSchedule` or `NoExecute` taint the pod doesn't tolerate, such as a tainted system node pool, and uses the
   node a pod template names with `spec.nodeName`. A cluster with
   arm64 system nodes and amd64 workspace nodes no longer fails with "mixed architectures in the Kubernetes cluster".
-- The workspace pod gets a `kubernetes.io/arch` node selector for the architecture of the `ARCHITECTURE` option or
-  the one DevPod found, so that it isn't scheduled on a node of another architecture than its image. A
-  `kubernetes.io/arch` node selector you set is kept, and is also the architecture DevPod builds for.
+- The workspace pod gets a `kubernetes.io/arch` node selector for the architecture its image was built for, so that it
+  isn't scheduled on a node of another architecture. DevPod keeps that architecture with the workspace, so a restart
+  doesn't depend on the nodes or options at that time. A `kubernetes.io/arch` node selector you set is kept, and is
+  also the architecture DevPod builds for; it's an error if it differs from the `ARCHITECTURE` option or the image.
 
 ## v0.11.0 (2026-11-16)
 

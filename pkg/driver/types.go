@@ -49,6 +49,10 @@ type RunOptions struct {
 	// Image is the image to run
 	Image string `json:"image,omitempty"`
 
+	// Architecture is the CPU architecture the image was built for, e.g. amd64, or empty if unknown. The kubernetes
+	// driver runs the container on a node of this architecture.
+	Architecture string `json:"architecture,omitempty"`
+
 	// User is the user to run the container as
 	User string `json:"user,omitempty"`
 

@@ -249,6 +249,7 @@ func (r *runner) buildImage(
 					PrebuildHash:  prebuildHash,
 					RegistryCache: options.RegistryCache,
 					Tags:          options.Tag,
+					Architecture:  targetArch,
 				}, nil
 			} else if err != nil {
 				r.Log.Debugf("Error trying to find prebuild image %s: %v", prebuildImage, err)
@@ -264,7 +265,14 @@ func (r *runner) buildImage(
 			return nil, fmt.Errorf("cannot build devcontainer because driver is non-docker and dockerless fallback is disabled")
 		}
 
-		return dockerlessFallback(r.LocalWorkspaceFolder, substitutionContext.ContainerWorkspaceFolder, parsedConfig, buildInfo, extendedBuildInfo, dockerfileContent, options)
+		result, err := dockerlessFallback(r.LocalWorkspaceFolder, substitutionContext.ContainerWorkspaceFolder, parsedConfig, buildInfo, extendedBuildInfo, dockerfileContent, options)
+		if err != nil {
+			return nil, err
+		}
+
+		// the image is built in the container, so the driver must run it on a node of the architecture it's built for
+		result.Architecture = targetArch
+		return result, nil
 	}
 
 	return dockerDriver.BuildDevContainer(ctx, prebuildHash, parsedConfig, extendedBuildInfo, dockerfilePath, dockerfileContent, r.LocalWorkspaceFolder, options)
