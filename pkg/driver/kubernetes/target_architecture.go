@@ -105,9 +105,9 @@ func (k *KubernetesDriver) podArchitecture(nodeSelector map[string]string, works
 // recordArchitecture sets the architecture of the node the workspace pod runs on in the run options, and keeps it
 // with the workspace, when the run options don't have one: there was no prebuilt image for the workspace, or an older
 // DevPod created it. Later pods of the workspace are pinned to that architecture, as the workspace's volume holds what
-// was built on it or copied from its image. It only trusts a running pod: one that isn't running may be on a node of
-// an architecture its image doesn't run on. Not being able to record it doesn't fail the workspace: the next start
-// tries again.
+// was built on it or copied from its image. It only trusts a pod whose dev container runs: one where it doesn't may
+// be on a node of an architecture its image doesn't run on. Not being able to record it doesn't fail the workspace:
+// the next start tries again.
 func (k *KubernetesDriver) recordArchitecture(ctx context.Context, id string, options *driver.RunOptions) {
 	if options.Architecture != "" {
 		return
@@ -137,13 +137,13 @@ func (k *KubernetesDriver) recordArchitecture(ctx context.Context, id string, op
 	k.Log.Debugf("Workspace pod '%s' runs on %s, keeping that with the workspace", id, arch)
 }
 
-// runningArchitecture returns the architecture of the node the workspace pod runs on, or "" if the pod isn't running
-// or its node doesn't tell.
+// runningArchitecture returns the architecture of the node the workspace's dev container runs on, or "" if it isn't
+// running or its node doesn't tell.
 func (k *KubernetesDriver) runningArchitecture(ctx context.Context, id string) (string, error) {
 	pod, err := k.getPod(ctx, id)
 	if err != nil {
 		return "", err
-	} else if pod == nil || !isPodRunning(pod) || pod.Spec.NodeName == "" {
+	} else if pod == nil || pod.Spec.NodeName == "" || !devContainerRunning(pod) {
 		return "", nil
 	}
 
@@ -158,6 +158,23 @@ func (k *KubernetesDriver) runningArchitecture(ctx context.Context, id string) (
 	}
 
 	return nodeArchitecture(node), nil
+}
+
+// devContainerRunning reports whether the pod's dev container is running. The pod's phase doesn't tell: it's Running
+// as long as one of its containers is, so also with a sidecar of the pod template next to a dev container that
+// couldn't start.
+func devContainerRunning(pod *corev1.Pod) bool {
+	if !isPodRunning(pod) {
+		return false
+	}
+
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name == DevContainerName {
+			return c.State.Running != nil
+		}
+	}
+
+	return false
 }
 
 // schedulableArchitecture returns the architecture of the nodes that the pod, with the given node selector, can be

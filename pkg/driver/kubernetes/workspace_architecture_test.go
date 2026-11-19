@@ -383,6 +383,88 @@ func TestKeepsArchitectureOfReplacedPod(t *testing.T) {
 	assert.Equal(t, cluster.persisted(t).Architecture, "arm64")
 }
 
+// `devpod stop` deletes the pod, which is the only one that tells the architecture of a workspace created by an older
+// DevPod, so it must keep it with the workspace first.
+func TestStopKeepsArchitecture(t *testing.T) {
+	ctx := context.Background()
+	cluster := &fakeCluster{
+		nodes:          []corev1.Node{testNode("arm-0", "arm64"), testNode("workspace-0", "amd64")},
+		nodesForbidden: true,
+	}
+	k := cluster.driver(t)
+
+	// as the nodes can't be listed, the workspace's architecture stays unknown, like an older DevPod left it
+	assert.NilError(t, k.RunDevContainer(ctx, "ws", runOptions("ghcr.io/curityio/dockerless:test", "")))
+	assert.Equal(t, cluster.persisted(t).Architecture, "")
+
+	cluster.set(func() { cluster.nodesForbidden = false })
+	assert.NilError(t, k.StopDevContainer(ctx, "ws"))
+	assert.Equal(t, cluster.persisted(t).Architecture, "arm64")
+
+	// the amd64 node is the first the pod could run on now
+	cluster.set(func() {
+		cluster.nodes = []corev1.Node{testNode("workspace-0", "amd64"), testNode("arm-0", "arm64")}
+	})
+	assert.NilError(t, k.StartDevContainer(ctx, "ws"))
+	_, selector, node := cluster.running(t)
+	assert.Equal(t, selector, "arm64")
+	assert.Equal(t, node, "arm-0")
+}
+
+func TestStopWithoutPersistentVolumeClaim(t *testing.T) {
+	cluster := &fakeCluster{}
+	k := cluster.driver(t)
+	assert.NilError(t, k.StopDevContainer(context.Background(), "ws"))
+}
+
+// A pod is Running as long as one of its containers is. The dev container of this one couldn't start, as it does on a
+// node of an architecture its image isn't for, so the node's architecture isn't the workspace's.
+func TestRunningArchitectureNeedsDevContainer(t *testing.T) {
+	ctx := context.Background()
+	running := corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}
+	failed := corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 128, Reason: "StartError"}}
+	waiting := corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerCreating"}}
+
+	tests := []struct {
+		name     string
+		statuses []corev1.ContainerStatus
+		want     string
+	}{
+		{
+			name:     "dev container runs",
+			statuses: []corev1.ContainerStatus{containerStatus("sidecar", running), containerStatus(DevContainerName, running)},
+			want:     "arm64",
+		},
+		{
+			name:     "dev container failed to start next to a running sidecar",
+			statuses: []corev1.ContainerStatus{containerStatus("sidecar", running), containerStatus(DevContainerName, failed)},
+		},
+		{
+			name:     "dev container waits next to a running sidecar",
+			statuses: []corev1.ContainerStatus{containerStatus("sidecar", running), containerStatus(DevContainerName, waiting)},
+		},
+		{
+			name:     "no status of the dev container",
+			statuses: []corev1.ContainerStatus{containerStatus("sidecar", running)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &fakeCluster{
+				nodes: []corev1.Node{testNode("arm-0", "arm64")},
+				pod: &corev1.Pod{
+					Spec:   corev1.PodSpec{NodeName: "arm-0"},
+					Status: corev1.PodStatus{Phase: corev1.PodRunning, ContainerStatuses: tt.statuses},
+				},
+			}
+			arch, err := cluster.driver(t).runningArchitecture(ctx, "devpod-ws")
+			assert.NilError(t, err)
+			assert.Equal(t, arch, tt.want)
+		})
+	}
+}
+
 // The node selector of a pod that isn't running says where it should run, not where it does.
 func TestArchitectureOfPendingPodIsNotKept(t *testing.T) {
 	ctx := context.Background()
