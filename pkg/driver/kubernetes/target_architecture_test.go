@@ -54,10 +54,18 @@ func labeled(key, value string) nodeOption {
 func nodesDriver(t *testing.T, nodes ...corev1.Node) (*KubernetesDriver, func() []string) {
 	t.Helper()
 	return fakeDriver(t, func(method, path string) (int, any) {
-		if method == http.MethodGet && path == nodesPath {
+		if method != http.MethodGet {
+			return http.StatusMethodNotAllowed, nil
+		}
+		if path == nodesPath {
 			return http.StatusOK, corev1.NodeList{Items: nodes}
 		}
-		return http.StatusNotFound, nil
+		for _, node := range nodes {
+			if path == nodesPath+"/"+node.Name {
+				return http.StatusOK, node
+			}
+		}
+		return http.StatusNotFound, kerrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, strings.TrimPrefix(path, nodesPath+"/")).ErrStatus
 	})
 }
 
@@ -132,6 +140,19 @@ func TestTargetArchitecture(t *testing.T) {
             values: ["true"]
 `,
 			want: "amd64",
+		},
+		{
+			// the scheduler doesn't check taints or cordoning for a pod that names its node
+			name:     "uses the architecture of the node the pod template names",
+			nodes:    []corev1.Node{testNode("system-0", "arm64", tainted(criticalAddonsOnly), cordoned), workspace},
+			template: "spec:\n  nodeName: system-0\n",
+			want:     "arm64",
+		},
+		{
+			name:     "node the pod template names doesn't exist",
+			nodes:    []corev1.Node{workspace},
+			template: "spec:\n  nodeName: gone-0\n",
+			wantErr:  "get node 'gone-0' of the pod template",
 		},
 		{
 			name:         "uses the node selector's architecture",
@@ -239,6 +260,30 @@ func TestPodArchitecture(t *testing.T) {
 
 func TestMatchesRequiredNodeAffinity(t *testing.T) {
 	node := testNode("workspace-0", "amd64", labeled("cpus", "16"))
+	// node names may be longer than the 63 characters a label value may have
+	longName := "workspace-" + strings.Repeat("a", 70)
+	longNode := testNode(longName, "amd64")
+	nameField := func(op corev1.NodeSelectorOperator, names ...string) *corev1.Affinity {
+		return &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+				MatchFields: []corev1.NodeSelectorRequirement{{Key: "metadata.name", Operator: op, Values: names}},
+			}}},
+		}}
+	}
+	for _, tt := range []struct {
+		name     string
+		affinity *corev1.Affinity
+		want     bool
+	}{
+		{name: "In with a long node name", affinity: nameField(corev1.NodeSelectorOpIn, longName), want: true},
+		{name: "NotIn with a long node name", affinity: nameField(corev1.NodeSelectorOpNotIn, longName)},
+		{name: "NotIn another node", affinity: nameField(corev1.NodeSelectorOpNotIn, "other"), want: true},
+		{name: "unsupported operator", affinity: nameField(corev1.NodeSelectorOpExists)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, matchesRequiredNodeAffinity(&longNode, tt.affinity), tt.want)
+		})
+	}
 	required := func(terms ...corev1.NodeSelectorTerm) *corev1.Affinity {
 		return &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{NodeSelectorTerms: terms},

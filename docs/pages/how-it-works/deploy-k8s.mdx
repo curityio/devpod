@@ -84,7 +84,8 @@ devpod provider set-options kubernetes -o CREATE_NAMESPACE=false -o KUBERNETES_N
 
 DevPod builds the workspace's image for the architecture of the nodes its pod can be scheduled on: nodes that are
 ready and not cordoned, match the pod's node selector (`NODE_SELECTOR` and the `POD_MANIFEST_TEMPLATE`'s) and
-required node affinity, and have no `NoSchedule` or `NoExecute` taint the pod doesn't tolerate. It then pins the pod
+required node affinity, and have no `NoSchedule` or `NoExecute` taint the pod doesn't tolerate. If the pod template
+names a node with `spec.nodeName`, it's that node's architecture. It then pins the pod
 to that architecture with a `kubernetes.io/arch` node selector. If those nodes have different architectures, or you
 can't list the cluster's nodes, choose one, either with `ARCHITECTURE` or with a node selector, which also restricts
 the nodes:

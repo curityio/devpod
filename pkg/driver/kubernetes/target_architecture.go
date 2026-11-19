@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -69,15 +70,21 @@ func (k *KubernetesDriver) podArchitecture(ctx context.Context, pod *corev1.Pod,
 }
 
 // schedulableArchitecture returns the architecture of the nodes that the pod, with the given node selector, can be
-// scheduled on, or "" if there are none. It fails if those nodes have different architectures.
+// scheduled on, or "" if there are none. It fails if those nodes have different architectures. A pod template that
+// names its node with spec.nodeName bypasses the scheduler, so then it's that node's architecture.
 func (k *KubernetesDriver) schedulableArchitecture(ctx context.Context, pod *corev1.Pod, nodeSelector map[string]string) (string, error) {
-	nodes, err := k.client.Client().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		if kerrors.IsForbidden(err) {
-			return "", fmt.Errorf("you don't have permission to list nodes in the Kubernetes cluster, please set the cluster architecture manually with the ARCHITECTURE provider option")
+	if pod.Spec.NodeName != "" {
+		node, err := k.client.Client().CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+		if err != nil {
+			return "", nodesError(fmt.Sprintf("get node '%s' of the pod template", pod.Spec.NodeName), err)
 		}
 
-		return "", fmt.Errorf("list nodes: %w", err)
+		return node.Status.NodeInfo.Architecture, nil
+	}
+
+	nodes, err := k.client.Client().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", nodesError("list nodes", err)
 	}
 
 	nodesByArch := map[string][]string{}
@@ -106,6 +113,14 @@ func (k *KubernetesDriver) schedulableArchitecture(ctx context.Context, pod *cor
 	}
 
 	return "", nil
+}
+
+func nodesError(action string, err error) error {
+	if kerrors.IsForbidden(err) {
+		return fmt.Errorf("you don't have permission to read nodes in the Kubernetes cluster, please set the cluster architecture manually with the ARCHITECTURE provider option")
+	}
+
+	return fmt.Errorf("%s: %w", action, err)
 }
 
 // unschedulableReason returns why the pod, with the given node selector, can't be scheduled on the node, or "" if it
@@ -170,7 +185,7 @@ func matchesRequiredNodeAffinity(node *corev1.Node, affinity *corev1.Affinity) b
 			continue
 		}
 		if nodeSelectorRequirementsMatch(term.MatchExpressions, labels.Set(node.Labels)) &&
-			nodeSelectorRequirementsMatch(term.MatchFields, labels.Set{"metadata.name": node.Name}) {
+			nodeFieldRequirementsMatch(term.MatchFields, node) {
 			return true
 		}
 	}
@@ -195,6 +210,34 @@ func nodeSelectorRequirementsMatch(requirements []corev1.NodeSelectorRequirement
 		}
 		requirement, err := labels.NewRequirement(r.Key, op, r.Values)
 		if err != nil || !requirement.Matches(set) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// nodeFieldRequirementsMatch matches the node's fields against a node selector term's matchFields, which Kubernetes
+// only allows for metadata.name with the In and NotIn operators. Unlike label values, a node name may be longer than
+// 63 characters, so they are compared as they are.
+func nodeFieldRequirementsMatch(requirements []corev1.NodeSelectorRequirement, node *corev1.Node) bool {
+	for _, r := range requirements {
+		if r.Key != "metadata.name" {
+			return false
+		}
+
+		switch r.Operator {
+		case corev1.NodeSelectorOpIn:
+			if !slices.Contains(r.Values, node.Name) {
+				return false
+			}
+		case corev1.NodeSelectorOpNotIn:
+			if slices.Contains(r.Values, node.Name) {
+				return false
+			}
+		case corev1.NodeSelectorOpExists, corev1.NodeSelectorOpDoesNotExist, corev1.NodeSelectorOpGt, corev1.NodeSelectorOpLt:
+			return false
+		default:
 			return false
 		}
 	}

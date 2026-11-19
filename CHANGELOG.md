@@ -24,7 +24,8 @@ Add new entries to the top of the "Unreleased" section.
 - Without the `ARCHITECTURE` option, the kubernetes provider works out the architecture to build for from the nodes
   the workspace pod can be scheduled on, instead of every node in the cluster. It skips nodes that are cordoned, not
   ready, don't match the pod's node selector (`NODE_SELECTOR` and the pod template's) or required node affinity, or
-  have a `NoSchedule` or `NoExecute` taint the pod doesn't tolerate, such as a tainted system node pool. A cluster with
+  have a `NoSchedule` or `NoExecute` taint the pod doesn't tolerate, such as a tainted system node pool, and uses the
+  node a pod template names with `spec.nodeName`. A cluster with
   arm64 system nodes and amd64 workspace nodes no longer fails with "mixed architectures in the Kubernetes cluster".
 - The workspace pod gets a `kubernetes.io/arch` node selector for the architecture of the `ARCHITECTURE` option or
   the one DevPod found, so that it isn't scheduled on a node of another architecture than its image. A
